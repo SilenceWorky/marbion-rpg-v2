@@ -2,6 +2,9 @@ import {
   getProfile
 } from "../core/database.js";
 
+import {
+  getXpNeeded
+} from "../systems/progression.js";
 
 export async function profileRoute(
   request,
@@ -59,7 +62,13 @@ export async function profileRoute(
       : "Não despertado";
 
 
+  const xpNeeded =
+    getXpNeeded(
+      profile.level
+    );
+
+
   return new Response(
-    `@${user} | Raça: ${profile.race} | Elemento: ${elements} | Nível: ${profile.level} | XP: ${profile.xp}`
+    `@${user} | Raça: ${profile.race} | Elemento: ${elements} | Nível: ${profile.level} | XP: ${profile.xp}/${xpNeeded}`
   );
 }

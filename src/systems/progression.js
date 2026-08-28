@@ -2,10 +2,18 @@ export function getXpNeeded(level) {
   const safeLevel =
     Math.max(
       1,
-      Number(level) || 1
+      Math.floor(
+        Number(level) || 1
+      )
     );
 
-  return safeLevel * 100;
+  return Math.round(
+    200 *
+    Math.pow(
+      safeLevel,
+      1.18
+    )
+  );
 }
 
 
