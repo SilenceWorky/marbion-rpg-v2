@@ -165,6 +165,12 @@ export async function statusRoute(
       result.error ===
       "NOT_ENOUGH_POINTS"
     ) {
+      if (result.available === 0) {
+        return new Response(
+          `@${user}, você não possui nenhum ponto de status disponível para gastar.`
+        );
+      }
+
       return new Response(
         `@${user}, você possui apenas ${result.available} ponto(s) de status.`
       );
