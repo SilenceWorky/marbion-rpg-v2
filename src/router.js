@@ -3,7 +3,7 @@ import { raceRoute } from "./routes/race.js";
 import { elementRoute } from "./routes/element.js";
 import { profileRoute } from "./routes/profile.js";
 import { statusRoute } from "./routes/status.js";
-
+import { dailyRoute } from "./routes/daily.js";
 
 
 
@@ -39,6 +39,13 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/status") {
     return statusRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/daily") {
+    return dailyRoute(
       request,
       env
     );
