@@ -3,6 +3,7 @@ const STAT_ALIASES = {
   strength: "strength",
 
   forcamagica: "magicStrength",
+  magia: "magicStrength",
   magicstrength: "magicStrength",
 
   velocidade: "speed",
