@@ -69,12 +69,15 @@ export async function statusRoute(
   const stat =
     url.searchParams.get("stat");
 
+  const isQuery =
+    !stat ||
+    stat.toLowerCase() === "consulta";
 
   /*
    * Sem atributo:
    * apenas consulta o status.
    */
-  if (!stat) {
+  if (isQuery) {
     const profile =
       await getProfile(
         env,
