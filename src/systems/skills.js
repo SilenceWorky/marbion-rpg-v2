@@ -1,3 +1,29 @@
+export const BASIC_PUNCH_SKILL = {
+  id: "Universais:Soco",
+
+  group: "Universais",
+  key: "Soco",
+
+  nome: "Soco",
+
+  tipo: "Fisica",
+  raridade: "Basica",
+  elemento: "Universal",
+
+  custoMentalidade: 0,
+  cooldown: 0,
+
+  escala: "strength",
+
+  dano: 12,
+  precisao: 95,
+  prioridade: 0,
+
+  efeito:
+    "Um soco simples que qualquer personagem pode executar."
+};
+
+
 function normalizeText(value) {
   return String(value ?? "")
     .normalize("NFD")
@@ -74,6 +100,15 @@ export function ensureSkillLoadout(
     )
   ) {
     profile.skills = [];
+  }
+
+
+  if (
+    !profile.skillMeta ||
+    typeof profile.skillMeta !== "object" ||
+    Array.isArray(profile.skillMeta)
+  ) {
+    profile.skillMeta = {};
   }
 
 
@@ -169,18 +204,28 @@ export function getEquippedSkills(
 
   return profile.equippedSkills
     .map(
-      (skillId, index) => ({
-        slot:
-          index + 1,
-
-        skillId:
-          skillId || null,
-
-        skill:
+      (skillId, index) => {
+        const equippedSkill =
           skillId
             ? byId.get(skillId) || null
-            : null
-      })
+            : null;
+
+
+        return {
+          slot:
+            index + 1,
+
+          skillId:
+            skillId || null,
+
+          skill:
+            equippedSkill ||
+            BASIC_PUNCH_SKILL,
+
+          fallback:
+            !equippedSkill
+        };
+      }
     );
 }
 

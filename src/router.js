@@ -5,7 +5,7 @@ import { profileRoute } from "./routes/profile.js";
 import { statusRoute } from "./routes/status.js";
 import { dailyRoute } from "./routes/daily.js";
 import { skillsRoute } from "./routes/skills.js";
-
+import { adminRoute } from "./routes/admin.js";
 
 
 
@@ -55,6 +55,13 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/habilidades") {
     return skillsRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/adm") {
+    return adminRoute(
       request,
       env
     );

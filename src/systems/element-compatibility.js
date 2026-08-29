@@ -451,6 +451,21 @@ export function canLearnSkillFromScroll(
       skillElement
     );
 
+    /*
+    * NEUTRO
+    *
+    * Pode aprender por pergaminho
+    * habilidades de qualquer elemento.
+    */
+    if (
+    isNativeElement(
+        profile,
+        "Neutro"
+    )
+    ) {
+    return true;
+    }
+
 
   if (
     target === "universal"

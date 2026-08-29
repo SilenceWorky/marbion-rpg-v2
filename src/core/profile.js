@@ -41,12 +41,16 @@ export function createBaseProfile(user) {
     // SKILLS
     skills: [],
 
+    skillMeta: {},
+
     equippedSkills: [
       null,
       null,
       null,
       null
     ],
+
+    skillCooldowns: {},
 
     skillCooldowns: {},
 

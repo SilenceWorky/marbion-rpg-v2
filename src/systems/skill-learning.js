@@ -25,8 +25,14 @@ function hasSkill(
 
 function addSkill(
   profile,
-  skill
+  skill,
+  metadata = {}
 ) {
+  ensureSkillLoadout(
+    profile
+  );
+
+
   if (
     hasSkill(
       profile,
@@ -46,14 +52,76 @@ function addSkill(
   );
 
 
+  profile.skillMeta[
+    skill.id
+  ] = {
+    source:
+      metadata.source ||
+      "unknown",
+
+    temporary:
+      metadata.temporary === true,
+
+    ...(metadata.usesRemaining !== undefined
+      ? {
+          usesRemaining:
+            metadata.usesRemaining
+        }
+      : {})
+  };
+
+
   return {
     ok: true,
+
     skill,
+
+    metadata:
+      profile.skillMeta[
+        skill.id
+      ],
+
     skills:
       [...profile.skills]
   };
 }
 
+function normalizeElement(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+
+function isNeutralCharacter(
+  profile
+) {
+  return (
+    Array.isArray(profile?.elements) &&
+    profile.elements.some(
+      element =>
+        normalizeElement(element) ===
+        "neutro"
+    )
+  );
+}
+
+
+function isPermanentForNeutral(
+  skill
+) {
+  const element =
+    normalizeElement(
+      skill?.elemento
+    );
+
+  return (
+    element === "neutro" ||
+    element === "universal"
+  );
+}
 
 /*
  * APRENDIZADO POR LEVEL
@@ -125,8 +193,12 @@ export function learnSkillByLevel(
 
   return addSkill(
     profile,
-    skill
-  );
+    skill,
+    {
+        source: "level",
+        temporary: false
+    }
+    );
 }
 
 
@@ -189,10 +261,29 @@ export function learnSkillFromScroll(
   }
 
 
-  return addSkill(
+  const temporaryNeutralSkill =
+    isNeutralCharacter(
+        profile
+    ) &&
+    !isPermanentForNeutral(
+        skill
+    );
+
+
+    return addSkill(
     profile,
-    skill
-  );
+    skill,
+    temporaryNeutralSkill
+        ? {
+            source: "scroll",
+            temporary: true,
+            usesRemaining: 1
+        }
+        : {
+            source: "scroll",
+            temporary: false
+        }
+    );
 }
 
 
