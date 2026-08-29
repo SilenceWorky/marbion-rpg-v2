@@ -1,6 +1,11 @@
 import {
-  getProfile
+  getProfile,
+  saveProfile
 } from "../core/database.js";
+
+import {
+  consumeSkillUse
+} from "../systems/skill-usage.js";
 
 import {
   fetchJson
@@ -15,6 +20,10 @@ import {
   ensureSkillLoadout,
   flattenSkills
 } from "../systems/skills.js";
+
+import {
+  resolveOffensiveSkill
+} from "../systems/combat.js";
 
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
@@ -100,6 +109,77 @@ function getSkillPriority(
   ) || 0;
 }
 
+function executeOffensiveAction(
+  attacker,
+  defender,
+  action
+) {
+  const result =
+    resolveOffensiveSkill(
+      attacker,
+      defender,
+      action.skill
+    );
+
+
+  if (!result.hit) {
+    return {
+      attacker:
+        attacker.user,
+
+      defender:
+        defender.user,
+
+      skill:
+        action.skill.nome,
+
+      hit:
+        false,
+
+      hitChance:
+        result.hitChance,
+
+      damage:
+        0,
+
+      defenderHp:
+        defender.hp
+    };
+  }
+
+
+  defender.hp =
+    Math.max(
+      0,
+      defender.hp -
+      result.damage
+    );
+
+
+  return {
+    attacker:
+      attacker.user,
+
+    defender:
+      defender.user,
+
+    skill:
+      action.skill.nome,
+
+    hit:
+      true,
+
+    hitChance:
+      result.hitChance,
+
+    damage:
+      result.damage,
+
+    defenderHp:
+      defender.hp
+  };
+}
+
 export class PvpCoordinator {
   constructor(
     state,
@@ -177,6 +257,158 @@ export class PvpCoordinator {
     );
   }
 
+    async ensurePlayerSnapshot(
+        player
+    ) {
+    const requiredStats = [
+        "strength",
+        "magicStrength",
+        "speed",
+        "evasion",
+        "accuracy",
+        "defense"
+    ];
+
+
+    const needsProfile =
+        !Array.isArray(
+        player.loadout
+        ) ||
+        requiredStats.some(
+        stat =>
+            !Number.isFinite(
+            Number(
+                player[stat]
+            )
+            )
+        );
+
+
+    if (!needsProfile) {
+        return true;
+    }
+
+
+    const profile =
+        await getProfile(
+        this.env,
+        player.user
+        );
+
+
+    if (!profile) {
+        return false;
+    }
+
+
+    if (
+        !Array.isArray(
+        player.loadout
+        )
+    ) {
+        player.loadout =
+        snapshotLoadout(
+            profile
+        );
+    }
+
+
+    for (
+        const stat
+        of requiredStats
+    ) {
+        if (
+        !Number.isFinite(
+            Number(
+            player[stat]
+            )
+        )
+        ) {
+        player[stat] =
+            Number(
+            profile[stat]
+            ) || 0;
+        }
+    }
+
+
+    return true;
+    }
+
+
+    async consumeExecutedSkill(
+    player,
+    action
+    ) {
+    /*
+    * Soco é virtual.
+    */
+    if (
+        !action?.skillId
+    ) {
+        return {
+        consumed: false,
+        removed: false
+        };
+    }
+
+
+    const profile =
+        await getProfile(
+        this.env,
+        player.user
+        );
+
+
+    if (!profile) {
+        return {
+        consumed: false,
+        removed: false
+        };
+    }
+
+
+    const result =
+        consumeSkillUse(
+        profile,
+        action.skillId
+        );
+
+
+    if (
+        result.ok &&
+        result.consumed
+    ) {
+        await saveProfile(
+        this.env,
+        player.user,
+        profile
+        );
+    }
+
+
+    /*
+    * Se era uma habilidade temporária
+    * do Neutro e acabou, o slot dentro
+    * da batalha também vira Soco.
+    */
+    if (
+        result.ok &&
+        result.removed
+    ) {
+        player.loadout =
+        player.loadout.map(
+            skillId =>
+            skillId ===
+            action.skillId
+                ? null
+                : skillId
+        );
+    }
+
+
+    return result;
+    }
 
   async createChallenge(
     challenger,
@@ -469,33 +701,48 @@ export class PvpCoordinator {
       state:
         "WAITING_ACTIONS",
 
-      player1: {
+     player1: {
         user:
-          challenge.challenger,
+            challenge.challenger,
 
         hp:
-          challengerProfile.maxHp,
+            challengerProfile.maxHp,
 
         maxHp:
-          challengerProfile.maxHp,
+            challengerProfile.maxHp,
 
         mentalidade:
-          challengerProfile.maxMentalidade,
+            challengerProfile.maxMentalidade,
 
         maxMentalidade:
-          challengerProfile.maxMentalidade,
+            challengerProfile.maxMentalidade,
+
+        strength:
+            challengerProfile.strength,
+
+        magicStrength:
+            challengerProfile.magicStrength,
 
         speed:
             challengerProfile.speed,
 
+        evasion:
+            challengerProfile.evasion,
+
+        accuracy:
+            challengerProfile.accuracy,
+
+        defense:
+            challengerProfile.defense,
+
         loadout:
             snapshotLoadout(
-                challengerProfile
+            challengerProfile
             ),
 
         action:
-          null
-      },
+            null
+        },
 
     player2: {
     user:
@@ -513,8 +760,23 @@ export class PvpCoordinator {
     maxMentalidade:
         targetProfile.maxMentalidade,
 
+    strength:
+        targetProfile.strength,
+
+    magicStrength:
+        targetProfile.magicStrength,
+
     speed:
         targetProfile.speed,
+
+    evasion:
+        targetProfile.evasion,
+
+    accuracy:
+        targetProfile.accuracy,
+
+    defense:
+        targetProfile.defense,
 
     loadout:
         snapshotLoadout(
@@ -629,57 +891,25 @@ export class PvpCoordinator {
     * Compatibilidade com batalhas
     * criadas antes desta atualização.
     */
-    if (
-        !Array.isArray(
-        player.loadout
-        )
-    ) {
-        const profile =
-        await getProfile(
-            this.env,
-            player.user
-        );
+    const playerReady =
+    await this.ensurePlayerSnapshot(
+        player
+    );
 
-
-        if (!profile) {
-        return {
-            ok: false,
-            error: "PLAYER_NOT_FOUND"
-        };
-        }
-
-
-        player.loadout =
-        snapshotLoadout(
-            profile
-        );
-    }
+    const opponentReady =
+    await this.ensurePlayerSnapshot(
+        opponent
+    );
 
 
     if (
-        !Array.isArray(
-        opponent.loadout
-        )
+    !playerReady ||
+    !opponentReady
     ) {
-        const profile =
-        await getProfile(
-            this.env,
-            opponent.user
-        );
-
-
-        if (!profile) {
-        return {
-            ok: false,
-            error: "PLAYER_NOT_FOUND"
-        };
-        }
-
-
-        opponent.loadout =
-        snapshotLoadout(
-            profile
-        );
+    return {
+        ok: false,
+        error: "PLAYER_NOT_FOUND"
+    };
     }
 
 
@@ -946,102 +1176,229 @@ export class PvpCoordinator {
     }
 
 
+    const currentTurn =
+    battle.turn;
+
+    const player1Slot =
+    battle.player1.action.slot;
+
+    const player2Slot =
+    battle.player2.action.slot;
+
+
     /*
-    * Por enquanto NÃO causamos dano.
-    *
-    * Só confirmamos:
-    * - escolha secreta;
-    * - revelação;
-    * - prioridade;
-    * - velocidade;
-    * - ordem correta.
+    * ==============================
+    * PRIMEIRO ATAQUE
+    * ==============================
     */
 
+    const firstExecution =
+    executeOffensiveAction(
+        first.player,
+        second.player,
+        first.action
+    );
 
-    const result = {
-        ok: true,
 
-        waiting:
-        false,
+    /*
+    * A habilidade foi EXECUTADA.
+    *
+    * Se for temporária do Neutro,
+    * o uso é consumido mesmo que erre.
+    */
+    await this.consumeExecutedSkill(
+    first.player,
+    first.action
+    );
 
-        turn:
-        battle.turn,
 
+    let secondExecution =
+    null;
+
+    let battleOver =
+    false;
+
+    let winner =
+    null;
+
+    let loser =
+    null;
+
+
+    /*
+    * Se o primeiro ataque matou,
+    * o segundo jogador não executa.
+    */
+    if (
+    second.player.hp <= 0
+    ) {
+    battleOver =
+        true;
+
+    winner =
+        first.player.user;
+
+    loser =
+        second.player.user;
+    }
+
+    else {
+    /*
+    * ==============================
+    * SEGUNDO ATAQUE
+    * ==============================
+    */
+
+    secondExecution =
+        executeOffensiveAction(
+        second.player,
+        first.player,
+        second.action
+        );
+
+
+    await this.consumeExecutedSkill(
+        second.player,
+        second.action
+    );
+
+
+    if (
+        first.player.hp <= 0
+    ) {
+        battleOver =
+        true;
+
+        winner =
+        second.player.user;
+
+        loser =
+        first.player.user;
+    }
+    }
+
+
+    /*
+    * As escolhas deste turno
+    * sempre são apagadas.
+    */
+    battle.player1.action =
+    null;
+
+    battle.player2.action =
+    null;
+
+
+    /*
+    * ==============================
+    * FIM DA BATALHA
+    * ==============================
+    */
+    if (battleOver) {
+    battle.status =
+        "FINISHED";
+
+    battle.state =
+        "FINISHED";
+
+    battle.winner =
+        winner;
+
+    battle.loser =
+        loser;
+
+    battle.finishedAt =
+        Date.now();
+    }
+
+
+    /*
+    * ==============================
+    * PRÓXIMO TURNO
+    * ==============================
+    */
+    else {
+    battle.turn += 1;
+
+    battle.state =
+        "WAITING_ACTIONS";
+    }
+
+
+    await this.saveData(
+    data
+    );
+
+
+    return {
+    ok: true,
+
+    waiting: false,
+
+    turn:
+        currentTurn,
+
+    player1: {
+        user:
+        battle.player1.user,
+
+        slot:
+        player1Slot,
+
+        skill:
+        player1Action.skill.nome
+    },
+
+    player2: {
+        user:
+        battle.player2.user,
+
+        slot:
+        player2Slot,
+
+        skill:
+        player2Action.skill.nome
+    },
+
+    firstExecution,
+
+    secondExecution,
+
+    hp: {
         player1: {
         user:
             battle.player1.user,
 
-        slot:
-            battle.player1.action.slot,
+        current:
+            battle.player1.hp,
 
-        skill:
-            player1Action.skill.nome,
-
-        priority:
-            priority1,
-
-        speed:
-            battle.player1.speed
+        max:
+            battle.player1.maxHp
         },
 
         player2: {
         user:
             battle.player2.user,
 
-        slot:
-            battle.player2.action.slot,
+        current:
+            battle.player2.hp,
 
-        skill:
-            player2Action.skill.nome,
-
-        priority:
-            priority2,
-
-        speed:
-            battle.player2.speed
-        },
-
-        first: {
-        user:
-            first.player.user,
-
-        skill:
-            first.action.skill.nome
-        },
-
-        second: {
-        user:
-            second.player.user,
-
-        skill:
-            second.action.skill.nome
+        max:
+            battle.player2.maxHp
         }
+    },
+
+    battleOver,
+
+    winner,
+
+    loser,
+
+    nextTurn:
+        battleOver
+        ? null
+        : battle.turn
     };
-
-
-    /*
-    * Como ainda não existe dano,
-    * já avançamos para o turno seguinte.
-    */
-
-    battle.player1.action =
-        null;
-
-    battle.player2.action =
-        null;
-
-    battle.turn += 1;
-
-    battle.state =
-        "WAITING_ACTIONS";
-
-
-    await this.saveData(
-        data
-    );
-
-
-    return result;
     }
 
   async fetch(

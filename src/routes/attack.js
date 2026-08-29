@@ -157,7 +157,82 @@ export async function attackRoute(
    * Agora podemos revelar
    * as habilidades.
    */
-  return new Response(
-    `⚔️ Turno ${result.turn} | @${result.player1.user}: habilidade ${result.player1.slot} → ${result.player1.skill} | @${result.player2.user}: habilidade ${result.player2.slot} → ${result.player2.skill} | @${result.first.user} agirá primeiro com ${result.first.skill}.`
-  );
+    function formatExecution(
+    execution,
+    hpData
+    ) {
+    if (!execution) {
+        return "";
+    }
+
+
+    if (!execution.hit) {
+        return (
+        `@${execution.attacker} usou ${execution.skill}, ` +
+        `mas errou.`
+        );
+    }
+
+
+    const defenderHp =
+        hpData.player1.user ===
+        execution.defender
+        ? hpData.player1
+        : hpData.player2;
+
+
+    return (
+        `@${execution.attacker} usou ${execution.skill} ` +
+        `e causou ${execution.damage} de dano em ` +
+        `@${execution.defender}. ` +
+        `HP: ${defenderHp.current}/${defenderHp.max}.`
+    );
+    }
+
+
+    const firstText =
+    formatExecution(
+        result.firstExecution,
+        result.hp
+    );
+
+    const secondText =
+    formatExecution(
+        result.secondExecution,
+        result.hp
+    );
+
+
+    let message =
+    `⚔️ Turno ${result.turn} | ` +
+    `@${result.player1.user}: ${result.player1.skill} | ` +
+    `@${result.player2.user}: ${result.player2.skill} | ` +
+    firstText;
+
+
+    if (secondText) {
+    message +=
+        ` ${secondText}`;
+    }
+
+
+    if (
+    result.battleOver
+    ) {
+    message +=
+        ` 🏆 @${result.winner} venceu o PvP!`;
+
+    return new Response(
+        message
+    );
+    }
+
+
+    message +=
+    ` | Turno ${result.nextTurn} iniciado.`;
+
+
+    return new Response(
+    message
+    );
 }

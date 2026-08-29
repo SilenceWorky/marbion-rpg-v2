@@ -52,8 +52,6 @@ export function createBaseProfile(user) {
 
     skillCooldowns: {},
 
-    skillCooldowns: {},
-
     // ARMAS
     weapon: null,
     weapons: {},
