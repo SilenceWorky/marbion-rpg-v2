@@ -95,6 +95,29 @@ export function createBaseProfile(user) {
       streak: 0,
       bestStreak: 0,
 
+      /*
+      * Sistema ranqueado.
+      *
+      * "rating" é mostrado para
+      * o jogador como XP de Combate.
+      */
+      rating: 1000,
+      peakRating: 1000,
+
+      rank: "Prata III",
+
+      /*
+      * null = não é Prodígio.
+      *
+      * 1 até 7 representa sua
+      * posição entre os Prodígios.
+      */
+      prodigyPosition: null,
+
+      /*
+      * Campo antigo.
+      * Mantido por compatibilidade.
+      */
       points: 0
     },
 

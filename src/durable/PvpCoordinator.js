@@ -1,4 +1,8 @@
 import {
+  applyRankedResult
+} from "../systems/pvp-ranking.js";
+
+import {
   getProfile,
   saveProfile
 } from "../core/database.js";
@@ -408,6 +412,78 @@ export class PvpCoordinator {
 
 
     return result;
+    }
+
+    async applyRankedBattleResult(
+    winnerUser,
+    loserUser
+    ) {
+    const [
+        winnerProfile,
+        loserProfile
+    ] =
+        await Promise.all([
+        getProfile(
+            this.env,
+            winnerUser
+        ),
+
+        getProfile(
+            this.env,
+            loserUser
+        )
+        ]);
+
+
+    if (
+        !winnerProfile ||
+        !loserProfile
+    ) {
+        return {
+        ok: false,
+        error:
+            "RANKED_PROFILE_NOT_FOUND"
+        };
+    }
+
+
+    const result =
+        applyRankedResult(
+        winnerProfile,
+        loserProfile
+        );
+
+
+    const now =
+        Date.now();
+
+
+    winnerProfile.lastCombat =
+        now;
+
+    loserProfile.lastCombat =
+        now;
+
+
+    await Promise.all([
+        saveProfile(
+        this.env,
+        winnerUser,
+        winnerProfile
+        ),
+
+        saveProfile(
+        this.env,
+        loserUser,
+        loserProfile
+        )
+    ]);
+
+
+    return {
+        ok: true,
+        ...result
+    };
     }
 
   async createChallenge(
@@ -1224,6 +1300,9 @@ export class PvpCoordinator {
     let loser =
     null;
 
+    let rankedResult =
+    null;
+
 
     /*
     * Se o primeiro ataque matou,
@@ -1295,6 +1374,19 @@ export class PvpCoordinator {
     * ==============================
     */
     if (battleOver) {
+    /*
+    * Resultado ranqueado.
+    *
+    * Isso altera somente o
+    * XP de Combate/PvP.
+    */
+    rankedResult =
+        await this.applyRankedBattleResult(
+        winner,
+        loser
+        );
+
+
     battle.status =
         "FINISHED";
 
@@ -1307,10 +1399,12 @@ export class PvpCoordinator {
     battle.loser =
         loser;
 
+    battle.rankedResult =
+        rankedResult;
+
     battle.finishedAt =
         Date.now();
     }
-
 
     /*
     * ==============================
@@ -1387,17 +1481,19 @@ export class PvpCoordinator {
             battle.player2.maxHp
         }
     },
+    
+        battleOver,
 
-    battleOver,
+        winner,
 
-    winner,
+        loser,
 
-    loser,
+        rankedResult,
 
-    nextTurn:
+        nextTurn:
         battleOver
-        ? null
-        : battle.turn
+            ? null
+            : battle.turn
     };
     }
 

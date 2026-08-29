@@ -222,6 +222,29 @@ export async function attackRoute(
     message +=
         ` 🏆 @${result.winner} venceu o PvP!`;
 
+
+    const ranked =
+        result.rankedResult;
+
+
+    if (
+        ranked?.ok
+    ) {
+        message +=
+        ` | XP de Combate: ` +
+        `@${result.winner} +${ranked.change} → ${ranked.winner.after} ` +
+        `[${ranked.winner.rank}] | ` +
+        `@${result.loser} -${ranked.change} → ${ranked.loser.after} ` +
+        `[${ranked.loser.rank}] | ` +
+        `Sequência: ${ranked.winner.streak}`;
+    }
+
+    else {
+        message +=
+        ` | ⚠️ O resultado da luta foi salvo, mas o ranking não pôde ser atualizado.`;
+    }
+
+
     return new Response(
         message
     );
