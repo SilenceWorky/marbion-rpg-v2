@@ -342,6 +342,46 @@ export function equipSkill(
   };
 }
 
+export function clearSkillSlot(
+  profile,
+  slot
+) {
+  ensureSkillLoadout(
+    profile
+  );
+
+
+  const normalizedSlot =
+    Number(slot);
+
+
+  if (
+    !Number.isInteger(
+      normalizedSlot
+    ) ||
+    normalizedSlot < 1 ||
+    normalizedSlot > 4
+  ) {
+    return {
+      ok: false,
+      error: "INVALID_SLOT"
+    };
+  }
+
+
+  profile.equippedSkills[
+    normalizedSlot - 1
+  ] = null;
+
+
+  return {
+    ok: true,
+    slot:
+      normalizedSlot,
+    skill:
+      BASIC_PUNCH_SKILL
+  };
+}
 
 export function findSkill(
   skillsData,
