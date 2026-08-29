@@ -40,6 +40,14 @@ export function createBaseProfile(user) {
 
     // SKILLS
     skills: [],
+
+    equippedSkills: [
+      null,
+      null,
+      null,
+      null
+    ],
+
     skillCooldowns: {},
 
     // ARMAS
