@@ -1,12 +1,29 @@
 {
-	"name": "marbion-rpg-v2",
-	"main": "src/index.js",
-	"compatibility_date": "2026-08-25",
-	"kv_namespaces": [
-		{
-			"binding": "MARBION_USERS_V2",
-			"id": "3731c622c6764dbc9025cef56030c23e",
-			"remote": true
-		}
-	]
+  "name": "marbion-rpg-v2",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-25",
+
+  "kv_namespaces": [
+    {
+      "binding": "MARBION_USERS_V2",
+      "id": "3731c622c6764dbc9025cef56030c23e",
+      "remote": true
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PVP_COORDINATOR",
+        "class_name": "PvpCoordinator"
+      }
+    ]
+  },
+
+  "exports": {
+    "PvpCoordinator": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  }
 }

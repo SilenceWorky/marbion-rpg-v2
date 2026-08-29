@@ -8,7 +8,10 @@ import { skillsRoute } from "./routes/skills.js";
 import { adminRoute } from "./routes/admin.js";
 import { slotRoute } from "./routes/slot.js";
 import { slotsRoute } from "./routes/slots.js";
-
+import { pvpTestRoute } from "./routes/pvptest.js";
+import { pvpRoute } from "./routes/pvp.js";
+import { acceptRoute } from "./routes/accept.js";
+import { attackRoute } from "./routes/attack.js";
 
 
 
@@ -80,6 +83,34 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/slots") {
     return slotsRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/pvptest") {
+    return pvpTestRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/pvp") {
+    return pvpRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/aceitar") {
+    return acceptRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/ataque") {
+    return attackRoute(
       request,
       env
     );
