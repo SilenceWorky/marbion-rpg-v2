@@ -12,11 +12,11 @@
 
 - Worker modular Cloudflare ✔️
 - KV central `MARBION_USERS_V2` ✔️
-- Acesso a perfil centralizado por `getProfile()` / `saveProfile()` ✔️
+- acesso a perfil centralizado por `getProfile()` / `saveProfile()` ✔️
 - Durable Object `PVP_COORDINATOR` para estado de batalha ✔️
-- Conteúdo externo em `worky-live-responses` para `racas.json`, `elementos.json` e `skills.json` ✔️
-- `cmdrpg.md` passa a ser mantido no próprio repositório `marbion-rpg-v2` ✔️
-- V1 continua preservada como referência até a V2 ficar completa ✔️
+- conteúdo externo em `worky-live-responses` para `racas.json`, `elementos.json` e `skills.json` ✔️
+- `cmdrpg.md` mantido no próprio repositório `marbion-rpg-v2` ✔️
+- V1 preservada como referência até a V2 ficar completa ✔️
 
 ---
 
@@ -261,7 +261,7 @@ Equipa uma habilidade em um dos 4 slots de batalha.
 
 Status V2: ✔️
 
-A sintaxe é:
+Sintaxe:
 ```txt
 !slot [número do slot] [número da habilidade]
 ```
@@ -269,19 +269,19 @@ A sintaxe é:
 O primeiro número indica **em qual dos 4 slots** a habilidade será equipada.
 O segundo número indica **qual habilidade da sua lista `!habilidades`** será colocada naquele slot.
 
-Exemplos:
+Exemplo:
 ```txt
 !slot 1 2
 ```
-Coloca a **habilidade nº 2** da sua lista no **slot 1**.
+Coloca a **habilidade nº 2** da lista no **slot 1**.
 
-Exemplo prático: se a habilidade nº 2 for **Bola de Fogo**, `!slot 1 2` equipa **Bola de Fogo no slot 1**.
+Se a habilidade nº 2 for **Bola de Fogo**, `!slot 1 2` equipa **Bola de Fogo no slot 1**.
 
 Outro exemplo:
 ```txt
 !slot 1 25
 ```
-Coloca a **habilidade nº 25** da sua lista no **slot 1**.
+Coloca a **habilidade nº 25** da lista no **slot 1**.
 
 Para limpar o slot e voltar ao Soco:
 ```txt
@@ -366,6 +366,45 @@ Regras:
 
 ---
 
+## !meditar
+Recupera Mentalidade como uma ação especial de combate.
+
+Status V2: ✔️ **validado em PvP real**
+
+Regras atuais:
+- recupera 25 de Mentalidade
+- respeita `maxMentalidade`
+- não ocupa nenhum dos 4 slots
+- prioridade: -1
+- normalmente age depois de ataques de prioridade 0
+- se o jogador morrer antes da vez da Meditação, não recupera Mentalidade
+- se morrer antes de agir, o cooldown também não é criado
+- não pode meditar com a Mentalidade já cheia
+- após executar, entra em cooldown por 3 turnos completos
+- se meditar no T4, fica bloqueado no T5, T6 e T7 e volta a estar disponível no T8
+
+Teste real validado:
+```txt
+Mentalidade: 15/50 → Meditação → 40/50
+```
+
+---
+
+## Recuperação genérica de Mentalidade
+Status V2: ✔️ base estrutural
+
+`restoreMentalidade()` pode ser reutilizada futuramente por:
+- poções
+- livros
+- comidas
+- habilidades de suporte
+- equipamentos
+- outros sistemas de recuperação
+
+Regeneração natural por tempo fora de combate: ⏳
+
+---
+
 # ❤️ HP E CURA
 
 ## HP real no PvP
@@ -386,6 +425,51 @@ Status V2: ✔️
 - gasto de Mentalidade ocorre normalmente
 
 Teste real validado com **Maré Regenerativa**.
+
+---
+
+# ⬆️ BUFFS
+
+## Buff de atributo
+Status V2: ✔️ **validado em PvP real**
+
+Funcionamento atual:
+- habilidades `tipo: Buff` agem sobre o próprio usuário
+- o atributo afetado vem de `skill.escala`
+- atributos suportados: Força, Magia, Velocidade, Evasão, Precisão e Defesa
+- força inicial do buff: `custoMentalidade / 5`
+- mínimo +1
+- máximo +10
+- duração base: 2 turnos
+- o bônus é registrado em `player.effects`
+- ao expirar, o valor aplicado é removido do atributo
+- `!estado` pode exibir o efeito enquanto estiver ativo
+
+Teste local validado com **Foco Absoluto**:
+```txt
+Precisão: 90 → 93
+Mentalidade: 50 → 35
+```
+
+Teste real em PvP validado:
+```txt
+Foco Absoluto → +3 de Precisão por 2 turnos
+```
+
+## Expiração de efeitos
+Status V2: ✔️
+
+- `expireBattleEffects()` processa efeitos quando um novo turno começa
+- buff continua ativo durante sua duração
+- ao atingir o turno de expiração, o atributo volta ao valor anterior
+- efeito expirado é removido de `player.effects`
+
+Exemplo validado:
+```txt
+T1: Precisão 90 → 93
+T2: Precisão 93
+T3: Precisão 93 → 90 e efeito removido
+```
 
 ---
 
@@ -428,9 +512,11 @@ Regras:
 ## Ordem das ações
 Status V2: ✔️
 
-1. prioridade da habilidade
+1. prioridade da habilidade/ação
 2. Velocidade
 3. empate total → 50/50 aleatório
+
+A Meditação participa desta mesma ordem com prioridade -1.
 
 ---
 
@@ -730,10 +816,11 @@ Projeto futuro definido:
 
 ## 🌟 PRIORIDADE ATUAL
 
-- Buffs reais em combate ⏳
-- Expiração de buffs por turno ⏳
-- Debuffs reais em combate ⏳
-- Recuperação de Mentalidade / habilidades de Suporte ⏳
+- Buffs reais em combate ✔️
+- Expiração de buffs por turno ✔️
+- Meditação / recuperação de Mentalidade em PvP ✔️
+- Debuffs reais em combate ⏳ **PRÓXIMO**
+- Regeneração natural de Mentalidade fora do combate ⏳
 - Veneno / queimadura / dano por turno ⏳
 - Paralisia / congelamento / controle ⏳
 - Counter ⏳
@@ -750,7 +837,8 @@ Projeto futuro definido:
 - 1503 habilidades cadastradas ✔️
 - Cura real ✔️
 - Mentalidade real ✔️
-- Buff ⏳
+- Buff ✔️
+- Meditação ✔️
 - Debuff ⏳
 - Suporte ⏳
 - DoT ⏳
