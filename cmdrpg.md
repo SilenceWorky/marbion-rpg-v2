@@ -261,10 +261,27 @@ Equipa uma habilidade em um dos 4 slots de batalha.
 
 Status V2: ✔️
 
-Exemplo:
+A sintaxe é:
+```txt
+!slot [número do slot] [número da habilidade]
+```
+
+O primeiro número indica **em qual dos 4 slots** a habilidade será equipada.
+O segundo número indica **qual habilidade da sua lista `!habilidades`** será colocada naquele slot.
+
+Exemplos:
 ```txt
 !slot 1 2
 ```
+Coloca a **habilidade nº 2** da sua lista no **slot 1**.
+
+Exemplo prático: se a habilidade nº 2 for **Bola de Fogo**, `!slot 1 2` equipa **Bola de Fogo no slot 1**.
+
+Outro exemplo:
+```txt
+!slot 1 25
+```
+Coloca a **habilidade nº 25** da sua lista no **slot 1**.
 
 Para limpar o slot e voltar ao Soco:
 ```txt
