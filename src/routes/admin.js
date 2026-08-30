@@ -6,6 +6,7 @@ import {
   adminSetLevel,
   adminSetRace,
   adminSetElements,
+  adminAddStatusPoints,
   adminSkill
 } from "../systems/admin.js";
 
@@ -306,6 +307,65 @@ export async function adminRoute(
     );
   }
 
+  /*
+  * ==========================
+  * PONTOS
+  * ==========================
+  *
+  * !adm pontos @user 10
+  */
+  if (
+    command === "pontos" ||
+    command === "points" ||
+    command === "statuspoints"
+  ) {
+    const target =
+      args[1];
+
+    const amount =
+      args[2];
+
+
+    if (
+      !target ||
+      !amount
+    ) {
+      return new Response(
+        `@${actor}, uso: !adm pontos @usuário quantidade`
+      );
+    }
+
+
+    const result =
+      await adminAddStatusPoints(
+        env,
+        target,
+        amount
+      );
+
+
+    if (!result.ok) {
+      if (
+        result.error ===
+        "INVALID_STATUS_POINTS"
+      ) {
+        return new Response(
+          `@${actor}, informe uma quantidade inteira maior que 0.`
+        );
+      }
+
+
+      return new Response(
+        `@${actor}, não foi possível adicionar Status Points.`
+      );
+    }
+
+
+    return new Response(
+      `✅ ADM | @${result.user} recebeu ${result.added} Status Points. ` +
+      `Total disponível: ${result.statusPoints}.`
+    );
+  }
 
   /*
    * ==========================
@@ -416,7 +476,7 @@ export async function adminRoute(
   }
 
 
-  return new Response(
-    `@${actor}, comando ADM desconhecido. Use level, raça, elemento ou skill.`
-  );
+return new Response(
+  `@${actor}, comando ADM desconhecido. Use level, raça, elemento, pontos ou skill.`
+);
 }

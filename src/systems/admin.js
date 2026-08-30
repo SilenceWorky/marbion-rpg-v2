@@ -369,6 +369,87 @@ export async function adminSetElements(
   };
 }
 
+export async function adminAddStatusPoints(
+  env,
+  user,
+  amount
+) {
+  const targetUser =
+    normalizeUser(
+      user
+    );
+
+
+  const points =
+    Number(
+      amount
+    );
+
+
+  if (!targetUser) {
+    return {
+      ok: false,
+      error:
+        "INVALID_USER"
+    };
+  }
+
+
+  if (
+    !Number.isInteger(
+      points
+    ) ||
+    points < 1
+  ) {
+    return {
+      ok: false,
+      error:
+        "INVALID_STATUS_POINTS"
+    };
+  }
+
+
+  const profile =
+    await getOrCreateProfile(
+      env,
+      targetUser
+    );
+
+
+  const current =
+    Math.max(
+      0,
+      Number(
+        profile.statusPoints
+      ) || 0
+    );
+
+
+  profile.statusPoints =
+    current +
+    points;
+
+
+  await saveProfile(
+    env,
+    targetUser,
+    profile
+  );
+
+
+  return {
+    ok: true,
+
+    user:
+      targetUser,
+
+    added:
+      points,
+
+    statusPoints:
+      profile.statusPoints
+  };
+}
 
 export async function adminSkill(
   env,

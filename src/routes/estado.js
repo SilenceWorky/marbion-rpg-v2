@@ -102,15 +102,38 @@ function formatBattleEffect(
         effect.amount
       );
 
-
-    const signal =
-      amount >= 0
-        ? "+"
-        : "";
+  let displayedAmount =
+    amount;
 
 
-    text =
-      `${statName} ${signal}${amount}`;
+  if (
+    type === "debuff"
+  ) {
+    displayedAmount =
+      -Math.abs(
+        amount
+      );
+  }
+
+  else if (
+    type === "buff"
+  ) {
+    displayedAmount =
+      Math.abs(
+        amount
+      );
+  }
+
+
+  const signal =
+    displayedAmount >= 0
+      ? "+"
+      : "";
+
+
+  text =
+    `${statName} ${signal}${displayedAmount}`;
+  
   }
 
 

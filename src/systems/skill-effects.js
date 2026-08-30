@@ -282,6 +282,227 @@ export function executeBuffSkill(
   };
 }
 
+const DEBUFFABLE_STATS =
+  new Set([
+    "strength",
+    "magicStrength",
+    "speed",
+    "evasion",
+    "accuracy",
+    "defense"
+  ]);
+
+
+export function calculateDebuffAmount(
+  skill
+) {
+  const cost =
+    Math.max(
+      0,
+      getNumber(
+        skill?.custoMentalidade
+      )
+    );
+
+
+  /*
+   * Mesma escala inicial do Buff:
+   *
+   * cada 5 de Mentalidade
+   * = -1 no atributo.
+   *
+   * mínimo: 1
+   * máximo: 10
+   */
+  return Math.min(
+    10,
+    Math.max(
+      1,
+      Math.round(
+        cost / 5
+      )
+    )
+  );
+}
+
+
+export function applyDebuffSkill(
+  target,
+  skill,
+  currentTurn
+) {
+  const stat =
+    String(
+      skill?.debuffStat ?? ""
+    ).trim();
+
+
+  if (
+    !DEBUFFABLE_STATS.has(
+      stat
+    )
+  ) {
+    return {
+      kind: "debuff",
+
+      ok: false,
+
+      error:
+        "INVALID_DEBUFF_STAT",
+
+      user:
+        target.user,
+
+      skill:
+        skill.nome,
+
+      stat
+    };
+  }
+
+
+  if (
+    !Array.isArray(
+      target.effects
+    )
+  ) {
+    target.effects = [];
+  }
+
+
+  const requestedAmount =
+    calculateDebuffAmount(
+      skill
+    );
+
+
+  const before =
+    Math.max(
+      0,
+      getNumber(
+        target[stat]
+      )
+    );
+
+
+  /*
+   * O atributo não pode ficar negativo.
+   *
+   * Guardamos quanto realmente
+   * conseguimos retirar.
+   */
+  const after =
+    Math.max(
+      0,
+      before -
+      requestedAmount
+    );
+
+
+  const appliedAmount =
+    before -
+    after;
+
+  /*
+  * O atributo já está em 0.
+  *
+  * Não registra um Debuff inútil
+  * de valor zero.
+  */
+  if (
+    appliedAmount <= 0
+  ) {
+    return {
+      kind:
+        "debuff",
+
+      ok: false,
+
+      error:
+        "DEBUFF_NO_EFFECT",
+
+      user:
+        target.user,
+
+      skill:
+        skill.nome,
+
+      stat,
+
+      amount: 0,
+
+      requestedAmount,
+
+      before,
+
+      after
+    };
+  }
+
+  target[stat] =
+    after;
+
+
+  const duration =
+    2;
+
+
+  const effect = {
+    type:
+      "debuff",
+
+    source:
+      skill.nome,
+
+    stat,
+
+    amount:
+      appliedAmount,
+
+    appliedAtTurn:
+      currentTurn,
+
+    expiresAtTurn:
+      currentTurn +
+      duration
+  };
+
+
+  target.effects.push(
+    effect
+  );
+
+
+  return {
+    kind:
+      "debuff",
+
+    ok: true,
+
+    user:
+      target.user,
+
+    skill:
+      skill.nome,
+
+    stat,
+
+    amount:
+      appliedAmount,
+
+    requestedAmount,
+
+    before,
+
+    after,
+
+    duration,
+
+    expiresAtTurn:
+      effect.expiresAtTurn
+  };
+}
+
 export function expireBattleEffects(
   user,
   currentTurn
@@ -321,6 +542,9 @@ export function expireBattleEffects(
         currentTurn;
 
 
+    /*
+     * O efeito ainda está ativo.
+     */
     if (!shouldExpire) {
       active.push(
         effect
@@ -331,9 +555,13 @@ export function expireBattleEffects(
 
 
     /*
-     * BUFF:
-     * desfaz exatamente o bônus
-     * aplicado anteriormente.
+     * ==============================
+     * BUFF
+     * ==============================
+     *
+     * O Buff adicionou atributo.
+     * Ao terminar, retiramos
+     * exatamente o mesmo valor.
      */
     if (
       effect.type === "buff" &&
@@ -362,6 +590,46 @@ export function expireBattleEffects(
         effect.stat
       ] =
         current -
+        amount;
+    }
+
+
+    /*
+     * ==============================
+     * DEBUFF
+     * ==============================
+     *
+     * O Debuff retirou atributo.
+     * Ao terminar, devolvemos
+     * exatamente o mesmo valor.
+     */
+    else if (
+      effect.type === "debuff" &&
+      effect.stat &&
+      Number.isFinite(
+        Number(
+          effect.amount
+        )
+      )
+    ) {
+      const amount =
+        Number(
+          effect.amount
+        );
+
+
+      const current =
+        getNumber(
+          user[
+            effect.stat
+          ]
+        );
+
+
+      user[
+        effect.stat
+      ] =
+        current +
         amount;
     }
 

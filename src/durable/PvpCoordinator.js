@@ -32,6 +32,7 @@ import {
 import {
   executeHealingSkill,
   executeBuffSkill,
+  applyDebuffSkill,
   expireBattleEffects,
   executeMeditation,
   MEDITATION_SKILL
@@ -300,6 +301,119 @@ function executeOffensiveAction(
   };
 }
 
+
+function executeDebuffAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  /*
+   * Primeiro resolve a parte ofensiva.
+   *
+   * O Debuff precisa acertar
+   * o adversário.
+   */
+  const offensive =
+    resolveOffensiveSkill(
+      attacker,
+      defender,
+      action.skill
+    );
+
+
+  /*
+   * ERROU:
+   * não causa dano
+   * e não aplica Debuff.
+   */
+  if (!offensive.hit) {
+    return {
+      kind:
+        "debuff",
+
+      attacker:
+        attacker.user,
+
+      defender:
+        defender.user,
+
+      skill:
+        action.skill.nome,
+
+      hit:
+        false,
+
+      hitChance:
+        offensive.hitChance,
+
+      damage:
+        0,
+
+      debuffApplied:
+        false,
+
+      defenderHp:
+        defender.hp
+    };
+  }
+
+
+  /*
+   * ACERTOU:
+   * primeiro aplica o dano.
+   */
+  defender.hp =
+    Math.max(
+      0,
+      defender.hp -
+      offensive.damage
+    );
+
+
+  /*
+   * Depois aplica o Debuff.
+   */
+  const debuff =
+    applyDebuffSkill(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    kind:
+      "debuff",
+
+    attacker:
+      attacker.user,
+
+    defender:
+      defender.user,
+
+    skill:
+      action.skill.nome,
+
+    hit:
+      true,
+
+    hitChance:
+      offensive.hitChance,
+
+    damage:
+      offensive.damage,
+
+    defenderHp:
+      defender.hp,
+
+    debuffApplied:
+      debuff.ok,
+
+    debuff
+  };
+}
+
 function executeBattleAction(
   attacker,
   defender,
@@ -338,6 +452,28 @@ function executeBattleAction(
     return executeBuffSkill(
       attacker,
       action.skill,
+      currentTurn
+    );
+  }
+
+  /*
+  * DEBUFF / VENENO
+  *
+  * Por enquanto habilidades do tipo
+  * Veneno utilizam a infraestrutura
+  * de Debuff.
+  *
+  * Depois adicionaremos a camada
+  * própria de dano por turno.
+  */
+  if (
+    skillType === "debuff" ||
+    skillType === "veneno"
+  ) {
+    return executeDebuffAction(
+      attacker,
+      defender,
+      action,
       currentTurn
     );
   }

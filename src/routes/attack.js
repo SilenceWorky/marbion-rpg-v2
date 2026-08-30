@@ -258,6 +258,55 @@ export async function attackRoute(
 
     if (
       execution.kind ===
+      "debuff"
+    ) {
+      if (!execution.hit) {
+        return (
+          `@${execution.attacker} usou ${execution.skill}, ` +
+          `mas errou.`
+        );
+      }
+
+
+      if (
+        !execution.debuffApplied
+      ) {
+        return (
+          `@${execution.attacker} usou ${execution.skill} ` +
+          `e causou ${execution.damage} de dano em ` +
+          `@${execution.defender}, mas o Debuff não pôde ser aplicado.`
+        );
+      }
+
+
+      const statNames = {
+        strength: "Força",
+        magicStrength: "Magia",
+        speed: "Velocidade",
+        evasion: "Evasão",
+        accuracy: "Precisão",
+        defense: "Defesa"
+      };
+
+
+      const statName =
+        statNames[
+          execution.debuff.stat
+        ] ||
+        execution.debuff.stat;
+
+
+      return (
+        `@${execution.attacker} usou ${execution.skill}, ` +
+        `causou ${execution.damage} de dano em ` +
+        `@${execution.defender} e reduziu ` +
+        `${statName} em ${execution.debuff.amount} ` +
+        `por ${execution.debuff.duration} turnos.`
+      );
+    }
+
+    if (
+      execution.kind ===
       "meditate"
     ) {
       return (
