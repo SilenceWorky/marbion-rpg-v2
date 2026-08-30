@@ -84,6 +84,27 @@ export async function attackRoute(
 
     if (
       result.error ===
+      "MENTALIDADE_FULL"
+    ) {
+      return new Response(
+        `@${user}, sua Mentalidade já está cheia: ` +
+        `${result.currentMentalidade}/${result.maxMentalidade}.`
+      );
+    }
+
+
+    if (
+      result.error ===
+      "MEDITATION_COOLDOWN"
+    ) {
+      return new Response(
+        `@${user}, você ainda não pode meditar. ` +
+        `Aguarde ${result.turnsRemaining} turno(s).`
+      );
+    }
+
+    if (
+      result.error ===
       "INSUFFICIENT_MENTALIDADE"
     ) {
       return new Response(
@@ -156,6 +177,16 @@ export async function attackRoute(
   if (
     result.waiting === true
   ) {
+
+      if (
+        result.meditating
+      ) {
+        return new Response(
+          `🧘 @${result.user} começou a meditar. ` +
+          `Aguardando @${result.opponent}.`
+        );
+      }
+
     return new Response(
       `⚔️ @${result.user} escolheu a habilidade ${result.slot}. Aguardando @${result.opponent}.`
     );
@@ -184,6 +215,55 @@ export async function attackRoute(
         `@${execution.user} usou ${execution.skill} ` +
         `e recuperou ${execution.healing} de HP. ` +
         `HP: ${execution.hpAfter}/${execution.maxHp}.`
+      );
+    }
+
+    if (
+      execution.kind ===
+      "buff"
+    ) {
+      if (
+        execution.ok === false
+      ) {
+        return (
+          `@${execution.user} usou ${execution.skill}, ` +
+          `mas o buff não pôde ser aplicado.`
+        );
+      }
+
+
+      const statNames = {
+        strength: "Força",
+        magicStrength: "Magia",
+        speed: "Velocidade",
+        evasion: "Evasão",
+        accuracy: "Precisão",
+        defense: "Defesa"
+      };
+
+
+      const statName =
+        statNames[
+          execution.stat
+        ] ||
+        execution.stat;
+
+
+      return (
+        `@${execution.user} usou ${execution.skill} ` +
+        `e recebeu +${execution.amount} de ${statName} ` +
+        `por ${execution.duration} turnos.`
+      );
+    }
+
+    if (
+      execution.kind ===
+      "meditate"
+    ) {
+      return (
+        `🧘 @${execution.user} meditou e recuperou ` +
+        `${execution.recovered} de Mentalidade. ` +
+        `Mentalidade: ${execution.after}/${execution.maxMentalidade}.`
       );
     }
 

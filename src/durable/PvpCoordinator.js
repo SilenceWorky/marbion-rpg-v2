@@ -30,7 +30,11 @@ import {
 } from "../systems/combat.js";
 
 import {
-  executeHealingSkill
+  executeHealingSkill,
+  executeBuffSkill,
+  expireBattleEffects,
+  executeMeditation,
+  MEDITATION_SKILL
 } from "../systems/skill-effects.js";
 
 const CHALLENGE_TIMEOUT =
@@ -62,6 +66,29 @@ function resolveSkillFromSlot(
   slot,
   skillsData
 ) {
+
+
+  /*
+  * Slot 0 não existe para o jogador.
+  *
+  * É usado internamente apenas
+  * para representar Meditação.
+  */
+  if (
+    slot === 0
+  ) {
+    return {
+      skillId: null,
+
+      skill:
+        MEDITATION_SKILL,
+
+      fallback: false,
+
+      meditation: true
+    };
+  }
+
   const index =
     slot - 1;
 
@@ -276,7 +303,8 @@ function executeOffensiveAction(
 function executeBattleAction(
   attacker,
   defender,
-  action
+  action,
+  currentTurn
 ) {
   const skillType =
     String(
@@ -287,10 +315,7 @@ function executeBattleAction(
 
 
   /*
-   * Cura age sobre o próprio usuário.
-   *
-   * Não usa precisão/evasão
-   * e não causa dano ao adversário.
+   * CURA
    */
   if (
     skillType === "cura"
@@ -303,12 +328,35 @@ function executeBattleAction(
 
 
   /*
-   * Por enquanto todos os outros tipos
-   * continuam usando a resolução
-   * ofensiva atual.
+   * BUFF
    *
-   * Buff/Debuff/Suporte serão
-   * implementados depois.
+   * Age sobre o próprio usuário.
+   */
+  if (
+    skillType === "buff"
+  ) {
+    return executeBuffSkill(
+      attacker,
+      action.skill,
+      currentTurn
+    );
+  }
+
+  /*
+  * MEDITAÇÃO
+  */
+  if (
+    skillType === "meditacao"
+  ) {
+    return executeMeditation(
+      attacker,
+      currentTurn
+    );
+  }
+
+
+  /*
+   * Ataques normais.
    */
   return executeOffensiveAction(
     attacker,
@@ -1033,8 +1081,24 @@ export class PvpCoordinator {
         );
 
 
+    const rawSlot =
+      String(
+        slot ?? ""
+      )
+        .trim()
+        .toLowerCase();
+
+
+    const isMeditation =
+      rawSlot === "meditar" ||
+      rawSlot === "meditacao" ||
+      rawSlot === "meditação";
+
+
     const normalizedSlot =
-        Number(slot);
+      isMeditation
+        ? 0
+        : Number(slot);
 
 
     if (!user) {
@@ -1046,12 +1110,16 @@ export class PvpCoordinator {
 
 
     if (
+      !isMeditation &&
+      (
         !Number.isInteger(
-        normalizedSlot
+          normalizedSlot
         ) ||
         normalizedSlot < 1 ||
         normalizedSlot > 4
-    ) {
+      )
+    )
+     {
         return {
         ok: false,
         error: "INVALID_SLOT"
@@ -1195,6 +1263,78 @@ export class PvpCoordinator {
     }
 
 
+    if (
+      isMeditation
+    ) {
+      const currentMentalidade =
+        Math.max(
+          0,
+          Number(
+            player.mentalidade
+          ) || 0
+        );
+
+
+      const maxMentalidade =
+        Math.max(
+          1,
+          Number(
+            player.maxMentalidade
+          ) || 1
+        );
+
+
+      /*
+      * Não deixa desperdiçar um turno
+      * meditando com a barra cheia.
+      */
+      if (
+        currentMentalidade >=
+        maxMentalidade
+      ) {
+        return {
+          ok: false,
+          error:
+            "MENTALIDADE_FULL",
+
+          currentMentalidade,
+          maxMentalidade
+        };
+      }
+
+
+      const availableAtTurn =
+        Math.max(
+          1,
+          Number(
+            player
+              .meditationAvailableAtTurn
+          ) || 1
+        );
+
+
+      if (
+        battle.turn <
+        availableAtTurn
+      ) {
+        return {
+          ok: false,
+
+          error:
+            "MEDITATION_COOLDOWN",
+
+          availableAtTurn,
+
+          currentTurn:
+            battle.turn,
+
+          turnsRemaining:
+            availableAtTurn -
+            battle.turn
+        };
+      }
+    }
+
     /*
     * Guarda SOMENTE o número do slot.
     *
@@ -1225,6 +1365,9 @@ export class PvpCoordinator {
 
         waiting:
             true,
+
+        meditating:
+          isMeditation,
 
         user,
 
@@ -1466,7 +1609,8 @@ export class PvpCoordinator {
       executeBattleAction(
         first.player,
         second.player,
-        first.action
+        first.action,
+        battle.turn
       );
 
 
@@ -1532,7 +1676,8 @@ export class PvpCoordinator {
       executeBattleAction(
         second.player,
         first.player,
-        second.action
+        second.action,
+        battle.turn
       );
 
 
@@ -1613,6 +1758,23 @@ export class PvpCoordinator {
     */
     else {
     battle.turn += 1;
+
+    /*
+    * O novo turno começou.
+    *
+    * Remove automaticamente buffs/debuffs
+    * cuja duração terminou.
+    */
+    expireBattleEffects(
+      battle.player1,
+      battle.turn
+    );
+
+
+    expireBattleEffects(
+      battle.player2,
+      battle.turn
+    );
 
     battle.state =
         "WAITING_ACTIONS";
@@ -1721,6 +1883,86 @@ export class PvpCoordinator {
     };
     }
 
+  async getPlayerState(
+    user
+  ) {
+    user =
+      normalizeUser(
+        user
+      );
+
+
+    if (!user) {
+      return {
+        ok: false,
+        error: "INVALID_USER"
+      };
+    }
+
+
+    const data =
+      await this.getData();
+
+
+    const battle =
+      this.findBattleByUser(
+        data,
+        user
+      );
+
+
+    if (!battle) {
+      return {
+        ok: true,
+        inBattle: false
+      };
+    }
+
+
+    const player =
+      battle.player1.user === user
+        ? battle.player1
+        : battle.player2;
+
+
+    const opponent =
+      battle.player1.user === user
+        ? battle.player2
+        : battle.player1;
+
+
+    return {
+      ok: true,
+
+      inBattle: true,
+
+      turn:
+        battle.turn,
+
+      opponent:
+        opponent.user,
+
+      hp:
+        player.hp,
+
+      maxHp:
+        player.maxHp,
+
+      mentalidade:
+        player.mentalidade,
+
+      maxMentalidade:
+        player.maxMentalidade,
+
+      effects:
+        Array.isArray(
+          player.effects
+        )
+          ? player.effects
+          : []
+    };
+  }
+
   async fetch(
     request
   ) {
@@ -1786,6 +2028,23 @@ export class PvpCoordinator {
     return Response.json(
         result
     );
+    }
+
+    if (
+      url.pathname ===
+      "/player-state"
+    ) {
+      const result =
+        await this.getPlayerState(
+          url.searchParams.get(
+            "user"
+          )
+        );
+
+
+      return Response.json(
+        result
+      );
     }
 
     if (

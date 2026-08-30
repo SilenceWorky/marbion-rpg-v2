@@ -13,7 +13,7 @@ import { pvpRoute } from "./routes/pvp.js";
 import { acceptRoute } from "./routes/accept.js";
 import { attackRoute } from "./routes/attack.js";
 import { rankRoute } from "./routes/rank.js";
-
+import { estadoRoute } from "./routes/estado.js";
 
 
 export async function handleRequest(request, env, ctx) {
@@ -48,6 +48,15 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/status") {
     return statusRoute(
+      request,
+      env
+    );
+  }
+
+  if (
+    path === "/estado"
+  ) {
+    return estadoRoute(
       request,
       env
     );
