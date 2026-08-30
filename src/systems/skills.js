@@ -159,20 +159,36 @@ export function getOwnedSkills(
     );
 
 
-  const owned =
-    new Set(
-      profile.skills
-        .map(
-          skill =>
-            String(skill)
-        )
+  const byId =
+    new Map(
+      catalog.map(
+        skill => [
+          skill.id,
+          skill
+        ]
+      )
     );
 
 
-  return catalog.filter(
-    skill =>
-      owned.has(skill.id)
-  );
+  /*
+   * A ordem das habilidades deve
+   * seguir profile.skills.
+   *
+   * Assim:
+   * - habilidade 1 continua sendo 1;
+   * - habilidade 2 continua sendo 2;
+   * - novas habilidades entram no final;
+   * - mudanças no skills.json não
+   *   reorganizam o inventário.
+   */
+  return profile.skills
+    .map(
+      skillId =>
+        byId.get(
+          String(skillId)
+        ) || null
+    )
+    .filter(Boolean);
 }
 
 

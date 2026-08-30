@@ -81,6 +81,17 @@ export async function attackRoute(
 
 
   if (!result.ok) {
+
+    if (
+      result.error ===
+      "INSUFFICIENT_MENTALIDADE"
+    ) {
+      return new Response(
+        `@${user}, você não possui Mentalidade suficiente para a habilidade ${result.slot}. ` +
+        `Necessário: ${result.requiredMentalidade} | Atual: ${result.currentMentalidade}.`
+      );
+    }
+
     if (
       result.error ===
       "INVALID_SLOT"
@@ -165,6 +176,16 @@ export async function attackRoute(
         return "";
     }
 
+    if (
+      execution.kind ===
+      "heal"
+    ) {
+      return (
+        `@${execution.user} usou ${execution.skill} ` +
+        `e recuperou ${execution.healing} de HP. ` +
+        `HP: ${execution.hpAfter}/${execution.maxHp}.`
+      );
+    }
 
     if (!execution.hit) {
         return (

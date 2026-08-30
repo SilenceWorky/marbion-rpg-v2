@@ -12,7 +12,7 @@ import { pvpTestRoute } from "./routes/pvptest.js";
 import { pvpRoute } from "./routes/pvp.js";
 import { acceptRoute } from "./routes/accept.js";
 import { attackRoute } from "./routes/attack.js";
-
+import { rankRoute } from "./routes/rank.js";
 
 
 
@@ -111,6 +111,13 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/ataque") {
     return attackRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/rank") {
+    return rankRoute(
       request,
       env
     );

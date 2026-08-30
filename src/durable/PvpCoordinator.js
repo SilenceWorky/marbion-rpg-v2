@@ -29,6 +29,10 @@ import {
   resolveOffensiveSkill
 } from "../systems/combat.js";
 
+import {
+  executeHealingSkill
+} from "../systems/skill-effects.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -113,6 +117,87 @@ function getSkillPriority(
   ) || 0;
 }
 
+function getSkillMentalidadeCost(
+  skill
+) {
+  return Math.max(
+    0,
+    Number(
+      skill?.custoMentalidade
+    ) || 0
+  );
+}
+
+
+function canPaySkillCost(
+  player,
+  skill
+) {
+  const cost =
+    getSkillMentalidadeCost(
+      skill
+    );
+
+  const current =
+    Math.max(
+      0,
+      Number(
+        player?.mentalidade
+      ) || 0
+    );
+
+
+  return {
+    ok:
+      current >= cost,
+
+    cost,
+    current
+  };
+}
+
+
+function spendSkillMentalidade(
+  player,
+  skill
+) {
+  const payment =
+    canPaySkillCost(
+      player,
+      skill
+    );
+
+
+  if (!payment.ok) {
+    return {
+      ok: false,
+      error:
+        "INSUFFICIENT_MENTALIDADE",
+
+      ...payment
+    };
+  }
+
+
+  player.mentalidade =
+    payment.current -
+    payment.cost;
+
+
+  return {
+    ok: true,
+
+    cost:
+      payment.cost,
+
+    before:
+      payment.current,
+
+    after:
+      player.mentalidade
+  };
+}
+
 function executeOffensiveAction(
   attacker,
   defender,
@@ -128,6 +213,8 @@ function executeOffensiveAction(
 
   if (!result.hit) {
     return {
+      kind: "damage",
+
       attacker:
         attacker.user,
 
@@ -161,6 +248,8 @@ function executeOffensiveAction(
 
 
   return {
+    kind: "damage",
+
     attacker:
       attacker.user,
 
@@ -182,6 +271,50 @@ function executeOffensiveAction(
     defenderHp:
       defender.hp
   };
+}
+
+function executeBattleAction(
+  attacker,
+  defender,
+  action
+) {
+  const skillType =
+    String(
+      action?.skill?.tipo ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  /*
+   * Cura age sobre o próprio usuário.
+   *
+   * Não usa precisão/evasão
+   * e não causa dano ao adversário.
+   */
+  if (
+    skillType === "cura"
+  ) {
+    return executeHealingSkill(
+      attacker,
+      action.skill
+    );
+  }
+
+
+  /*
+   * Por enquanto todos os outros tipos
+   * continuam usando a resolução
+   * ofensiva atual.
+   *
+   * Buff/Debuff/Suporte serão
+   * implementados depois.
+   */
+  return executeOffensiveAction(
+    attacker,
+    defender,
+    action
+  );
 }
 
 export class PvpCoordinator {
@@ -994,16 +1127,71 @@ export class PvpCoordinator {
     * uma ação por turno.
     */
     if (
-        player.action !== null
+      player.action !== null
     ) {
-        return {
+      return {
         ok: false,
         error:
-            "ACTION_ALREADY_SELECTED",
+          "ACTION_ALREADY_SELECTED",
 
         slot:
-            player.action.slot
-        };
+          player.action.slot
+      };
+    }
+
+
+    /*
+    * Verifica o custo sem revelar
+    * a habilidade para o adversário.
+    */
+    const validationSkillsData =
+      await fetchJson(
+        SKILLS_URL
+      );
+
+
+    const selectedAction =
+      resolveSkillFromSlot(
+        player.loadout,
+        normalizedSlot,
+        validationSkillsData
+      );
+
+
+    if (!selectedAction) {
+      return {
+        ok: false,
+        error:
+          "SKILL_NOT_FOUND"
+      };
+    }
+
+
+    const mentalidadeCheck =
+      canPaySkillCost(
+        player,
+        selectedAction.skill
+      );
+
+
+    if (
+      !mentalidadeCheck.ok
+    ) {
+      return {
+        ok: false,
+
+        error:
+          "INSUFFICIENT_MENTALIDADE",
+
+        slot:
+          normalizedSlot,
+
+        currentMentalidade:
+          mentalidadeCheck.current,
+
+        requiredMentalidade:
+          mentalidadeCheck.cost
+      };
     }
 
 
@@ -1268,12 +1456,18 @@ export class PvpCoordinator {
     * ==============================
     */
 
+    const firstMentalidade =
+      spendSkillMentalidade(
+        first.player,
+        first.action.skill
+      );
+
     const firstExecution =
-    executeOffensiveAction(
+      executeBattleAction(
         first.player,
         second.player,
         first.action
-    );
+      );
 
 
     /*
@@ -1328,12 +1522,18 @@ export class PvpCoordinator {
     * ==============================
     */
 
+    const secondMentalidade =
+      spendSkillMentalidade(
+        second.player,
+        second.action.skill
+      );
+
     secondExecution =
-        executeOffensiveAction(
+      executeBattleAction(
         second.player,
         first.player,
         second.action
-        );
+      );
 
 
     await this.consumeExecutedSkill(
@@ -1481,7 +1681,31 @@ export class PvpCoordinator {
             battle.player2.maxHp
         }
     },
-    
+        
+    mentalidade: {
+      player1: {
+        user:
+          battle.player1.user,
+
+        current:
+          battle.player1.mentalidade,
+
+        max:
+          battle.player1.maxMentalidade
+      },
+
+      player2: {
+        user:
+          battle.player2.user,
+
+        current:
+          battle.player2.mentalidade,
+
+        max:
+          battle.player2.maxMentalidade
+      }
+    },
+
         battleOver,
 
         winner,
