@@ -258,6 +258,72 @@ export async function attackRoute(
 
     if (
       execution.kind ===
+      "poison"
+    ) {
+      if (!execution.hit) {
+        return (
+          `@${execution.attacker} usou ${execution.skill}, ` +
+          `mas errou.`
+        );
+      }
+
+
+      const statNames = {
+        strength: "Força",
+        magicStrength: "Magia",
+        speed: "Velocidade",
+        evasion: "Evasão",
+        accuracy: "Precisão",
+        defense: "Defesa"
+      };
+
+
+      let text =
+        `@${execution.attacker} usou ${execution.skill} ` +
+        `e causou ${execution.damage} de dano em ` +
+        `@${execution.defender}.`;
+
+
+      /*
+      * Debuff associado ao Veneno.
+      */
+      if (
+        execution.debuffApplied &&
+        execution.debuff
+      ) {
+        const statName =
+          statNames[
+            execution.debuff.stat
+          ] ||
+          execution.debuff.stat;
+
+
+        text +=
+          ` Reduziu ${statName} em ` +
+          `${execution.debuff.amount} por ` +
+          `${execution.debuff.duration} turnos.`;
+      }
+
+
+      /*
+      * Envenenamento periódico.
+      */
+      if (
+        execution.poisonApplied &&
+        execution.poison
+      ) {
+        text +=
+          ` ☠️ @${execution.defender} ficou Envenenado: ` +
+          `${execution.poison.damagePerTurn} de dano por turno ` +
+          `por ${execution.poison.duration} turnos.`;
+      }
+
+
+      return text;
+    }
+
+    if (
+      execution.kind ===
       "debuff"
     ) {
       if (!execution.hit) {
@@ -324,18 +390,38 @@ export async function attackRoute(
     }
 
 
-    const defenderHp =
-        hpData.player1.user ===
-        execution.defender
+    const defenderHpData =
+      hpData.player1.user ===
+      execution.defender
         ? hpData.player1
         : hpData.player2;
 
 
+    /*
+    * Mostra o HP imediatamente
+    * após ESTA ação.
+    *
+    * Não o HP final depois de
+    * Veneno ou outros efeitos
+    * do início do próximo turno.
+    */
+    const hpAfterExecution =
+      Number.isFinite(
+        Number(
+          execution.defenderHp
+        )
+      )
+        ? Number(
+            execution.defenderHp
+          )
+        : defenderHpData.current;
+
+
     return (
-        `@${execution.attacker} usou ${execution.skill} ` +
-        `e causou ${execution.damage} de dano em ` +
-        `@${execution.defender}. ` +
-        `HP: ${defenderHp.current}/${defenderHp.max}.`
+      `@${execution.attacker} usou ${execution.skill} ` +
+      `e causou ${execution.damage} de dano em ` +
+      `@${execution.defender}. ` +
+      `HP: ${hpAfterExecution}/${defenderHpData.max}.`
     );
     }
 
@@ -352,6 +438,19 @@ export async function attackRoute(
         result.hp
     );
 
+    const poisonText =
+      Array.isArray(
+        result.poisonTicks
+      )
+        ? result.poisonTicks
+            .map(
+              tick =>
+                `☠️ Início do Turno ${Number(result.turn) + 1}: ` +
+                `@${tick.user} sofreu ${tick.damage} de dano por ${tick.source}. ` +
+                `HP: ${tick.hpAfter}/${tick.maxHp}.`
+            )
+            .join(" ")
+        : "";
 
     let message =
     `⚔️ Turno ${result.turn} | ` +
@@ -365,10 +464,27 @@ export async function attackRoute(
         ` ${secondText}`;
     }
 
+    if (poisonText) {
+      message +=
+        ` ${poisonText}`;
+    }
 
     if (
     result.battleOver
     ) {
+
+    if (
+      result.draw
+    ) {
+      message +=
+        ` ☠️ Os dois jogadores foram derrotados pelo Veneno no início do turno. ` +
+        `O PvP terminou em empate.`;
+
+      return new Response(
+        message
+      );
+    }
+
     message +=
         ` 🏆 @${result.winner} venceu o PvP!`;
 

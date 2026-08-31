@@ -33,6 +33,8 @@ import {
   executeHealingSkill,
   executeBuffSkill,
   applyDebuffSkill,
+  applyPoisonEffect,
+  processPoisonEffects,
   expireBattleEffects,
   executeMeditation,
   MEDITATION_SKILL
@@ -414,6 +416,104 @@ function executeDebuffAction(
   };
 }
 
+function executePoisonAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  /*
+   * Veneno reutiliza toda a execução
+   * ofensiva do Debuff:
+   *
+   * - teste de acerto
+   * - dano direto
+   * - redução de atributo
+   */
+  const base =
+    executeDebuffAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+
+
+  /*
+   * Se o golpe errou,
+   * não existe envenenamento.
+   */
+  if (!base.hit) {
+    return {
+      ...base,
+
+      kind:
+        "poison",
+
+      poisonApplied:
+        false,
+
+      poison:
+        null
+    };
+  }
+
+
+  /*
+   * Se o dano direto já derrubou
+   * o adversário, também não precisamos
+   * adicionar um efeito periódico.
+   */
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+
+      kind:
+        "poison",
+
+      poisonApplied:
+        false,
+
+      poison:
+        null
+    };
+  }
+
+
+  /*
+   * O golpe acertou.
+   *
+   * O Debuff pode ou não ter sido
+   * aplicado — por exemplo, se o
+   * atributo já estava em 0.
+   *
+   * Isso NÃO impede o Veneno.
+   */
+  const poison =
+    applyPoisonEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+
+    kind:
+      "poison",
+
+    poisonApplied:
+      poison.ok,
+
+    poison
+  };
+}
+
 function executeBattleAction(
   attacker,
   defender,
@@ -466,11 +566,32 @@ function executeBattleAction(
   * Depois adicionaremos a camada
   * própria de dano por turno.
   */
+  /*
+  * DEBUFF
+  */
   if (
-    skillType === "debuff" ||
-    skillType === "veneno"
+    skillType === "debuff"
   ) {
     return executeDebuffAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
+
+
+  /*
+  * VENENO
+  *
+  * Dano direto
+  * + Debuff
+  * + Envenenamento.
+  */
+  if (
+    skillType === "veneno"
+  ) {
+    return executePoisonAction(
       attacker,
       defender,
       action,
@@ -1777,6 +1898,11 @@ export class PvpCoordinator {
     let rankedResult =
     null;
 
+    let poisonTicks =
+      [];
+
+    let draw =
+      false;
 
     /*
     * Se o primeiro ataque matou,
@@ -1893,29 +2019,231 @@ export class PvpCoordinator {
     * ==============================
     */
     else {
-    battle.turn += 1;
-
-    /*
-    * O novo turno começou.
-    *
-    * Remove automaticamente buffs/debuffs
-    * cuja duração terminou.
-    */
-    expireBattleEffects(
-      battle.player1,
-      battle.turn
-    );
+      battle.turn += 1;
 
 
-    expireBattleEffects(
-      battle.player2,
-      battle.turn
-    );
+      /*
+      * ==============================
+      * VENENO
+      * ==============================
+      *
+      * O dano periódico acontece
+      * imediatamente quando o novo
+      * turno começa, antes de qualquer
+      * jogador escolher sua ação.
+      *
+      * Os dois jogadores são processados
+      * antes de verificarmos quem caiu.
+      */
+      const player1Poison =
+        processPoisonEffects(
+          battle.player1,
+          battle.turn
+        );
 
-    battle.state =
-        "WAITING_ACTIONS";
+
+      const player2Poison =
+        processPoisonEffects(
+          battle.player2,
+          battle.turn
+        );
+
+
+      poisonTicks = [
+        ...player1Poison.ticks.map(
+          tick => ({
+            ...tick,
+
+            user:
+              battle.player1.user,
+
+            maxHp:
+              battle.player1.maxHp
+          })
+        ),
+
+        ...player2Poison.ticks.map(
+          tick => ({
+            ...tick,
+
+            user:
+              battle.player2.user,
+
+            maxHp:
+              battle.player2.maxHp
+          })
+        )
+      ];
+
+
+      /*
+      * Buffs e Debuffs também
+      * expiraram ao iniciar
+      * o novo turno.
+      */
+      expireBattleEffects(
+        battle.player1,
+        battle.turn
+      );
+
+
+      expireBattleEffects(
+        battle.player2,
+        battle.turn
+      );
+
+
+      const player1Dead =
+        Number(
+          battle.player1.hp
+        ) <= 0;
+
+
+      const player2Dead =
+        Number(
+          battle.player2.hp
+        ) <= 0;
+
+
+      /*
+      * ==============================
+      * MORTE PELO VENENO
+      * ==============================
+      */
+      if (
+        player1Dead ||
+        player2Dead
+      ) {
+        battleOver =
+          true;
+
+
+        /*
+        * Os dois morreram no mesmo
+        * início de turno.
+        *
+        * Não existe vencedor.
+        */
+        if (
+          player1Dead &&
+          player2Dead
+        ) {
+          draw =
+            true;
+
+          winner =
+            null;
+
+          loser =
+            null;
+
+          rankedResult =
+            null;
+
+
+          battle.status =
+            "FINISHED";
+
+          battle.state =
+            "FINISHED";
+
+          battle.draw =
+            true;
+
+          battle.finishedAt =
+            Date.now();
+        }
+
+
+        /*
+        * Apenas Player 1 caiu.
+        */
+        else if (
+          player1Dead
+        ) {
+          winner =
+            battle.player2.user;
+
+          loser =
+            battle.player1.user;
+
+
+          rankedResult =
+            await this.applyRankedBattleResult(
+              winner,
+              loser
+            );
+
+
+          battle.status =
+            "FINISHED";
+
+          battle.state =
+            "FINISHED";
+
+          battle.winner =
+            winner;
+
+          battle.loser =
+            loser;
+
+          battle.rankedResult =
+            rankedResult;
+
+          battle.finishedAt =
+            Date.now();
+        }
+
+
+        /*
+        * Apenas Player 2 caiu.
+        */
+        else {
+          winner =
+            battle.player1.user;
+
+          loser =
+            battle.player2.user;
+
+
+          rankedResult =
+            await this.applyRankedBattleResult(
+              winner,
+              loser
+            );
+
+
+          battle.status =
+            "FINISHED";
+
+          battle.state =
+            "FINISHED";
+
+          battle.winner =
+            winner;
+
+          battle.loser =
+            loser;
+
+          battle.rankedResult =
+            rankedResult;
+
+          battle.finishedAt =
+            Date.now();
+        }
+      }
+
+
+      /*
+      * Ninguém foi derrotado pelo Veneno.
+      *
+      * O novo turno abre normalmente.
+      */
+      else {
+        battle.state =
+          "WAITING_ACTIONS";
+      }
     }
-
 
     await this.saveData(
     data
@@ -2012,8 +2340,12 @@ export class PvpCoordinator {
 
         rankedResult,
 
+        poisonTicks,
+
+        draw,
+
         nextTurn:
-        battleOver
+          battleOver
             ? null
             : battle.turn
     };

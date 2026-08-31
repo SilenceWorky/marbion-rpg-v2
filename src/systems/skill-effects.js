@@ -503,6 +503,370 @@ export function applyDebuffSkill(
   };
 }
 
+export const POISON_DURATION =
+  3;
+
+
+/*
+ * Dano periódico do Veneno.
+ *
+ * Inicialmente:
+ * 35% do custo de Mentalidade,
+ * mínimo de 2 de dano por turno.
+ */
+export function calculatePoisonDamage(
+  skill
+) {
+  const cost =
+    Math.max(
+      0,
+      getNumber(
+        skill?.custoMentalidade
+      )
+    );
+
+
+  return Math.max(
+    2,
+    Math.round(
+      cost * 0.35
+    )
+  );
+}
+
+
+/*
+ * Aplica Envenenado.
+ *
+ * Regras:
+ *
+ * - dura 3 ticks;
+ * - começa a causar dano
+ *   no próximo turno;
+ * - não acumula infinitamente;
+ * - reaplicar renova a duração;
+ * - mantém o maior dano entre
+ *   o Veneno antigo e o novo.
+ */
+export function applyPoisonEffect(
+  target,
+  skill,
+  currentTurn
+) {
+  if (
+    !Array.isArray(
+      target.effects
+    )
+  ) {
+    target.effects = [];
+  }
+
+
+  const damagePerTurn =
+    calculatePoisonDamage(
+      skill
+    );
+
+
+  const existing =
+    target.effects.find(
+      effect =>
+        effect?.type ===
+        "veneno"
+    );
+
+
+  /*
+   * Já está envenenado.
+   *
+   * Renova os 3 ticks e
+   * mantém o Veneno mais forte.
+   */
+  if (existing) {
+    existing.source =
+      skill.nome;
+
+    existing.damagePerTurn =
+      Math.max(
+        getNumber(
+          existing.damagePerTurn
+        ),
+        damagePerTurn
+      );
+
+    existing.remainingTicks =
+      POISON_DURATION;
+
+    existing.nextTickTurn =
+      Number(currentTurn) +
+      1;
+
+
+    return {
+      kind:
+        "poison",
+
+      ok: true,
+
+      refreshed: true,
+
+      user:
+        target.user,
+
+      skill:
+        skill.nome,
+
+      damagePerTurn:
+        existing.damagePerTurn,
+
+      duration:
+        POISON_DURATION,
+
+      nextTickTurn:
+        existing.nextTickTurn
+    };
+  }
+
+
+  const effect = {
+    type:
+      "veneno",
+
+    source:
+      skill.nome,
+
+    damagePerTurn,
+
+    remainingTicks:
+      POISON_DURATION,
+
+    appliedAtTurn:
+      Number(
+        currentTurn
+      ),
+
+    nextTickTurn:
+      Number(
+        currentTurn
+      ) + 1
+  };
+
+
+  target.effects.push(
+    effect
+  );
+
+
+  return {
+    kind:
+      "poison",
+
+    ok: true,
+
+    refreshed: false,
+
+    user:
+      target.user,
+
+    skill:
+      skill.nome,
+
+    damagePerTurn,
+
+    duration:
+      POISON_DURATION,
+
+    nextTickTurn:
+      effect.nextTickTurn
+  };
+}
+
+
+/*
+ * Processa todos os Venenos
+ * no início de um turno.
+ */
+export function processPoisonEffects(
+  user,
+  currentTurn
+) {
+  if (
+    !Array.isArray(
+      user.effects
+    )
+  ) {
+    user.effects = [];
+
+    return {
+      ticks: [],
+      killed: false
+    };
+  }
+
+
+  const active = [];
+  const ticks = [];
+
+
+  for (
+    const effect
+    of user.effects
+  ) {
+    /*
+     * Outros efeitos continuam
+     * normalmente.
+     */
+    if (
+      effect?.type !==
+      "veneno"
+    ) {
+      active.push(
+        effect
+      );
+
+      continue;
+    }
+
+
+    const remainingTicks =
+      Math.max(
+        0,
+        Math.floor(
+          getNumber(
+            effect.remainingTicks
+          )
+        )
+      );
+
+
+    const nextTickTurn =
+      Math.max(
+        1,
+        Math.floor(
+          getNumber(
+            effect.nextTickTurn,
+            Number(currentTurn)
+          )
+        )
+      );
+
+
+    /*
+     * Ainda não chegou o turno
+     * do próximo dano.
+     */
+    if (
+      Number(currentTurn) <
+      nextTickTurn
+    ) {
+      active.push(
+        effect
+      );
+
+      continue;
+    }
+
+
+    if (
+      remainingTicks <= 0
+    ) {
+      continue;
+    }
+
+
+    const hpBefore =
+      Math.max(
+        0,
+        getNumber(
+          user.hp
+        )
+      );
+
+
+    const requestedDamage =
+      Math.max(
+        0,
+        getNumber(
+          effect.damagePerTurn
+        )
+      );
+
+
+    const hpAfter =
+      Math.max(
+        0,
+        hpBefore -
+        requestedDamage
+      );
+
+
+    const damage =
+      hpBefore -
+      hpAfter;
+
+
+    user.hp =
+      hpAfter;
+
+
+    const newRemainingTicks =
+      remainingTicks -
+      1;
+
+
+    ticks.push({
+      type:
+        "veneno",
+
+      source:
+        effect.source,
+
+      damage,
+
+      hpBefore,
+
+      hpAfter,
+
+      remainingTicks:
+        newRemainingTicks
+    });
+
+
+    /*
+     * Se ainda houver ticks,
+     * mantém o Veneno.
+     */
+    if (
+      newRemainingTicks > 0
+    ) {
+      effect.remainingTicks =
+        newRemainingTicks;
+
+      effect.nextTickTurn =
+        Number(currentTurn) +
+        1;
+
+      active.push(
+        effect
+      );
+    }
+  }
+
+
+  user.effects =
+    active;
+
+
+  return {
+    ticks,
+
+    killed:
+      Number(
+        user.hp
+      ) <= 0
+  };
+}
+
 export function expireBattleEffects(
   user,
   currentTurn

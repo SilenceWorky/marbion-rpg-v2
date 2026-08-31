@@ -78,6 +78,40 @@ function formatBattleEffect(
     type ||
     "Efeito";
 
+  /*
+  * Veneno possui seu próprio
+  * formato de exibição.
+  */
+  if (
+    (
+      type === "poison" ||
+      type === "veneno"
+    ) &&
+    Number.isFinite(
+      Number(
+        effect.damagePerTurn
+      )
+    )
+  ) {
+    const damage =
+      Number(
+        effect.damagePerTurn
+      );
+
+    const remaining =
+      Math.max(
+        0,
+        Number(
+          effect.remainingTicks
+        ) || 0
+      );
+
+
+    return (
+      `☠️ ${name || "Envenenado"} — ` +
+      `${damage} dano/turno (${remaining}T)`
+    );
+  }
 
   /*
    * Buff/debuff de atributo.
