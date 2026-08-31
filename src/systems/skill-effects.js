@@ -503,55 +503,31 @@ export function applyDebuffSkill(
   };
 }
 
-export const POISON_DURATION =
-  3;
-
-
 /*
- * Dano periódico do Veneno.
+ * ==============================
+ * DANO PERIÓDICO GENÉRICO
+ * ==============================
  *
- * Inicialmente:
- * 35% do custo de Mentalidade,
- * mínimo de 2 de dano por turno.
+ * Base compartilhada por:
+ *
+ * ☠️ Veneno
+ * 🔥 Queimadura
+ * 🩸 Sangramento
+ * ☢️ Radiação
+ * e futuros DoTs.
  */
-export function calculatePoisonDamage(
-  skill
-) {
-  const cost =
-    Math.max(
-      0,
-      getNumber(
-        skill?.custoMentalidade
-      )
-    );
 
 
-  return Math.max(
-    2,
-    Math.round(
-      cost * 0.35
-    )
-  );
-}
-
-
-/*
- * Aplica Envenenado.
- *
- * Regras:
- *
- * - dura 3 ticks;
- * - começa a causar dano
- *   no próximo turno;
- * - não acumula infinitamente;
- * - reaplicar renova a duração;
- * - mantém o maior dano entre
- *   o Veneno antigo e o novo.
- */
-export function applyPoisonEffect(
+export function applyDamageOverTimeEffect(
   target,
   skill,
-  currentTurn
+  currentTurn,
+  {
+    effectType,
+    resultKind,
+    duration,
+    damagePerTurn
+  }
 ) {
   if (
     !Array.isArray(
@@ -562,41 +538,125 @@ export function applyPoisonEffect(
   }
 
 
-  const damagePerTurn =
-    calculatePoisonDamage(
-      skill
+  const normalizedType =
+    String(
+      effectType ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const normalizedKind =
+    String(
+      resultKind ??
+      normalizedType
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const safeDuration =
+    Math.max(
+      1,
+      Math.floor(
+        getNumber(
+          duration,
+          1
+        )
+      )
     );
 
 
-  const existing =
-    target.effects.find(
-      effect =>
-        effect?.type ===
-        "veneno"
+  const safeDamage =
+    Math.max(
+      0,
+      Math.round(
+        getNumber(
+          damagePerTurn
+        )
+      )
     );
+
+
+  if (
+    !normalizedType ||
+    safeDamage <= 0
+  ) {
+    return {
+      kind:
+        normalizedKind ||
+        "dot",
+
+      ok: false,
+
+      error:
+        "INVALID_DOT_CONFIG",
+
+      user:
+        target.user,
+
+      skill:
+        skill?.nome
+    };
+  }
 
 
   /*
-   * Já está envenenado.
+   * Cada tipo de DoT possui
+   * apenas uma instância ativa.
    *
-   * Renova os 3 ticks e
-   * mantém o Veneno mais forte.
+   * Veneno não acumula com Veneno.
+   * Queimadura não acumula com
+   * Queimadura.
+   *
+   * Mas Veneno + Queimadura podem
+   * coexistir futuramente.
    */
+  const existing =
+    target.effects.find(
+      effect =>
+        String(
+          effect?.type ?? ""
+        )
+          .trim()
+          .toLowerCase() ===
+        normalizedType
+    );
+
+
   if (existing) {
     existing.source =
       skill.nome;
 
+
+    /*
+     * Reaplicação mantém
+     * o dano mais forte.
+     */
     existing.damagePerTurn =
       Math.max(
         getNumber(
           existing.damagePerTurn
         ),
-        damagePerTurn
+        safeDamage
       );
 
-    existing.remainingTicks =
-      POISON_DURATION;
 
+    /*
+     * Renova completamente
+     * a duração.
+     */
+    existing.remainingTicks =
+      safeDuration;
+
+
+    /*
+     * Nunca causa dano
+     * imediatamente.
+     *
+     * O primeiro tick é
+     * no próximo turno.
+     */
     existing.nextTickTurn =
       Number(currentTurn) +
       1;
@@ -604,11 +664,14 @@ export function applyPoisonEffect(
 
     return {
       kind:
-        "poison",
+        normalizedKind,
 
       ok: true,
 
       refreshed: true,
+
+      type:
+        normalizedType,
 
       user:
         target.user,
@@ -620,7 +683,7 @@ export function applyPoisonEffect(
         existing.damagePerTurn,
 
       duration:
-        POISON_DURATION,
+        safeDuration,
 
       nextTickTurn:
         existing.nextTickTurn
@@ -630,15 +693,16 @@ export function applyPoisonEffect(
 
   const effect = {
     type:
-      "veneno",
+      normalizedType,
 
     source:
       skill.nome,
 
-    damagePerTurn,
+    damagePerTurn:
+      safeDamage,
 
     remainingTicks:
-      POISON_DURATION,
+      safeDuration,
 
     appliedAtTurn:
       Number(
@@ -659,11 +723,14 @@ export function applyPoisonEffect(
 
   return {
     kind:
-      "poison",
+      normalizedKind,
 
     ok: true,
 
     refreshed: false,
+
+    type:
+      normalizedType,
 
     user:
       target.user,
@@ -671,10 +738,11 @@ export function applyPoisonEffect(
     skill:
       skill.nome,
 
-    damagePerTurn,
+    damagePerTurn:
+      safeDamage,
 
     duration:
-      POISON_DURATION,
+      safeDuration,
 
     nextTickTurn:
       effect.nextTickTurn
@@ -683,12 +751,15 @@ export function applyPoisonEffect(
 
 
 /*
- * Processa todos os Venenos
- * no início de um turno.
+ * Processador genérico de DoT.
+ *
+ * effectTypes define quais efeitos
+ * serão processados nesta chamada.
  */
-export function processPoisonEffects(
+export function processDamageOverTimeEffects(
   user,
-  currentTurn
+  currentTurn,
+  effectTypes
 ) {
   if (
     !Array.isArray(
@@ -704,6 +775,31 @@ export function processPoisonEffects(
   }
 
 
+  const requestedTypes =
+    Array.isArray(
+      effectTypes
+    )
+      ? effectTypes
+      : [
+          effectTypes
+        ];
+
+
+  const acceptedTypes =
+    new Set(
+      requestedTypes
+        .map(
+          type =>
+            String(
+              type ?? ""
+            )
+              .trim()
+              .toLowerCase()
+        )
+        .filter(Boolean)
+    );
+
+
   const active = [];
   const ticks = [];
 
@@ -712,13 +808,25 @@ export function processPoisonEffects(
     const effect
     of user.effects
   ) {
+    const effectType =
+      String(
+        effect?.type ?? ""
+      )
+        .trim()
+        .toLowerCase();
+
+
     /*
-     * Outros efeitos continuam
-     * normalmente.
+     * Não pertence aos DoTs
+     * solicitados nesta chamada.
+     *
+     * Buff, Debuff e outros efeitos
+     * continuam intactos.
      */
     if (
-      effect?.type !==
-      "veneno"
+      !acceptedTypes.has(
+        effectType
+      )
     ) {
       active.push(
         effect
@@ -745,15 +853,17 @@ export function processPoisonEffects(
         Math.floor(
           getNumber(
             effect.nextTickTurn,
-            Number(currentTurn)
+            Number(
+              currentTurn
+            )
           )
         )
       );
 
 
     /*
-     * Ainda não chegou o turno
-     * do próximo dano.
+     * Ainda não chegou
+     * a hora do dano.
      */
     if (
       Number(currentTurn) <
@@ -800,6 +910,18 @@ export function processPoisonEffects(
       );
 
 
+    /*
+     * Guarda somente o dano
+     * que realmente entrou.
+     *
+     * Exemplo:
+     *
+     * 5 HP
+     * tick de 8
+     *
+     * damage = 5
+     * hp = 0
+     */
     const damage =
       hpBefore -
       hpAfter;
@@ -816,7 +938,7 @@ export function processPoisonEffects(
 
     ticks.push({
       type:
-        "veneno",
+        effectType,
 
       source:
         effect.source,
@@ -833,8 +955,8 @@ export function processPoisonEffects(
 
 
     /*
-     * Se ainda houver ticks,
-     * mantém o Veneno.
+     * Continua ativo somente
+     * se ainda possuir ticks.
      */
     if (
       newRemainingTicks > 0
@@ -842,9 +964,11 @@ export function processPoisonEffects(
       effect.remainingTicks =
         newRemainingTicks;
 
+
       effect.nextTickTurn =
         Number(currentTurn) +
         1;
+
 
       active.push(
         effect
@@ -865,6 +989,84 @@ export function processPoisonEffects(
         user.hp
       ) <= 0
   };
+}
+
+
+/*
+ * ==============================
+ * VENENO
+ * ==============================
+ *
+ * Veneno agora é apenas uma
+ * implementação do motor genérico.
+ *
+ * Mantemos as funções antigas
+ * para não quebrar o PvP atual.
+ */
+
+
+export const POISON_DURATION =
+  3;
+
+
+export function calculatePoisonDamage(
+  skill
+) {
+  const cost =
+    Math.max(
+      0,
+      getNumber(
+        skill?.custoMentalidade
+      )
+    );
+
+
+  return Math.max(
+    2,
+    Math.round(
+      cost * 0.35
+    )
+  );
+}
+
+
+export function applyPoisonEffect(
+  target,
+  skill,
+  currentTurn
+) {
+  return applyDamageOverTimeEffect(
+    target,
+    skill,
+    currentTurn,
+    {
+      effectType:
+        "veneno",
+
+      resultKind:
+        "poison",
+
+      duration:
+        POISON_DURATION,
+
+      damagePerTurn:
+        calculatePoisonDamage(
+          skill
+        )
+    }
+  );
+}
+
+
+export function processPoisonEffects(
+  user,
+  currentTurn
+) {
+  return processDamageOverTimeEffects(
+    user,
+    currentTurn,
+    "veneno"
+  );
 }
 
 export function expireBattleEffects(
