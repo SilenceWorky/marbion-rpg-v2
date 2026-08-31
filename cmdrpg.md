@@ -117,6 +117,7 @@ Mostra:
 - adversário quando estiver em PvP
 - efeitos persistentes
 - buffs/debuffs de batalha quando existirem
+- dano por turno e duração restante de Veneno quando existir
 
 Exemplo:
 ```txt
@@ -473,6 +474,87 @@ T3: Precisão 93 → 90 e efeito removido
 
 ---
 
+# ☠️ DEBUFFS E DANO POR TURNO
+
+## Debuffs de atributo
+Status V2: ✔️ **validado em PvP real**
+
+Funcionamento atual:
+- habilidades `tipo: Debuff` precisam acertar o adversário
+- podem causar dano direto e aplicar Debuff na mesma ação
+- o atributo afetado vem de `skill.debuffStat`
+- atributos suportados: Força, Magia, Velocidade, Evasão, Precisão e Defesa
+- força inicial do Debuff usa `custoMentalidade / 5`
+- mínimo de 1
+- máximo de 10
+- atributo nunca fica abaixo de 0
+- somente a quantidade realmente retirada é registrada
+- duração base: 2 turnos
+- ao expirar, o atributo retirado é devolvido exatamente
+- se o golpe errar, não causa dano e não aplica Debuff
+- mesmo errando, a habilidade executada consome Mentalidade
+- `!estado` mostra o Debuff enquanto estiver ativo
+
+Teste real validado com **Brasa Ascendente**:
+```txt
+Defesa: 5 → 3
+Efeito: ⬇️ Defesa -2
+Após expiração: Defesa volta para 5
+```
+
+---
+
+## Veneno
+Status V2: ✔️ **validado em PvP real**
+
+Habilidades `tipo: Veneno` podem produzir três efeitos na mesma execução:
+```txt
+Dano direto
++
+Debuff de atributo
++
+Envenenamento periódico
+```
+
+Regras atuais:
+- o golpe precisa acertar para envenenar
+- Veneno não é aplicado se o dano direto já derrubar o alvo
+- duração base: 3 ticks
+- primeiro tick acontece no início do turno seguinte
+- dano por tick = `Math.max(2, Math.round(custoMentalidade * 0.35))`
+- reaplicar Veneno renova a duração
+- vários Venenos não acumulam infinitamente
+- ao reaplicar, permanece o maior dano por turno
+- o dano periódico acontece antes das novas ações do turno
+- se o Veneno reduzir HP a 0, a batalha termina antes das ações daquele novo turno
+- se os dois jogadores morrerem simultaneamente por Veneno, o PvP termina empatado
+- após o último tick, o efeito é removido automaticamente
+- mensagens de combate mostram separadamente o HP após a ação e o HP após o tick de Veneno
+
+Exibição no `!estado`:
+```txt
+☠️ Nuvem Tóxica — 8 dano/turno (2T)
+```
+
+Teste real validado com **Nuvem Tóxica**:
+```txt
+Dano direto
+→ Debuff de Força
+→ Envenenado
+
+Início do T2 → -8 HP
+Início do T3 → -8 HP
+Início do T4 → -8 HP
+→ efeito removido
+```
+
+Também foram validados:
+- morte causada pelo último tick de Veneno
+- encerramento da luta antes das novas ações quando o Veneno mata
+- empate quando os dois jogadores chegam a 0 pelo Veneno no mesmo início de turno
+
+---
+
 # ⚔️ PVP
 
 ## !pvp @usuario
@@ -644,6 +726,7 @@ Subcomandos atuais:
 !adm level @usuario 20
 !adm raça @usuario Terrariano
 !adm elemento @usuario Fogo Terra
+!adm pontos @usuario 10
 !adm skill @usuario add Nome da Habilidade
 !adm skill @usuario rem Nome da Habilidade
 ```
@@ -651,6 +734,7 @@ Subcomandos atuais:
 Regras:
 - somente usuários autorizados
 - protegido por chave administrativa
+- `!adm pontos` adiciona Status Points disponíveis sem alterar diretamente os atributos
 - ADM pode forçar habilidades incompatíveis com os elementos do personagem para testes/administração
 
 ---
@@ -819,9 +903,10 @@ Projeto futuro definido:
 - Buffs reais em combate ✔️
 - Expiração de buffs por turno ✔️
 - Meditação / recuperação de Mentalidade em PvP ✔️
-- Debuffs reais em combate ⏳ **PRÓXIMO**
+- Debuffs reais em combate ✔️
+- Veneno / dano por turno ✔️
+- Queimadura / outros danos por turno ⏳ **PRÓXIMO**
 - Regeneração natural de Mentalidade fora do combate ⏳
-- Veneno / queimadura / dano por turno ⏳
 - Paralisia / congelamento / controle ⏳
 - Counter ⏳
 - Cooldown real de habilidades ⏳
@@ -839,9 +924,9 @@ Projeto futuro definido:
 - Mentalidade real ✔️
 - Buff ✔️
 - Meditação ✔️
-- Debuff ⏳
+- Debuff ✔️
 - Suporte ⏳
-- DoT ⏳
+- DoT ✔️ Veneno
 - Controle ⏳
 - Counter ⏳
 - efeitos especiais de Tempo/Espaço/Gravidade/Matéria ⏳
