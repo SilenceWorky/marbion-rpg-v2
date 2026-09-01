@@ -118,6 +118,7 @@ Mostra:
 - efeitos persistentes
 - buffs/debuffs de batalha quando existirem
 - dano por turno e duração restante de Veneno, Queimadura e futuros DoTs quando existirem
+- Controles ativos, origem e quantidade de ações ainda bloqueadas
 
 Exemplo:
 ```txt
@@ -993,7 +994,9 @@ Projeto futuro definido:
 - Veneno / dano por turno ✔️
 - Queimadura / dano por turno ✔️
 - Motor genérico de DoT ✔️
-- Paralisia / congelamento / controle ⏳ **PRÓXIMO**
+- Motor genérico de Controle ✔️
+- Paralisia ✔️
+- Congelamento ✔️
 - Regeneração natural de Mentalidade fora do combate ⏳
 - Counter ⏳
 - Cooldown real de habilidades ⏳
@@ -1014,7 +1017,7 @@ Projeto futuro definido:
 - Debuff ✔️
 - Suporte ⏳
 - DoT ✔️ Veneno + Queimadura
-- Controle ⏳
+- Controle ✔️ Paralisia + Congelamento
 - Counter ⏳
 - efeitos especiais de Tempo/Espaço/Gravidade/Matéria ⏳
 - sistema de crítico ⏳
