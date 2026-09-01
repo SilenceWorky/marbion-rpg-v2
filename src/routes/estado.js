@@ -1,6 +1,11 @@
 import {
-  getProfile
+  getProfile,
+  saveProfile
 } from "../core/database.js";
+
+import {
+  applyNaturalMentalidadeRegen
+} from "../systems/mentalidade-regen.js";
 
 
 function normalizeUser(
@@ -548,6 +553,27 @@ export async function estadoRoute(
     !battleState.ok ||
     !battleState.inBattle
   ) {
+
+    /*
+     * Fora do PvP podemos atualizar
+     * a Mentalidade persistente.
+     */
+    const regen =
+      applyNaturalMentalidadeRegen(
+        profile
+      );
+
+
+    if (
+      regen.changed
+    ) {
+      await saveProfile(
+        env,
+        user,
+        profile
+      );
+    }
+
     const effects =
       persistentEffects.length
         ? persistentEffects.join(", ")

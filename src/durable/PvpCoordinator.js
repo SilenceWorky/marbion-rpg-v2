@@ -8,6 +8,10 @@ import {
 } from "../core/database.js";
 
 import {
+  applyNaturalMentalidadeRegen
+} from "../systems/mentalidade-regen.js";
+
+import {
   consumeSkillUse
 } from "../systems/skill-usage.js";
 
@@ -1029,6 +1033,138 @@ export class PvpCoordinator {
     );
   }
 
+  async persistBattleMentalidade(
+    battle,
+    finishedAt = Date.now()
+  ) {
+    if (
+      !battle?.player1?.user ||
+      !battle?.player2?.user
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_BATTLE"
+      };
+    }
+
+
+    const [
+      player1Profile,
+      player2Profile
+    ] =
+      await Promise.all([
+        getProfile(
+          this.env,
+          battle.player1.user
+        ),
+
+        getProfile(
+          this.env,
+          battle.player2.user
+        )
+      ]);
+
+
+    if (
+      !player1Profile ||
+      !player2Profile
+    ) {
+      return {
+        ok: false,
+        error:
+          "PROFILE_NOT_FOUND"
+      };
+    }
+
+
+    const safeFinishedAt =
+      Math.max(
+        0,
+        Number(
+          finishedAt
+        ) ||
+        Date.now()
+      );
+
+
+    player1Profile.mentalidade =
+      Math.min(
+        player1Profile.maxMentalidade,
+        Math.max(
+          0,
+          Number(
+            battle.player1.mentalidade
+          ) || 0
+        )
+      );
+
+
+    player2Profile.mentalidade =
+      Math.min(
+        player2Profile.maxMentalidade,
+        Math.max(
+          0,
+          Number(
+            battle.player2.mentalidade
+          ) || 0
+        )
+      );
+
+
+    /*
+     * A regeneração natural começa
+     * a contar somente depois que
+     * o combate realmente terminou.
+     *
+     * Tempo dentro do PvP não conta
+     * como tempo de regeneração.
+     */
+    player1Profile.lastMentalidadeRegenAt =
+      safeFinishedAt;
+
+    player2Profile.lastMentalidadeRegenAt =
+      safeFinishedAt;
+
+
+    await Promise.all([
+      saveProfile(
+        this.env,
+        battle.player1.user,
+        player1Profile
+      ),
+
+      saveProfile(
+        this.env,
+        battle.player2.user,
+        player2Profile
+      )
+    ]);
+
+
+    return {
+      ok: true,
+
+      player1: {
+        user:
+          battle.player1.user,
+
+        mentalidade:
+          player1Profile.mentalidade
+      },
+
+      player2: {
+        user:
+          battle.player2.user,
+
+        mentalidade:
+          player2Profile.mentalidade
+      },
+
+      finishedAt:
+        safeFinishedAt
+    };
+  }
 
   cleanExpiredChallenges(
     data
@@ -1575,6 +1711,59 @@ export class PvpCoordinator {
       };
     }
 
+    /*
+     * ==============================
+     * REGENERAÇÃO PRÉ-PvP
+     * ==============================
+     *
+     * Como nenhum dos dois jogadores
+     * está em combate neste momento,
+     * podemos aplicar toda a
+     * regeneração acumulada fora dele.
+     */
+    const battleStartedAt =
+      Date.now();
+
+
+    applyNaturalMentalidadeRegen(
+      challengerProfile,
+      battleStartedAt
+    );
+
+    applyNaturalMentalidadeRegen(
+      targetProfile,
+      battleStartedAt
+    );
+
+
+    /*
+     * A partir daqui eles entram
+     * oficialmente em combate.
+     *
+     * Zeramos o relógio da regeneração
+     * para impedir que o tempo gasto
+     * dentro do PvP seja contado.
+     */
+    challengerProfile.lastMentalidadeRegenAt =
+      battleStartedAt;
+
+    targetProfile.lastMentalidadeRegenAt =
+      battleStartedAt;
+
+
+    await Promise.all([
+      saveProfile(
+        this.env,
+        challenge.challenger,
+        challengerProfile
+      ),
+
+      saveProfile(
+        this.env,
+        challenge.target,
+        targetProfile
+      )
+    ]);
 
     const battle = {
       id:
@@ -1600,7 +1789,7 @@ export class PvpCoordinator {
             challengerProfile.maxHp,
 
         mentalidade:
-            challengerProfile.maxMentalidade,
+            challengerProfile.mentalidade,
 
         maxMentalidade:
             challengerProfile.maxMentalidade,
@@ -1643,7 +1832,7 @@ export class PvpCoordinator {
         targetProfile.maxHp,
 
     mentalidade:
-        targetProfile.maxMentalidade,
+        targetProfile.mentalidade,
 
     maxMentalidade:
         targetProfile.maxMentalidade,
@@ -2758,6 +2947,23 @@ export class PvpCoordinator {
     data
     );
 
+    /*
+     * ==============================
+     * MENTALIDADE PÓS-PvP
+     * ==============================
+     *
+     * A quantidade que restou dentro
+     * da batalha volta para o perfil.
+     */
+    if (
+      battleOver
+    ) {
+      await this.persistBattleMentalidade(
+        battle,
+        battle.finishedAt ||
+        Date.now()
+      );
+    }
 
     return {
     ok: true,
