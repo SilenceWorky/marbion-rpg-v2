@@ -1,0 +1,57 @@
+name: Atualizar CMD RPG com Controle concluido
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/temp-atualiza-controle-cmdrpg.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  update-doc:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Atualizar cmdrpg
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("cmdrpg.md")
+          text = path.read_text(encoding="utf-8")
+
+          text = text.replace(
+              "- dano por turno e duração restante de Veneno, Queimadura e futuros DoTs quando existirem\n",
+              "- dano por turno e duração restante de Veneno, Queimadura e futuros DoTs quando existirem\n- Controles ativos, origem e quantidade de ações ainda bloqueadas\n",
+          )
+
+          text = text.replace(
+              "- Paralisia / congelamento / controle ⏳ **PRÓXIMO**",
+              "- Motor genérico de Controle ✔️\n- Paralisia ✔️\n- Congelamento ✔️",
+          )
+
+          text = text.replace(
+              "- Controle ⏳",
+              "- Controle ✔️ Paralisia + Congelamento",
+          )
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add cmdrpg.md
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração necessária."
+            exit 0
+          fi
+          git commit -m "Atualiza CMD RPG com Paralisia e Congelamento"
+          git push
