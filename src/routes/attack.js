@@ -522,10 +522,12 @@ export async function attackRoute(
       * CONTROLE OFENSIVO
       * ==============================
       */
-      if (
-        execution.kind ===
-        "paralysis"
-      ) {
+    if (
+      execution.kind ===
+        "paralysis" ||
+      execution.kind ===
+        "freeze"
+    ) {
         if (!execution.hit) {
           return (
             `@${execution.attacker} usou ${execution.skill}, ` +

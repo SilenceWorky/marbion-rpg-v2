@@ -38,6 +38,7 @@ import {
   processDamageOverTimeEffects,
   applyControlEffect,
   applyParalysisEffect,
+  applyFreezeEffect,
   consumeControlBlock,
   expireBattleEffects,
   executeMeditation,
@@ -755,6 +756,23 @@ function executeBattleAction(
   }
 
   /*
+   * ==============================
+   * CONGELAMENTO
+   * ==============================
+   */
+  if (
+    controlType ===
+    "congelamento"
+  ) {
+    return executeFreezeAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
+
+  /*
   * MEDITAÇÃO
   */
   if (
@@ -857,6 +875,94 @@ function executeParalysisAction(
 
     kind:
       "paralysis",
+
+    controlApplied:
+      control.ok,
+
+    control
+  };
+}
+
+function executeFreezeAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  /*
+   * Congelamento funciona como:
+   *
+   * dano direto
+   * +
+   * Controle.
+   */
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  /*
+   * Errou:
+   * não congela.
+   */
+  if (!base.hit) {
+    return {
+      ...base,
+
+      kind:
+        "freeze",
+
+      controlApplied:
+        false,
+
+      control:
+        null
+    };
+  }
+
+
+  /*
+   * O dano direto já derrubou
+   * o adversário.
+   *
+   * Não cria Controle inútil.
+   */
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+
+      kind:
+        "freeze",
+
+      controlApplied:
+        false,
+
+      control:
+        null
+    };
+  }
+
+
+  const control =
+    applyFreezeEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+
+    kind:
+      "freeze",
 
     controlApplied:
       control.ok,

@@ -1583,6 +1583,56 @@ export function applyParalysisEffect(
   );
 }
 
+/*
+ * ==============================
+ * CONGELAMENTO
+ * ==============================
+ *
+ * Segunda implementação real
+ * do motor genérico de Controle.
+ *
+ * Por padrão:
+ * bloqueia 1 ação.
+ */
+
+
+export const FREEZE_DURATION =
+  1;
+
+
+export function applyFreezeEffect(
+  target,
+  skill,
+  currentTurn
+) {
+  const duration =
+    Math.max(
+      1,
+      Math.floor(
+        Number(
+          skill?.controlDuration
+        ) ||
+        FREEZE_DURATION
+      )
+    );
+
+
+  return applyControlEffect(
+    target,
+    skill,
+    currentTurn,
+    {
+      effectType:
+        "congelamento",
+
+      resultKind:
+        "freeze",
+
+      duration
+    }
+  );
+}
+
 export function expireBattleEffects(
   user,
   currentTurn
