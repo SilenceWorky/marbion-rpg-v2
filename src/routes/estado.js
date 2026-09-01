@@ -81,6 +81,33 @@ const DOT_INFO = {
   }
 };
 
+const CONTROL_INFO = {
+  paralisia: {
+    name: "Paralisia",
+    icon: "⚡"
+  },
+
+  paralysis: {
+    name: "Paralisia",
+    icon: "⚡"
+  },
+
+  congelamento: {
+    name: "Congelamento",
+    icon: "❄️"
+  },
+
+  freeze: {
+    name: "Congelamento",
+    icon: "❄️"
+  },
+
+  atordoamento: {
+    name: "Atordoamento",
+    icon: "💫"
+  }
+};
+
 function formatBattleEffect(
   effect,
   turn
@@ -160,6 +187,35 @@ function formatBattleEffect(
     return (
       `${dotInfo.icon} ${name || dotInfo.name} — ` +
       `${damage} dano/turno (${remaining}T)`
+    );
+  }
+
+  /*
+  * ==============================
+  * CONTROLE
+  * ==============================
+  */
+  const controlInfo =
+    CONTROL_INFO[
+      type
+    ];
+
+  if (
+    controlInfo &&
+    effect.effectCategory ===
+      "control"
+  ) {
+    const remaining =
+      Math.max(
+        0,
+        Number(
+          effect.remainingBlocks
+        ) || 0
+      );
+
+    return (
+      `${controlInfo.icon} ${name || controlInfo.name} — ` +
+      `${remaining} ação(ões) bloqueada(s)`
     );
   }
 
@@ -248,11 +304,12 @@ function formatBattleEffect(
   }
 
   else if (
-    type === "paralysis" ||
-    type === "paralisia"
+    CONTROL_INFO[
+      type
+    ]
   ) {
     text =
-      `⚡ ${text}`;
+      `${CONTROL_INFO[type].icon} ${text}`;
   }
 
 

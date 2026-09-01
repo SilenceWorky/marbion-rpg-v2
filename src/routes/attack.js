@@ -248,6 +248,63 @@ export async function attackRoute(
       );
     }
 
+    function getControlInfo(
+      type
+    ) {
+      const normalized =
+        String(
+          type ?? ""
+        )
+          .trim()
+          .toLowerCase();
+
+      const controls = {
+        paralisia: {
+          name: "Paralisia",
+          adjective: "Paralisado",
+          icon: "⚡"
+        },
+
+        paralysis: {
+          name: "Paralisia",
+          adjective: "Paralisado",
+          icon: "⚡"
+        },
+
+        congelamento: {
+          name: "Congelamento",
+          adjective: "Congelado",
+          icon: "❄️"
+        },
+
+        freeze: {
+          name: "Congelamento",
+          adjective: "Congelado",
+          icon: "❄️"
+        },
+
+        atordoamento: {
+          name: "Atordoamento",
+          adjective: "Atordoado",
+          icon: "💫"
+        }
+      };
+
+      return (
+        controls[normalized] || {
+          name:
+            normalized ||
+            "Controle",
+
+          adjective:
+            "Imobilizado",
+
+          icon:
+            "⛔"
+        }
+      );
+    }
+
   /*
    * Os dois já escolheram.
    *
@@ -260,6 +317,27 @@ export async function attackRoute(
     ) {
     if (!execution) {
         return "";
+    }
+
+    if (
+      execution.kind ===
+      "control_blocked"
+    ) {
+      const info =
+        getControlInfo(
+          execution.control?.type
+        );
+
+      const source =
+        execution.control?.source
+          ? ` por ${execution.control.source}`
+          : "";
+
+      return (
+        `${info.icon} @${execution.attacker} tentou usar ` +
+        `${execution.skill}, mas ficou ${info.adjective}${source} ` +
+        `e perdeu a ação.`
+      );
     }
 
     if (
@@ -438,6 +516,63 @@ export async function attackRoute(
 
       return text;
     }
+
+      /*
+      * ==============================
+      * CONTROLE OFENSIVO
+      * ==============================
+      */
+      if (
+        execution.kind ===
+        "paralysis"
+      ) {
+        if (!execution.hit) {
+          return (
+            `@${execution.attacker} usou ${execution.skill}, ` +
+            `mas errou.`
+          );
+        }
+
+        const defenderHpData =
+          hpData.player1.user ===
+          execution.defender
+            ? hpData.player1
+            : hpData.player2;
+
+        const hpAfterExecution =
+          Number.isFinite(
+            Number(
+              execution.defenderHp
+            )
+          )
+            ? Number(
+                execution.defenderHp
+              )
+            : defenderHpData.current;
+
+        let text =
+          `@${execution.attacker} usou ${execution.skill} ` +
+          `e causou ${execution.damage} de dano em ` +
+          `@${execution.defender}. ` +
+          `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
+
+        if (
+          execution.controlApplied &&
+          execution.control
+        ) {
+          const info =
+            getControlInfo(
+              execution.control.type
+            );
+
+          text +=
+            ` ${info.icon} @${execution.defender} ficou ` +
+            `${info.adjective} e perderá ` +
+            `${execution.control.remainingBlocks} ação(ões).`;
+        }
+
+        return text;
+      }
 
     if (
       execution.kind ===
