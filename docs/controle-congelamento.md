@@ -86,6 +86,22 @@ Ação bloqueada:
 - exibição no `!estado` ✔️
 - teste real na Twitch com bloqueio no mesmo turno ✔️
 - teste real na Twitch com efeito persistente para o turno seguinte ✔️
+- teste real na Twitch com consumo do bloqueio no turno seguinte ✔️
+- `!estado` retorna `Efeitos: Nenhum` após o bloqueio ser consumido ✔️
+
+## Validação final em produção
+
+Fluxo confirmado na Twitch:
+
+```txt
+T3: alvo ainda estava Congelado
+→ alvo tentou usar Soco
+→ ação foi bloqueada por Lança Glaciar
+→ Turno 4 iniciou
+→ !estado: Efeitos: Nenhum
+```
+
+Esse teste fecha o ciclo completo de Congelamento em produção: aplicação, persistência, bloqueio posterior e remoção automática.
 
 ## Relação com o motor de Controle
 
