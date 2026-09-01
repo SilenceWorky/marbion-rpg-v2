@@ -24,6 +24,7 @@ export function createBaseProfile(user) {
     // MENTALIDADE
     mentalidade: 50,
     maxMentalidade: 50,
+    lastMentalidadeRegenAt: now,
 
     // STATUS
     strength: 5,
