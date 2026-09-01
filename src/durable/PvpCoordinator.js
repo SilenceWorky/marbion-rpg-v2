@@ -34,7 +34,8 @@ import {
   executeBuffSkill,
   applyDebuffSkill,
   applyPoisonEffect,
-  processPoisonEffects,
+  applyBurnEffect,
+  processDamageOverTimeEffects,
   expireBattleEffects,
   executeMeditation,
   MEDITATION_SKILL
@@ -514,6 +515,99 @@ function executePoisonAction(
   };
 }
 
+function executeBurnAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  /*
+   * Queimadura é diferente do Veneno.
+   *
+   * Ela funciona como:
+   *
+   * dano direto normal
+   * +
+   * efeito periódico de Queimadura
+   *
+   * Não aplica Debuff de atributo
+   * automaticamente.
+   */
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  /*
+   * Errou:
+   * não queima.
+   */
+  if (!base.hit) {
+    return {
+      ...base,
+
+      kind:
+        "burn",
+
+      burnApplied:
+        false,
+
+      burn:
+        null
+    };
+  }
+
+
+  /*
+   * O dano direto já derrotou
+   * o adversário.
+   *
+   * Não adiciona um DoT inútil.
+   */
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+
+      kind:
+        "burn",
+
+      burnApplied:
+        false,
+
+      burn:
+        null
+    };
+  }
+
+
+  const burn =
+    applyBurnEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+
+    kind:
+      "burn",
+
+    burnApplied:
+      burn.ok,
+
+    burn
+  };
+}
+
 function executeBattleAction(
   attacker,
   defender,
@@ -527,6 +621,12 @@ function executeBattleAction(
       .trim()
       .toLowerCase();
 
+  const dotType =
+    String(
+      action?.skill?.dotType ?? ""
+    )
+      .trim()
+      .toLowerCase();
 
   /*
    * CURA
@@ -592,6 +692,28 @@ function executeBattleAction(
     skillType === "veneno"
   ) {
     return executePoisonAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
+
+  /*
+   * QUEIMADURA
+   *
+   * A habilidade continua podendo ser
+   * tipo Elemental, Física etc.
+   *
+   * O campo dotType informa que,
+   * além do ataque normal, ela
+   * aplica Queimadura.
+   */
+  if (
+    dotType ===
+    "queimadura"
+  ) {
+    return executeBurnAction(
       attacker,
       defender,
       action,
@@ -1898,8 +2020,19 @@ export class PvpCoordinator {
     let rankedResult =
     null;
 
+    let dotTicks =
+      [];
+
     let poisonTicks =
       [];
+
+    let burnTicks =
+      [];
+
+    let dotDefeats = {
+      player1: null,
+      player2: null
+    };
 
     let draw =
       false;
@@ -2023,34 +2156,67 @@ export class PvpCoordinator {
 
 
       /*
-      * ==============================
-      * VENENO
-      * ==============================
-      *
-      * O dano periódico acontece
-      * imediatamente quando o novo
-      * turno começa, antes de qualquer
-      * jogador escolher sua ação.
-      *
-      * Os dois jogadores são processados
-      * antes de verificarmos quem caiu.
-      */
-      const player1Poison =
-        processPoisonEffects(
+       * ==============================
+       * DANO PERIÓDICO
+       * ==============================
+       *
+       * Todos os DoTs são processados
+       * juntos no início do turno.
+       *
+       * Hoje:
+       * ☠️ Veneno
+       * 🔥 Queimadura
+       */
+      const player1Dots =
+        processDamageOverTimeEffects(
           battle.player1,
-          battle.turn
+          battle.turn,
+          [
+            "veneno",
+            "queimadura"
+          ]
         );
 
 
-      const player2Poison =
-        processPoisonEffects(
+      const player2Dots =
+        processDamageOverTimeEffects(
           battle.player2,
-          battle.turn
+          battle.turn,
+          [
+            "veneno",
+            "queimadura"
+          ]
         );
 
+      /*
+       * Registra exatamente qual DoT
+       * foi responsável por levar
+       * cada jogador a 0 HP.
+       */
+      dotDefeats = {
+        player1:
+          player1Dots.killedBy
+            ? {
+                user:
+                  battle.player1.user,
 
-      poisonTicks = [
-        ...player1Poison.ticks.map(
+                ...player1Dots.killedBy
+              }
+            : null,
+
+        player2:
+          player2Dots.killedBy
+            ? {
+                user:
+                  battle.player2.user,
+
+                ...player2Dots.killedBy
+              }
+            : null
+      };
+
+      dotTicks = [
+        ...player1Dots.ticks.map(
           tick => ({
             ...tick,
 
@@ -2062,7 +2228,7 @@ export class PvpCoordinator {
           })
         ),
 
-        ...player2Poison.ticks.map(
+        ...player2Dots.ticks.map(
           tick => ({
             ...tick,
 
@@ -2074,6 +2240,27 @@ export class PvpCoordinator {
           })
         )
       ];
+
+
+      /*
+       * Mantemos listas separadas
+       * também por compatibilidade
+       * com o código atual.
+       */
+      poisonTicks =
+        dotTicks.filter(
+          tick =>
+            tick.type ===
+            "veneno"
+        );
+
+
+      burnTicks =
+        dotTicks.filter(
+          tick =>
+            tick.type ===
+            "queimadura"
+        );
 
 
       /*
@@ -2107,7 +2294,7 @@ export class PvpCoordinator {
 
       /*
       * ==============================
-      * MORTE PELO VENENO
+      * DERROTA POR DANO PERIÓDICO
       * ==============================
       */
       if (
@@ -2235,7 +2422,7 @@ export class PvpCoordinator {
 
 
       /*
-      * Ninguém foi derrotado pelo Veneno.
+      * Ninguém foi derrotado por dano periódico.
       *
       * O novo turno abre normalmente.
       */
@@ -2340,7 +2527,13 @@ export class PvpCoordinator {
 
         rankedResult,
 
+        dotTicks,
+
         poisonTicks,
+
+        burnTicks,
+
+        dotDefeats,
 
         draw,
 

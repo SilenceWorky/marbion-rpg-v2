@@ -803,6 +803,8 @@ export function processDamageOverTimeEffects(
   const active = [];
   const ticks = [];
 
+  let killedBy =
+    null;
 
   for (
     const effect
@@ -815,6 +817,21 @@ export function processDamageOverTimeEffects(
         .trim()
         .toLowerCase();
 
+    /*
+     * Outro DoT já derrubou
+     * este jogador nesta mesma
+     * abertura de turno.
+     *
+     * Não produzimos ticks falsos
+     * de 0 de dano depois da derrota.
+     */
+    if (killedBy) {
+      active.push(
+        effect
+      );
+
+      continue;
+    }
 
     /*
      * Não pertence aos DoTs
@@ -930,6 +947,14 @@ export function processDamageOverTimeEffects(
     user.hp =
       hpAfter;
 
+    /*
+     * Este foi exatamente o efeito
+     * que levou o HP de um valor
+     * positivo até 0.
+     */
+    const lethal =
+      hpBefore > 0 &&
+      hpAfter <= 0;      
 
     const newRemainingTicks =
       remainingTicks -
@@ -950,8 +975,34 @@ export function processDamageOverTimeEffects(
       hpAfter,
 
       remainingTicks:
-        newRemainingTicks
+        newRemainingTicks,
+
+      lethal
     });
+
+    /*
+     * Registra a causa exata
+     * da derrota.
+     */
+    if (lethal) {
+      killedBy = {
+        type:
+          effectType,
+
+        source:
+          effect.source
+      };
+
+
+      /*
+       * Não precisamos manter
+       * o próprio efeito letal ativo.
+       *
+       * Os efeitos seguintes serão
+       * preservados, mas não executados.
+       */
+      continue;
+    }
 
 
     /*
@@ -987,7 +1038,9 @@ export function processDamageOverTimeEffects(
     killed:
       Number(
         user.hp
-      ) <= 0
+      ) <= 0,
+
+    killedBy
   };
 }
 
@@ -1066,6 +1119,92 @@ export function processPoisonEffects(
     user,
     currentTurn,
     "veneno"
+  );
+}
+
+/*
+ * ==============================
+ * QUEIMADURA
+ * ==============================
+ *
+ * Queimadura usa o mesmo motor
+ * genérico de dano periódico.
+ *
+ * Diferença para Veneno:
+ *
+ * - duração menor;
+ * - dano por tick maior;
+ * - efeito mais agressivo
+ *   e de curta duração.
+ */
+
+
+export const BURN_DURATION =
+  2;
+
+
+/*
+ * 45% do custo de Mentalidade.
+ *
+ * mínimo de 2 de dano por turno.
+ */
+export function calculateBurnDamage(
+  skill
+) {
+  const cost =
+    Math.max(
+      0,
+      getNumber(
+        skill?.custoMentalidade
+      )
+    );
+
+
+  return Math.max(
+    2,
+    Math.round(
+      cost * 0.45
+    )
+  );
+}
+
+
+export function applyBurnEffect(
+  target,
+  skill,
+  currentTurn
+) {
+  return applyDamageOverTimeEffect(
+    target,
+    skill,
+    currentTurn,
+    {
+      effectType:
+        "queimadura",
+
+      resultKind:
+        "burn",
+
+      duration:
+        BURN_DURATION,
+
+      damagePerTurn:
+        calculateBurnDamage(
+          skill
+        )
+    }
+  );
+}
+
+
+export function processBurnEffects(
+  user,
+  currentTurn
+) {
+  return processDamageOverTimeEffects(
+    user,
+    currentTurn,
+    "queimadura"
   );
 }
 

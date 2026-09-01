@@ -192,6 +192,61 @@ export async function attackRoute(
     );
   }
 
+    function getDotInfo(
+      type
+    ) {
+      const normalized =
+        String(
+          type ?? ""
+        )
+          .trim()
+          .toLowerCase();
+
+
+      const dots = {
+        veneno: {
+          name: "Veneno",
+          icon: "☠️"
+        },
+
+        queimadura: {
+          name: "Queimadura",
+          icon: "🔥"
+        },
+
+        sangramento: {
+          name: "Sangramento",
+          icon: "🩸"
+        },
+
+        radiacao: {
+          name: "Radiação",
+          icon: "☢️"
+        },
+
+        deterioracao: {
+          name: "Deterioração",
+          icon: "🧬"
+        },
+
+        lava: {
+          name: "Lava",
+          icon: "🌋"
+        }
+      };
+
+
+      return (
+        dots[normalized] || {
+          name:
+            normalized ||
+            "Dano periódico",
+
+          icon:
+            "💥"
+        }
+      );
+    }
 
   /*
    * Os dois já escolheram.
@@ -322,6 +377,68 @@ export async function attackRoute(
       return text;
     }
 
+    /*
+     * ==============================
+     * QUEIMADURA
+     * ==============================
+     */
+    if (
+      execution.kind ===
+      "burn"
+    ) {
+      if (!execution.hit) {
+        return (
+          `@${execution.attacker} usou ${execution.skill}, ` +
+          `mas errou.`
+        );
+      }
+
+
+      const defenderHpData =
+        hpData.player1.user ===
+        execution.defender
+          ? hpData.player1
+          : hpData.player2;
+
+
+      /*
+       * HP imediatamente depois
+       * do golpe, antes dos ticks
+       * do próximo turno.
+       */
+      const hpAfterExecution =
+        Number.isFinite(
+          Number(
+            execution.defenderHp
+          )
+        )
+          ? Number(
+              execution.defenderHp
+            )
+          : defenderHpData.current;
+
+
+      let text =
+        `@${execution.attacker} usou ${execution.skill} ` +
+        `e causou ${execution.damage} de dano em ` +
+        `@${execution.defender}. ` +
+        `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
+
+
+      if (
+        execution.burnApplied &&
+        execution.burn
+      ) {
+        text +=
+          ` 🔥 @${execution.defender} ficou Queimado: ` +
+          `${execution.burn.damagePerTurn} de dano por turno ` +
+          `por ${execution.burn.duration} turnos.`;
+      }
+
+
+      return text;
+    }
+
     if (
       execution.kind ===
       "debuff"
@@ -438,16 +555,25 @@ export async function attackRoute(
         result.hp
     );
 
-    const poisonText =
+    const dotText =
       Array.isArray(
-        result.poisonTicks
+        result.dotTicks
       )
-        ? result.poisonTicks
+        ? result.dotTicks
             .map(
-              tick =>
-                `☠️ Início do Turno ${Number(result.turn) + 1}: ` +
-                `@${tick.user} sofreu ${tick.damage} de dano por ${tick.source}. ` +
-                `HP: ${tick.hpAfter}/${tick.maxHp}.`
+              tick => {
+                const info =
+                  getDotInfo(
+                    tick.type
+                  );
+
+
+                return (
+                  `${info.icon} Início do Turno ${Number(result.turn) + 1}: ` +
+                  `@${tick.user} sofreu ${tick.damage} de dano por ${tick.source}. ` +
+                  `HP: ${tick.hpAfter}/${tick.maxHp}.`
+                );
+              }
             )
             .join(" ")
         : "";
@@ -464,9 +590,106 @@ export async function attackRoute(
         ` ${secondText}`;
     }
 
-    if (poisonText) {
+    if (dotText) {
       message +=
-        ` ${poisonText}`;
+        ` ${dotText}`;
+    }
+
+    /*
+     * ==============================
+     * CAUSA DA DERROTA POR DoT
+     * ==============================
+     */
+    const dotDefeats =
+      result.dotDefeats || {};
+
+
+    const defeatedByDot =
+      [
+        dotDefeats.player1,
+        dotDefeats.player2
+      ]
+        .filter(Boolean);
+
+
+    let dotDefeatText =
+      "";
+
+
+    if (
+      defeatedByDot.length === 1
+    ) {
+      const defeat =
+        defeatedByDot[0];
+
+      const info =
+        getDotInfo(
+          defeat.type
+        );
+
+
+      dotDefeatText =
+        ` 💀 @${defeat.user} foi derrotado por ` +
+        `${info.icon} ${info.name} no início do turno.`;
+    }
+
+
+    else if (
+      defeatedByDot.length === 2
+    ) {
+      const first =
+        defeatedByDot[0];
+
+      const second =
+        defeatedByDot[1];
+
+
+      const firstInfo =
+        getDotInfo(
+          first.type
+        );
+
+      const secondInfo =
+        getDotInfo(
+          second.type
+        );
+
+
+      /*
+       * Os dois caíram pelo mesmo
+       * tipo de efeito.
+       */
+      if (
+        String(
+          first.type
+        ).toLowerCase() ===
+        String(
+          second.type
+        ).toLowerCase()
+      ) {
+        dotDefeatText =
+          ` 💀 @${first.user} e @${second.user} foram derrotados por ` +
+          `${firstInfo.icon} ${firstInfo.name} no início do turno.`;
+      }
+
+
+      /*
+       * Cada jogador caiu por
+       * uma causa diferente.
+       */
+      else {
+        dotDefeatText =
+          ` 💀 @${first.user} foi derrotado por ` +
+          `${firstInfo.icon} ${firstInfo.name} e ` +
+          `@${second.user} foi derrotado por ` +
+          `${secondInfo.icon} ${secondInfo.name} no início do turno.`;
+      }
+    }
+
+
+    if (dotDefeatText) {
+      message +=
+        dotDefeatText;
     }
 
     if (
@@ -477,8 +700,8 @@ export async function attackRoute(
       result.draw
     ) {
       message +=
-        ` ☠️ Os dois jogadores foram derrotados pelo Veneno no início do turno. ` +
-        `O PvP terminou em empate.`;
+        ` O PvP terminou em empate.`;
+
 
       return new Response(
         message

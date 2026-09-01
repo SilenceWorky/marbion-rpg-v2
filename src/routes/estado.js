@@ -39,6 +39,47 @@ const STAT_LABELS = {
   defense: "Defesa"
 };
 
+const DOT_INFO = {
+  poison: {
+    name: "Veneno",
+    icon: "☠️"
+  },
+
+  veneno: {
+    name: "Veneno",
+    icon: "☠️"
+  },
+
+  burn: {
+    name: "Queimadura",
+    icon: "🔥"
+  },
+
+  queimadura: {
+    name: "Queimadura",
+    icon: "🔥"
+  },
+
+  sangramento: {
+    name: "Sangramento",
+    icon: "🩸"
+  },
+
+  radiacao: {
+    name: "Radiação",
+    icon: "☢️"
+  },
+
+  deterioracao: {
+    name: "Deterioração",
+    icon: "🧬"
+  },
+
+  lava: {
+    name: "Lava",
+    icon: "🌋"
+  }
+};
 
 function formatBattleEffect(
   effect,
@@ -79,14 +120,22 @@ function formatBattleEffect(
     "Efeito";
 
   /*
-  * Veneno possui seu próprio
-  * formato de exibição.
-  */
+   * ==============================
+   * DANO PERIÓDICO
+   * ==============================
+   *
+   * Formatação compartilhada por
+   * Veneno, Queimadura e futuros
+   * DoTs.
+   */
+  const dotInfo =
+    DOT_INFO[
+      type
+    ];
+
+
   if (
-    (
-      type === "poison" ||
-      type === "veneno"
-    ) &&
+    dotInfo &&
     Number.isFinite(
       Number(
         effect.damagePerTurn
@@ -98,6 +147,7 @@ function formatBattleEffect(
         effect.damagePerTurn
       );
 
+
     const remaining =
       Math.max(
         0,
@@ -108,7 +158,7 @@ function formatBattleEffect(
 
 
     return (
-      `☠️ ${name || "Envenenado"} — ` +
+      `${dotInfo.icon} ${name || dotInfo.name} — ` +
       `${damage} dano/turno (${remaining}T)`
     );
   }
@@ -189,11 +239,12 @@ function formatBattleEffect(
   }
 
   else if (
-    type === "poison" ||
-    type === "veneno"
+    DOT_INFO[
+      type
+    ]
   ) {
     text =
-      `☠️ ${text}`;
+      `${DOT_INFO[type].icon} ${text}`;
   }
 
   else if (
