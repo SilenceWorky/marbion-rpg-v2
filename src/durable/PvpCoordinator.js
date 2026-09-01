@@ -36,6 +36,9 @@ import {
   applyPoisonEffect,
   applyBurnEffect,
   processDamageOverTimeEffects,
+  applyControlEffect,
+  applyParalysisEffect,
+  consumeControlBlock,
   expireBattleEffects,
   executeMeditation,
   MEDITATION_SKILL
@@ -628,6 +631,13 @@ function executeBattleAction(
       .trim()
       .toLowerCase();
 
+  const controlType =
+    String(
+      action?.skill?.controlType ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
   /*
    * CURA
    */
@@ -722,6 +732,29 @@ function executeBattleAction(
   }
 
   /*
+   * ==============================
+   * PARALISIA
+   * ==============================
+   *
+   * A habilidade mantém seu tipo
+   * principal como Elemental.
+   *
+   * controlType adiciona o efeito
+   * de Controle.
+   */
+  if (
+    controlType ===
+    "paralisia"
+  ) {
+    return executeParalysisAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
+
+  /*
   * MEDITAÇÃO
   */
   if (
@@ -742,6 +775,119 @@ function executeBattleAction(
     defender,
     action
   );
+}
+
+function executeParalysisAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  /*
+   * Paralisia funciona como:
+   *
+   * dano direto
+   * +
+   * Controle
+   */
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  /*
+   * Errou:
+   * não paralisa.
+   */
+  if (!base.hit) {
+    return {
+      ...base,
+
+      kind:
+        "paralysis",
+
+      controlApplied:
+        false,
+
+      control:
+        null
+    };
+  }
+
+
+  /*
+   * O dano direto já derrubou
+   * o adversário.
+   *
+   * Não cria Controle inútil.
+   */
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+
+      kind:
+        "paralysis",
+
+      controlApplied:
+        false,
+
+      control:
+        null
+    };
+  }
+
+
+  const control =
+    applyParalysisEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+
+    kind:
+      "paralysis",
+
+    controlApplied:
+      control.ok,
+
+    control
+  };
+}
+
+function createControlBlockedExecution(
+  player,
+  action,
+  controlResult
+) {
+  return {
+    kind:
+      "control_blocked",
+
+    attacker:
+      player.user,
+
+    skill:
+      action?.skill?.nome ??
+      "Ação",
+
+    blocked:
+      true,
+
+    control:
+      controlResult?.control ??
+      null
+  };
 }
 
 export class PvpCoordinator {
@@ -1978,31 +2124,68 @@ export class PvpCoordinator {
     * ==============================
     */
 
-    const firstMentalidade =
+        /*
+     * ==============================
+     * CONTROLE DO PRIMEIRO JOGADOR
+     * ==============================
+     *
+     * Antes de gastar Mentalidade
+     * ou executar a habilidade,
+     * verificamos se existe Controle.
+     */
+    const firstControl =
+      consumeControlBlock(
+        first.player
+      );
+
+
+    let firstExecution;
+
+
+    if (
+      firstControl.blocked
+    ) {
+      /*
+       * A ação foi impedida.
+       *
+       * Não gasta Mentalidade.
+       * Não consome habilidade
+       * temporária do Neutro.
+       */
+      firstExecution =
+        createControlBlockedExecution(
+          first.player,
+          first.action,
+          firstControl
+        );
+    }
+
+
+    else {
       spendSkillMentalidade(
         first.player,
         first.action.skill
       );
 
-    const firstExecution =
-      executeBattleAction(
+
+      firstExecution =
+        executeBattleAction(
+          first.player,
+          second.player,
+          first.action,
+          battle.turn
+        );
+
+
+      /*
+       * Só consumimos a habilidade
+       * porque ela realmente executou.
+       */
+      await this.consumeExecutedSkill(
         first.player,
-        second.player,
-        first.action,
-        battle.turn
+        first.action
       );
-
-
-    /*
-    * A habilidade foi EXECUTADA.
-    *
-    * Se for temporária do Neutro,
-    * o uso é consumido mesmo que erre.
-    */
-    await this.consumeExecutedSkill(
-    first.player,
-    first.action
-    );
+    }
 
 
     let secondExecution =
@@ -2061,25 +2244,58 @@ export class PvpCoordinator {
     * ==============================
     */
 
-    const secondMentalidade =
+        /*
+     * ==============================
+     * CONTROLE DO SEGUNDO JOGADOR
+     * ==============================
+     *
+     * Esta verificação acontece
+     * somente quando chega a vez
+     * real dele agir.
+     *
+     * Isso permite que o primeiro
+     * jogador aplique Controle
+     * durante o mesmo turno.
+     */
+    const secondControl =
+      consumeControlBlock(
+        second.player
+      );
+
+
+    if (
+      secondControl.blocked
+    ) {
+      secondExecution =
+        createControlBlockedExecution(
+          second.player,
+          second.action,
+          secondControl
+        );
+    }
+
+
+    else {
       spendSkillMentalidade(
         second.player,
         second.action.skill
       );
 
-    secondExecution =
-      executeBattleAction(
-        second.player,
-        first.player,
-        second.action,
-        battle.turn
-      );
+
+      secondExecution =
+        executeBattleAction(
+          second.player,
+          first.player,
+          second.action,
+          battle.turn
+        );
 
 
-    await this.consumeExecutedSkill(
+      await this.consumeExecutedSkill(
         second.player,
         second.action
-    );
+      );
+    }
 
 
     if (

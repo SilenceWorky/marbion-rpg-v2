@@ -1208,6 +1208,381 @@ export function processBurnEffects(
   );
 }
 
+/*
+ * ==============================
+ * CONTROLE GENÉRICO
+ * ==============================
+ *
+ * Base compartilhada por:
+ *
+ * ⚡ Paralisia
+ * ❄️ Congelamento
+ * 😵 Atordoamento
+ * e futuros controles.
+ *
+ * Diferente de Buff/Debuff,
+ * Controle não depende apenas
+ * de um turno de expiração.
+ *
+ * Ele bloqueia ações futuras.
+ */
+
+
+export function applyControlEffect(
+  target,
+  skill,
+  currentTurn,
+  {
+    effectType,
+    resultKind,
+    duration = 1
+  }
+) {
+  if (
+    !Array.isArray(
+      target.effects
+    )
+  ) {
+    target.effects = [];
+  }
+
+
+  const normalizedType =
+    String(
+      effectType ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const normalizedKind =
+    String(
+      resultKind ??
+      normalizedType
+    )
+      .trim()
+      .toLowerCase();
+
+
+  const safeDuration =
+    Math.max(
+      1,
+      Math.floor(
+        getNumber(
+          duration,
+          1
+        )
+      )
+    );
+
+
+  if (!normalizedType) {
+    return {
+      kind:
+        normalizedKind ||
+        "control",
+
+      ok: false,
+
+      error:
+        "INVALID_CONTROL_CONFIG",
+
+      user:
+        target.user,
+
+      skill:
+        skill?.nome
+    };
+  }
+
+
+  /*
+   * O mesmo tipo de Controle
+   * não cria cópias infinitas.
+   *
+   * Exemplo:
+   * Paralisia reaplicada
+   * apenas renova/reforça
+   * a Paralisia existente.
+   */
+  const existing =
+    target.effects.find(
+      effect =>
+        effect?.effectCategory ===
+          "control" &&
+        String(
+          effect?.type ?? ""
+        )
+          .trim()
+          .toLowerCase() ===
+        normalizedType
+    );
+
+
+  if (existing) {
+    existing.source =
+      skill.nome;
+
+
+    /*
+     * Uma reaplicação nunca
+     * reduz a duração restante.
+     */
+    existing.remainingBlocks =
+      Math.max(
+        Math.max(
+          0,
+          Math.floor(
+            getNumber(
+              existing.remainingBlocks
+            )
+          )
+        ),
+
+        safeDuration
+      );
+
+
+    existing.appliedAtTurn =
+      Number(
+        currentTurn
+      );
+
+
+    return {
+      kind:
+        normalizedKind,
+
+      ok: true,
+
+      refreshed: true,
+
+      type:
+        normalizedType,
+
+      user:
+        target.user,
+
+      skill:
+        skill.nome,
+
+      remainingBlocks:
+        existing.remainingBlocks
+    };
+  }
+
+
+  const effect = {
+    type:
+      normalizedType,
+
+    effectCategory:
+      "control",
+
+    source:
+      skill.nome,
+
+    remainingBlocks:
+      safeDuration,
+
+    appliedAtTurn:
+      Number(
+        currentTurn
+      )
+  };
+
+
+  target.effects.push(
+    effect
+  );
+
+
+  return {
+    kind:
+      normalizedKind,
+
+    ok: true,
+
+    refreshed: false,
+
+    type:
+      normalizedType,
+
+    user:
+      target.user,
+
+    skill:
+      skill.nome,
+
+    remainingBlocks:
+      safeDuration
+  };
+}
+
+
+/*
+ * Verifica e consome UM Controle
+ * quando o personagem tenta agir.
+ *
+ * Se houver Controle ativo:
+ *
+ * - a ação é bloqueada;
+ * - um bloqueio é consumido;
+ * - ao chegar a zero,
+ *   o efeito desaparece.
+ */
+export function consumeControlBlock(
+  user
+) {
+  if (
+    !Array.isArray(
+      user.effects
+    )
+  ) {
+    user.effects = [];
+
+    return {
+      blocked: false,
+      control: null
+    };
+  }
+
+
+  const index =
+    user.effects.findIndex(
+      effect =>
+        effect?.effectCategory ===
+          "control" &&
+        Math.max(
+          0,
+          Math.floor(
+            getNumber(
+              effect?.remainingBlocks
+            )
+          )
+        ) > 0
+    );
+
+
+  if (index < 0) {
+    return {
+      blocked: false,
+      control: null
+    };
+  }
+
+
+  const effect =
+    user.effects[index];
+
+
+  const before =
+    Math.max(
+      1,
+      Math.floor(
+        getNumber(
+          effect.remainingBlocks,
+          1
+        )
+      )
+    );
+
+
+  const after =
+    Math.max(
+      0,
+      before - 1
+    );
+
+
+  effect.remainingBlocks =
+    after;
+
+
+  const control = {
+    type:
+      String(
+        effect.type ?? ""
+      )
+        .trim()
+        .toLowerCase(),
+
+    source:
+      effect.source,
+
+    remainingBlocks:
+      after
+  };
+
+
+  /*
+   * O efeito cumpriu todos
+   * os bloqueios previstos.
+   */
+  if (after <= 0) {
+    user.effects.splice(
+      index,
+      1
+    );
+  }
+
+
+  return {
+    blocked: true,
+    control
+  };
+}
+
+/*
+ * ==============================
+ * PARALISIA
+ * ==============================
+ *
+ * Primeira implementação real
+ * do motor genérico de Controle.
+ *
+ * Por padrão:
+ * bloqueia 1 ação.
+ */
+
+
+export const PARALYSIS_DURATION =
+  1;
+
+
+export function applyParalysisEffect(
+  target,
+  skill,
+  currentTurn
+) {
+  const duration =
+    Math.max(
+      1,
+      Math.floor(
+        Number(
+          skill?.controlDuration
+        ) ||
+        PARALYSIS_DURATION
+      )
+    );
+
+
+  return applyControlEffect(
+    target,
+    skill,
+    currentTurn,
+    {
+      effectType:
+        "paralisia",
+
+      resultKind:
+        "paralysis",
+
+      duration
+    }
+  );
+}
+
 export function expireBattleEffects(
   user,
   currentTurn
