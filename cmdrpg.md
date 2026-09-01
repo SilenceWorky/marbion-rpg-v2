@@ -117,7 +117,7 @@ Mostra:
 - adversário quando estiver em PvP
 - efeitos persistentes
 - buffs/debuffs de batalha quando existirem
-- dano por turno e duração restante de Veneno quando existir
+- dano por turno e duração restante de Veneno, Queimadura e futuros DoTs quando existirem
 
 Exemplo:
 ```txt
@@ -555,6 +555,92 @@ Também foram validados:
 
 ---
 
+## Motor genérico de dano periódico (DoT)
+Status V2: ✔️ **validado com Veneno e Queimadura**
+
+O processamento de dano periódico foi generalizado para que novos efeitos reutilizem a mesma infraestrutura.
+
+Regras atuais:
+- todos os DoTs são processados no início do novo turno, antes das novas ações
+- cada tipo de DoT mantém sua própria instância ativa
+- efeitos diferentes podem coexistir no mesmo personagem
+- reaplicar o mesmo DoT renova sua duração e mantém o maior dano por turno
+- o tick registra o dano realmente causado, sem permitir HP negativo
+- o efeito que leva o personagem de HP positivo para 0 é marcado como letal
+- `killedBy` registra exatamente o tipo e a habilidade responsáveis pela derrota
+- depois que um DoT é letal, efeitos seguintes não geram ticks falsos de 0 de dano
+- mensagens de derrota usam a causa real dinamicamente, permitindo Veneno, Queimadura e futuros DoTs
+
+Tipos atualmente integrados ao motor:
+```txt
+☠️ Veneno
+🔥 Queimadura
+```
+
+Planejado sobre a mesma base:
+```txt
+🩸 Sangramento
+☢️ Radiação
+🧬 Deterioração
+🌋 Lava / outros efeitos periódicos
+```
+
+---
+
+## Queimadura
+Status V2: ✔️ **validado em PvP real**
+
+A Queimadura é um efeito adicional da habilidade e não substitui o tipo principal dela.
+
+Exemplo piloto no catálogo:
+```json
+{
+  "nome": "Chama Devastadora",
+  "tipo": "Elemental",
+  "elemento": "Fogo",
+  "dotType": "queimadura"
+}
+```
+
+Regras atuais:
+- a habilidade precisa acertar para aplicar Queimadura
+- Queimadura não é aplicada se o dano direto já derrubar o alvo
+- duração base: 2 ticks
+- primeiro tick acontece no início do turno seguinte
+- dano por tick = `Math.max(2, Math.round(custoMentalidade * 0.45))`
+- reaplicar Queimadura renova os 2 ticks
+- ao reaplicar, permanece o maior dano por turno
+- Queimadura pode coexistir com Veneno
+- após o segundo tick, o efeito é removido automaticamente
+- `!estado` mostra dano por turno e ticks restantes
+- a mensagem de combate separa o HP do golpe direto do HP após o tick
+- se Queimadura levar o HP a 0, `killedBy` identifica Queimadura como causa da derrota
+- em empate por DoT, cada jogador pode ter uma causa de derrota diferente
+
+Exibição validada no `!estado`:
+```txt
+🔥 Chama Devastadora — 9 dano/turno (1T)
+```
+
+Teste real validado com **Chama Devastadora**:
+```txt
+T1: dano direto → Queimadura aplicada (9 dano/turno por 2 turnos)
+Início do T2: -9 HP → Queimadura permanece com 1T
+Início do T3: -9 HP → efeito removido
+!estado após T3: Efeitos: Nenhum
+```
+
+Também foram validados localmente:
+- Queimadura causa exatamente 2 ticks
+- reaplicação renova duração e mantém a mais forte
+- Veneno + Queimadura coexistem
+- Queimadura pode derrubar o alvo
+- Chama Devastadora real do catálogo executa como `burn` no PvP
+- mensagem identifica dinamicamente derrota por Queimadura
+- empate pode identificar causas diferentes, por exemplo Veneno em um jogador e Queimadura no outro
+
+---
+
 # ⚔️ PVP
 
 ## !pvp @usuario
@@ -905,9 +991,10 @@ Projeto futuro definido:
 - Meditação / recuperação de Mentalidade em PvP ✔️
 - Debuffs reais em combate ✔️
 - Veneno / dano por turno ✔️
-- Queimadura / outros danos por turno ⏳ **PRÓXIMO**
+- Queimadura / dano por turno ✔️
+- Motor genérico de DoT ✔️
+- Paralisia / congelamento / controle ⏳ **PRÓXIMO**
 - Regeneração natural de Mentalidade fora do combate ⏳
-- Paralisia / congelamento / controle ⏳
 - Counter ⏳
 - Cooldown real de habilidades ⏳
 - Crítico geral de habilidades ⏳
@@ -926,7 +1013,7 @@ Projeto futuro definido:
 - Meditação ✔️
 - Debuff ✔️
 - Suporte ⏳
-- DoT ✔️ Veneno
+- DoT ✔️ Veneno + Queimadura
 - Controle ⏳
 - Counter ⏳
 - efeitos especiais de Tempo/Espaço/Gravidade/Matéria ⏳
