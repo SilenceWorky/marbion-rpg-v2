@@ -61,6 +61,11 @@ import {
   applySlowEffect
 } from "../systems/slowdown.js";
 
+import {
+  applyConfusionEffect,
+  consumeConfusionAction
+} from "../systems/confusion.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -510,6 +515,62 @@ function executeBlindnessAction(
       blindness.ok,
 
     blindness
+  };
+}
+
+
+function executeConfusionAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  if (!base.hit) {
+    return {
+      ...base,
+      kind: "confusion",
+      confusionApplied: false,
+      confusion: null
+    };
+  }
+
+
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+      kind: "confusion",
+      confusionApplied: false,
+      confusion: null
+    };
+  }
+
+
+  const confusion =
+    applyConfusionEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+    kind: "confusion",
+    confusionApplied:
+      confusion.ok,
+    confusion
   };
 }
 
@@ -987,6 +1048,26 @@ function executeBattleAction(
     );
   }
 
+
+  /*
+   * ==============================
+   * CONFUSAO
+   * ==============================
+   *
+   * Dano direto + efeito que verifica
+   * as proximas acoes do alvo.
+   */
+  if (
+    debuffType ===
+    "confusao"
+  ) {
+    return executeConfusionAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
 
   /*
    * ==============================
@@ -1507,6 +1588,45 @@ function createSilenceBlockedExecution(
     silence:
       silenceResult?.effect ??
       null
+  };
+}
+
+
+function createConfusionSelfHitExecution(
+  player,
+  action,
+  confusionResult
+) {
+  return {
+    kind:
+      "confusion_self_hit",
+
+    attacker:
+      player.user,
+
+    defender:
+      player.user,
+
+    skill:
+      action.skill.nome,
+
+    hit:
+      true,
+
+    blocked:
+      true,
+
+    damage:
+      confusionResult.damage,
+
+    hpAfter:
+      confusionResult.hpAfter,
+
+    confusion:
+      confusionResult.effect,
+
+    remainingActions:
+      confusionResult.remainingActions
   };
 }
 
@@ -3456,29 +3576,48 @@ export class PvpCoordinator {
 
 
     else {
-      spendSkillMentalidade(
-        first.player,
-        first.action.skill
-      );
-
-
-      firstExecution =
-        executeBattleAction(
-          first.player,
-          second.player,
-          first.action,
-          battle.turn
+      const firstConfusion =
+        consumeConfusionAction(
+          first.player
         );
 
 
-      /*
-       * Só consumimos a habilidade
-       * porque ela realmente executou.
-       */
-      await this.consumeExecutedSkill(
-        first.player,
-        first.action
-      );
+      if (
+        firstConfusion.selfHit
+      ) {
+        firstExecution =
+          createConfusionSelfHitExecution(
+            first.player,
+            first.action,
+            firstConfusion
+          );
+      }
+
+      else {
+        spendSkillMentalidade(
+          first.player,
+          first.action.skill
+        );
+
+
+        firstExecution =
+          executeBattleAction(
+            first.player,
+            second.player,
+            first.action,
+            battle.turn
+          );
+
+
+        /*
+         * Só consumimos a habilidade
+         * porque ela realmente executou.
+         */
+        await this.consumeExecutedSkill(
+          first.player,
+          first.action
+        );
+      }
     }
 
 
@@ -3519,6 +3658,19 @@ export class PvpCoordinator {
     * o segundo jogador não executa.
     */
     if (
+    first.player.hp <= 0
+    ) {
+    battleOver =
+        true;
+
+    winner =
+        second.player.user;
+
+    loser =
+        first.player.user;
+    }
+
+    else if (
     second.player.hp <= 0
     ) {
     battleOver =
@@ -3590,33 +3742,65 @@ export class PvpCoordinator {
 
 
     else {
-      spendSkillMentalidade(
-        second.player,
-        second.action.skill
-      );
-
-
-      secondExecution =
-        executeBattleAction(
-          second.player,
-          first.player,
-          second.action,
-          battle.turn,
-          {
-            defenderAlreadyActed:
-              true
-          }
+      const secondConfusion =
+        consumeConfusionAction(
+          second.player
         );
 
 
-      await this.consumeExecutedSkill(
-        second.player,
-        second.action
-      );
+      if (
+        secondConfusion.selfHit
+      ) {
+        secondExecution =
+          createConfusionSelfHitExecution(
+            second.player,
+            second.action,
+            secondConfusion
+          );
+      }
+
+      else {
+        spendSkillMentalidade(
+          second.player,
+          second.action.skill
+        );
+
+
+        secondExecution =
+          executeBattleAction(
+            second.player,
+            first.player,
+            second.action,
+            battle.turn,
+            {
+              defenderAlreadyActed:
+                true
+            }
+          );
+
+
+        await this.consumeExecutedSkill(
+          second.player,
+          second.action
+        );
+      }
     }
 
 
     if (
+        second.player.hp <= 0
+    ) {
+        battleOver =
+        true;
+
+        winner =
+        first.player.user;
+
+        loser =
+        second.player.user;
+    }
+
+    else if (
         first.player.hp <= 0
     ) {
         battleOver =

@@ -267,6 +267,32 @@ function formatBattleEffect(
 
   /*
    * ==============================
+   * CONFUSAO
+   * ==============================
+   */
+  if (
+    type === "confusao" &&
+    effect.effectCategory ===
+      "disruption"
+  ) {
+    const remaining =
+      Math.max(
+        0,
+        Number(
+          effect.remainingActions
+        ) || 0
+      );
+
+
+    return (
+      `😵 ${name || "Confusão"} — ` +
+      `Confusão (${remaining} ação(ões))`
+    );
+  }
+
+
+  /*
+   * ==============================
    * LENTIDAO
    * ==============================
    */

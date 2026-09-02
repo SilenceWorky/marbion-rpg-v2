@@ -332,6 +332,32 @@ export async function attackRoute(
 
     if (
       execution.kind ===
+      "confusion_self_hit"
+    ) {
+      const playerHpData =
+        hpData.player1.user ===
+        execution.attacker
+          ? hpData.player1
+          : hpData.player2;
+
+
+      const source =
+        execution.confusion?.source
+          ? ` por ${execution.confusion.source}`
+          : "";
+
+
+      return (
+        `😵 @${execution.attacker} se confundiu${source}, ` +
+        `se feriu em ${execution.damage} de dano e perdeu a ação ` +
+        `que usaria ${execution.skill}. ` +
+        `HP: ${execution.hpAfter}/${playerHpData.max}.`
+      );
+    }
+
+
+    if (
+      execution.kind ===
       "silence_blocked"
     ) {
       const source =
@@ -462,6 +488,60 @@ export async function attackRoute(
           ` 🤐 @${execution.defender} ficou Silenciado: ` +
           `apenas habilidades Físicas e Meditação ` +
           `por ${execution.silence.duration} turnos.`;
+      }
+
+
+      return text;
+    }
+
+
+    if (
+      execution.kind ===
+      "confusion"
+    ) {
+      if (!execution.hit) {
+        return (
+          `@${execution.attacker} usou ${execution.skill}, ` +
+          `mas errou.`
+        );
+      }
+
+
+      const defenderHpData =
+        hpData.player1.user ===
+        execution.defender
+          ? hpData.player1
+          : hpData.player2;
+
+
+      const hpAfterExecution =
+        Number.isFinite(
+          Number(
+            execution.defenderHp
+          )
+        )
+          ? Number(
+              execution.defenderHp
+            )
+          : defenderHpData.current;
+
+
+      let text =
+        `@${execution.attacker} usou ${execution.skill} ` +
+        `e causou ${execution.damage} de dano em ` +
+        `@${execution.defender}. ` +
+        `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
+
+
+      if (
+        execution.confusionApplied &&
+        execution.confusion
+      ) {
+        text +=
+          ` 😵 @${execution.defender} ficou Confuso por ` +
+          `${execution.confusion.duration} ações: ` +
+          `50% de chance de agir normalmente e 50% de chance ` +
+          `de se ferir e perder a ação.`;
       }
 
 
