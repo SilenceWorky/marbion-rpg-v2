@@ -22,194 +22,94 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
-          # ------------------------------------------
           # skill-effects.js
-          # ------------------------------------------
           path = Path("src/systems/skill-effects.js")
           text = path.read_text(encoding="utf-8")
 
-          old = '''export function applyBlindnessEffect(
-            target,
-            skill,
-            currentTurn
-          ) {'''
-          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
-
-          new = '''export function applyBlindnessEffect(
-            target,
-            skill,
-            currentTurn,
-            {
-              targetAlreadyActed = false
-            } = {}
-          ) {'''
-          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
-
-          if old not in text:
+          text, n = re.subn(
+              r'export function applyBlindnessEffect\(\n  target,\n  skill,\n  currentTurn\n\) \{',
+              'export function applyBlindnessEffect(\n  target,\n  skill,\n  currentTurn,\n  {\n    targetAlreadyActed = false\n  } = {}\n) {',
+              text,
+              count=1
+          )
+          if n != 1:
               raise SystemExit("Assinatura de applyBlindnessEffect nao encontrada")
-          text = text.replace(old, new, 1)
 
           start = text.index("export function applyBlindnessEffect(")
           end = text.index("export function applyDamageOverTimeEffect(", start)
           segment = text[start:end]
 
-          marker = '''  const effect = {
-            type:'''
-          marker = "\n".join(line[10:] if line.startswith("          ") else line for line in marker.splitlines())
-
-          insert = '''  const expiryOffset =
-            targetAlreadyActed
-              ? 1
-              : 0;
-
-
-          const effect = {
-            type:'''
-          insert = "\n".join(line[10:] if line.startswith("          ") else line for line in insert.splitlines())
-
-          if marker not in segment:
+          segment, n = re.subn(
+              r'\n  const effect = \{\n    type:\n      "debuff",',
+              '\n  const expiryOffset =\n    targetAlreadyActed\n      ? 1\n      : 0;\n\n\n  const effect = {\n    type:\n      "debuff",',
+              segment,
+              count=1
+          )
+          if n != 1:
               raise SystemExit("Criacao do effect de Cegueira nao encontrada")
-          segment = segment.replace(marker, insert, 1)
 
-          old_expiry = '''    expiresAtTurn:
-              Number(currentTurn) +
-              duration'''
-          old_expiry = "\n".join(line[10:] if line.startswith("          ") else line for line in old_expiry.splitlines())
-
-          new_expiry = '''    expiresAtTurn:
-              Number(currentTurn) +
-              duration +
-              expiryOffset'''
-          new_expiry = "\n".join(line[10:] if line.startswith("          ") else line for line in new_expiry.splitlines())
-
-          if old_expiry not in segment:
+          segment, n = re.subn(
+              r'expiresAtTurn:\n      Number\(currentTurn\) \+\n      duration',
+              'expiresAtTurn:\n      Number(currentTurn) +\n      duration +\n      expiryOffset',
+              segment,
+              count=1
+          )
+          if n != 1:
               raise SystemExit("expiresAtTurn da Cegueira nao encontrado")
-          segment = segment.replace(old_expiry, new_expiry, 1)
 
           text = text[:start] + segment + text[end:]
           path.write_text(text, encoding="utf-8")
 
-          # ------------------------------------------
           # PvpCoordinator.js
-          # ------------------------------------------
           path = Path("src/durable/PvpCoordinator.js")
           text = path.read_text(encoding="utf-8")
 
-          old = '''function executeBlindnessAction(
-            attacker,
-            defender,
-            action,
-            currentTurn
-          ) {'''
-          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
-
-          new = '''function executeBlindnessAction(
-            attacker,
-            defender,
-            action,
-            currentTurn,
-            defenderAlreadyActed = false
-          ) {'''
-          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
-
-          if old not in text:
+          text, n = re.subn(
+              r'function executeBlindnessAction\(\n  attacker,\n  defender,\n  action,\n  currentTurn\n\) \{',
+              'function executeBlindnessAction(\n  attacker,\n  defender,\n  action,\n  currentTurn,\n  defenderAlreadyActed = false\n) {',
+              text,
+              count=1
+          )
+          if n != 1:
               raise SystemExit("Assinatura de executeBlindnessAction nao encontrada")
-          text = text.replace(old, new, 1)
 
-          old = '''  const blindness =
-            applyBlindnessEffect(
-              defender,
-              action.skill,
-              currentTurn
-            );'''
-          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
-
-          new = '''  const blindness =
-            applyBlindnessEffect(
-              defender,
-              action.skill,
-              currentTurn,
-              {
-                targetAlreadyActed:
-                  defenderAlreadyActed
-              }
-            );'''
-          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
-
-          if old not in text:
+          text, n = re.subn(
+              r'  const blindness =\n    applyBlindnessEffect\(\n      defender,\n      action\.skill,\n      currentTurn\n    \);',
+              '  const blindness =\n    applyBlindnessEffect(\n      defender,\n      action.skill,\n      currentTurn,\n      {\n        targetAlreadyActed:\n          defenderAlreadyActed\n      }\n    );',
+              text,
+              count=1
+          )
+          if n != 1:
               raise SystemExit("Chamada de applyBlindnessEffect nao encontrada")
-          text = text.replace(old, new, 1)
 
-          old = '''function executeBattleAction(
-            attacker,
-            defender,
-            action,
-            currentTurn
-          ) {'''
-          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
-
-          new = '''function executeBattleAction(
-            attacker,
-            defender,
-            action,
-            currentTurn,
-            {
-              defenderAlreadyActed = false
-            } = {}
-          ) {'''
-          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
-
-          if old not in text:
+          text, n = re.subn(
+              r'function executeBattleAction\(\n  attacker,\n  defender,\n  action,\n  currentTurn\n\) \{',
+              'function executeBattleAction(\n  attacker,\n  defender,\n  action,\n  currentTurn,\n  {\n    defenderAlreadyActed = false\n  } = {}\n) {',
+              text,
+              count=1
+          )
+          if n != 1:
               raise SystemExit("Assinatura de executeBattleAction nao encontrada")
-          text = text.replace(old, new, 1)
 
-          old = '''    return executeBlindnessAction(
-              attacker,
-              defender,
-              action,
-              currentTurn
-            );'''
-          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
-
-          new = '''    return executeBlindnessAction(
-              attacker,
-              defender,
-              action,
-              currentTurn,
-              defenderAlreadyActed
-            );'''
-          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
-
-          if old not in text:
+          text, n = re.subn(
+              r'    return executeBlindnessAction\(\n      attacker,\n      defender,\n      action,\n      currentTurn\n    \);',
+              '    return executeBlindnessAction(\n      attacker,\n      defender,\n      action,\n      currentTurn,\n      defenderAlreadyActed\n    );',
+              text,
+              count=1
+          )
+          if n != 1:
               raise SystemExit("Chamada de executeBlindnessAction nao encontrada")
-          text = text.replace(old, new, 1)
 
-          old = '''      secondExecution =
-                executeBattleAction(
-                  second.player,
-                  first.player,
-                  second.action,
-                  battle.turn
-                );'''
-          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
-
-          new = '''      secondExecution =
-                executeBattleAction(
-                  second.player,
-                  first.player,
-                  second.action,
-                  battle.turn,
-                  {
-                    defenderAlreadyActed:
-                      true
-                  }
-                );'''
-          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
-
-          if old not in text:
+          text, n = re.subn(
+              r'      secondExecution =\n        executeBattleAction\(\n          second\.player,\n          first\.player,\n          second\.action,\n          battle\.turn\n        \);',
+              '      secondExecution =\n        executeBattleAction(\n          second.player,\n          first.player,\n          second.action,\n          battle.turn,\n          {\n            defenderAlreadyActed:\n              true\n          }\n        );',
+              text,
+              count=1
+          )
+          if n != 1:
               raise SystemExit("Segunda execucao de batalha nao encontrada")
-          text = text.replace(old, new, 1)
 
           path.write_text(text, encoding="utf-8")
           PY
