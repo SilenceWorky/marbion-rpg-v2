@@ -57,6 +57,10 @@ import {
   checkSilenceRestriction
 } from "../systems/silence.js";
 
+import {
+  applySlowEffect
+} from "../systems/slowdown.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -510,6 +514,62 @@ function executeBlindnessAction(
 }
 
 
+function executeSlowAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  if (!base.hit) {
+    return {
+      ...base,
+      kind: "slow",
+      slowApplied: false,
+      slow: null
+    };
+  }
+
+
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+      kind: "slow",
+      slowApplied: false,
+      slow: null
+    };
+  }
+
+
+  const slow =
+    applySlowEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+    kind: "slow",
+    slowApplied:
+      slow.ok,
+    slow
+  };
+}
+
+
 function executeSilenceAction(
   attacker,
   defender,
@@ -927,6 +987,28 @@ function executeBattleAction(
     );
   }
 
+
+  /*
+   * ==============================
+   * LENTIDAO
+   * ==============================
+   *
+   * Dano direto + reducao temporaria
+   * de Velocidade. A ordem do turno
+   * atual ja foi decidida; o efeito
+   * altera os turnos seguintes.
+   */
+  if (
+    debuffType ===
+    "lentidao"
+  ) {
+    return executeSlowAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
 
   /*
    * ==============================

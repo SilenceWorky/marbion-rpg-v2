@@ -267,6 +267,54 @@ function formatBattleEffect(
 
   /*
    * ==============================
+   * LENTIDAO
+   * ==============================
+   */
+  if (
+    type === "debuff" &&
+    subtype ===
+      "lentidao" &&
+    effect.stat ===
+      "speed" &&
+    Number.isFinite(
+      Number(
+        effect.amount
+      )
+    )
+  ) {
+    const amount =
+      Math.abs(
+        Number(
+          effect.amount
+        )
+      );
+
+
+    const remaining =
+      Number.isFinite(
+        Number(
+          effect.expiresAtTurn
+        )
+      )
+        ? Math.max(
+            0,
+            Number(
+              effect.expiresAtTurn
+            ) -
+            Number(turn)
+          )
+        : 0;
+
+
+    return (
+      `🐌 ${name || "Lentidão"} — ` +
+      `Velocidade -${amount} (${remaining}T)`
+    );
+  }
+
+
+  /*
+   * ==============================
    * CEGUEIRA
    * ==============================
    */
