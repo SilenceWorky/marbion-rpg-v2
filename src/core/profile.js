@@ -159,8 +159,6 @@ export function ensureProfileDefaults(profile, user = null) {
     pvp: {
       ...defaults.pvp,
       ...(profile.pvp || {})
-    },
-
-    updatedAt: Date.now()
+    }
   };
 }
