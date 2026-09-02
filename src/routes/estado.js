@@ -161,6 +161,39 @@ function formatBattleEffect(
 
   /*
    * ==============================
+   * SILÊNCIO
+   * ==============================
+   */
+  if (
+    type === "silencio" &&
+    effect.effectCategory ===
+      "restriction"
+  ) {
+    const remaining =
+      Number.isFinite(
+        Number(
+          effect.expiresAtTurn
+        )
+      )
+        ? Math.max(
+            0,
+            Number(
+              effect.expiresAtTurn
+            ) -
+            Number(turn)
+          )
+        : 0;
+
+
+    return (
+      `🤐 ${name || "Silêncio"} — ` +
+      `Silêncio: apenas Físicas/Meditação (${remaining}T)`
+    );
+  }
+
+
+  /*
+   * ==============================
    * DANO PERIÓDICO
    * ==============================
    *

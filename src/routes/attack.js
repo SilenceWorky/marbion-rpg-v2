@@ -115,6 +115,17 @@ export async function attackRoute(
 
     if (
       result.error ===
+      "SILENCED_SKILL"
+    ) {
+      return new Response(
+        `@${user}, você está Silenciado por ${result.source || "Silêncio"}. ` +
+        `Enquanto durar, use Soco, uma habilidade Física ou !meditar.`
+      );
+    }
+
+
+    if (
+      result.error ===
       "INVALID_SLOT"
     ) {
       return new Response(
@@ -321,6 +332,22 @@ export async function attackRoute(
 
     if (
       execution.kind ===
+      "silence_blocked"
+    ) {
+      const source =
+        execution.silence?.source
+          ? ` por ${execution.silence.source}`
+          : "";
+
+      return (
+        `🤐 @${execution.attacker} tentou usar ${execution.skill}, ` +
+        `mas está Silenciado${source} e não conseguiu usar a habilidade por causa do Silêncio.`
+      );
+    }
+
+
+    if (
+      execution.kind ===
       "control_blocked"
     ) {
       const info =
@@ -388,6 +415,59 @@ export async function attackRoute(
         `por ${execution.duration} turnos.`
       );
     }
+
+    if (
+      execution.kind ===
+      "silence"
+    ) {
+      if (!execution.hit) {
+        return (
+          `@${execution.attacker} usou ${execution.skill}, ` +
+          `mas errou.`
+        );
+      }
+
+
+      const defenderHpData =
+        hpData.player1.user ===
+        execution.defender
+          ? hpData.player1
+          : hpData.player2;
+
+
+      const hpAfterExecution =
+        Number.isFinite(
+          Number(
+            execution.defenderHp
+          )
+        )
+          ? Number(
+              execution.defenderHp
+            )
+          : defenderHpData.current;
+
+
+      let text =
+        `@${execution.attacker} usou ${execution.skill} ` +
+        `e causou ${execution.damage} de dano em ` +
+        `@${execution.defender}. ` +
+        `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
+
+
+      if (
+        execution.silenceApplied &&
+        execution.silence
+      ) {
+        text +=
+          ` 🤐 @${execution.defender} ficou Silenciado: ` +
+          `apenas habilidades Físicas e Meditação ` +
+          `por ${execution.silence.duration} turnos.`;
+      }
+
+
+      return text;
+    }
+
 
     if (
       execution.kind ===

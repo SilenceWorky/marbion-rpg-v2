@@ -52,6 +52,11 @@ import {
   MEDITATION_SKILL
 } from "../systems/skill-effects.js";
 
+import {
+  applySilenceEffect,
+  checkSilenceRestriction
+} from "../systems/silence.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -505,6 +510,67 @@ function executeBlindnessAction(
 }
 
 
+function executeSilenceAction(
+  attacker,
+  defender,
+  action,
+  currentTurn,
+  defenderAlreadyActed = false
+) {
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  if (!base.hit) {
+    return {
+      ...base,
+      kind: "silence",
+      silenceApplied: false,
+      silence: null
+    };
+  }
+
+
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+      kind: "silence",
+      silenceApplied: false,
+      silence: null
+    };
+  }
+
+
+  const silence =
+    applySilenceEffect(
+      defender,
+      action.skill,
+      currentTurn,
+      {
+        targetAlreadyActed:
+          defenderAlreadyActed
+      }
+    );
+
+
+  return {
+    ...base,
+    kind: "silence",
+    silenceApplied:
+      silence.ok,
+    silence
+  };
+}
+
+
 function executePoisonAction(
   attacker,
   defender,
@@ -805,6 +871,13 @@ function executeBattleAction(
       .trim()
       .toLowerCase();
 
+  const restrictionType =
+    String(
+      action?.skill?.restrictionType ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
   /*
    * CURA
    */
@@ -832,6 +905,28 @@ function executeBattleAction(
       currentTurn
     );
   }
+
+  /*
+   * ==============================
+   * SILÊNCIO
+   * ==============================
+   *
+   * Dano direto + restrição temporária
+   * a habilidades não físicas.
+   */
+  if (
+    restrictionType ===
+      "silencio"
+  ) {
+    return executeSilenceAction(
+      attacker,
+      defender,
+      action,
+      currentTurn,
+      defenderAlreadyActed
+    );
+  }
+
 
   /*
    * ==============================
@@ -1303,6 +1398,32 @@ function createControlBlockedExecution(
 
     control:
       controlResult?.control ??
+      null
+  };
+}
+
+
+function createSilenceBlockedExecution(
+  player,
+  action,
+  silenceResult
+) {
+  return {
+    kind:
+      "silence_blocked",
+
+    attacker:
+      player.user,
+
+    skill:
+      action?.skill?.nome ??
+      "Habilidade",
+
+    blocked:
+      true,
+
+    silence:
+      silenceResult?.effect ??
       null
   };
 }
@@ -2578,6 +2699,35 @@ export class PvpCoordinator {
     }
 
 
+    const silenceSelection =
+      checkSilenceRestriction(
+        player,
+        selectedAction.skill,
+        battle.turn
+      );
+
+
+    if (
+      silenceSelection.blocked
+    ) {
+      return {
+        ok: false,
+        error:
+          "SILENCED_SKILL",
+        slot:
+          normalizedSlot,
+        skill:
+          selectedAction.skill.nome,
+        source:
+          silenceSelection.effect?.source ??
+          "Silêncio",
+        expiresAtTurn:
+          silenceSelection.effect?.expiresAtTurn ??
+          null
+      };
+    }
+
+
     const mentalidadeCheck =
       canPaySkillCost(
         player,
@@ -2957,6 +3107,14 @@ export class PvpCoordinator {
       );
 
 
+    const firstSilence =
+      checkSilenceRestriction(
+        first.player,
+        first.action.skill,
+        battle.turn
+      );
+
+
     let firstExecution;
 
 
@@ -2975,6 +3133,18 @@ export class PvpCoordinator {
           first.player,
           first.action,
           firstControl
+        );
+    }
+
+
+    else if (
+      firstSilence.blocked
+    ) {
+      firstExecution =
+        createSilenceBlockedExecution(
+          first.player,
+          first.action,
+          firstSilence
         );
     }
 
@@ -3081,6 +3251,14 @@ export class PvpCoordinator {
       );
 
 
+    const secondSilence =
+      checkSilenceRestriction(
+        second.player,
+        second.action.skill,
+        battle.turn
+      );
+
+
     if (
       secondControl.blocked
     ) {
@@ -3089,6 +3267,18 @@ export class PvpCoordinator {
           second.player,
           second.action,
           secondControl
+        );
+    }
+
+
+    else if (
+      secondSilence.blocked
+    ) {
+      secondExecution =
+        createSilenceBlockedExecution(
+          second.player,
+          second.action,
+          secondSilence
         );
     }
 
