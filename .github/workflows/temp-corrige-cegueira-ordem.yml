@@ -1,0 +1,249 @@
+name: Corrigir duracao da Cegueira
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/temp-corrige-cegueira-ordem.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Corrigir semantica de duracao
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # ------------------------------------------
+          # skill-effects.js
+          # ------------------------------------------
+          path = Path("src/systems/skill-effects.js")
+          text = path.read_text(encoding="utf-8")
+
+          old = '''export function applyBlindnessEffect(
+            target,
+            skill,
+            currentTurn
+          ) {'''
+          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
+
+          new = '''export function applyBlindnessEffect(
+            target,
+            skill,
+            currentTurn,
+            {
+              targetAlreadyActed = false
+            } = {}
+          ) {'''
+          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
+
+          if old not in text:
+              raise SystemExit("Assinatura de applyBlindnessEffect nao encontrada")
+          text = text.replace(old, new, 1)
+
+          start = text.index("export function applyBlindnessEffect(")
+          end = text.index("export function applyDamageOverTimeEffect(", start)
+          segment = text[start:end]
+
+          marker = '''  const effect = {
+            type:'''
+          marker = "\n".join(line[10:] if line.startswith("          ") else line for line in marker.splitlines())
+
+          insert = '''  const expiryOffset =
+            targetAlreadyActed
+              ? 1
+              : 0;
+
+
+          const effect = {
+            type:'''
+          insert = "\n".join(line[10:] if line.startswith("          ") else line for line in insert.splitlines())
+
+          if marker not in segment:
+              raise SystemExit("Criacao do effect de Cegueira nao encontrada")
+          segment = segment.replace(marker, insert, 1)
+
+          old_expiry = '''    expiresAtTurn:
+              Number(currentTurn) +
+              duration'''
+          old_expiry = "\n".join(line[10:] if line.startswith("          ") else line for line in old_expiry.splitlines())
+
+          new_expiry = '''    expiresAtTurn:
+              Number(currentTurn) +
+              duration +
+              expiryOffset'''
+          new_expiry = "\n".join(line[10:] if line.startswith("          ") else line for line in new_expiry.splitlines())
+
+          if old_expiry not in segment:
+              raise SystemExit("expiresAtTurn da Cegueira nao encontrado")
+          segment = segment.replace(old_expiry, new_expiry, 1)
+
+          text = text[:start] + segment + text[end:]
+          path.write_text(text, encoding="utf-8")
+
+          # ------------------------------------------
+          # PvpCoordinator.js
+          # ------------------------------------------
+          path = Path("src/durable/PvpCoordinator.js")
+          text = path.read_text(encoding="utf-8")
+
+          old = '''function executeBlindnessAction(
+            attacker,
+            defender,
+            action,
+            currentTurn
+          ) {'''
+          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
+
+          new = '''function executeBlindnessAction(
+            attacker,
+            defender,
+            action,
+            currentTurn,
+            defenderAlreadyActed = false
+          ) {'''
+          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
+
+          if old not in text:
+              raise SystemExit("Assinatura de executeBlindnessAction nao encontrada")
+          text = text.replace(old, new, 1)
+
+          old = '''  const blindness =
+            applyBlindnessEffect(
+              defender,
+              action.skill,
+              currentTurn
+            );'''
+          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
+
+          new = '''  const blindness =
+            applyBlindnessEffect(
+              defender,
+              action.skill,
+              currentTurn,
+              {
+                targetAlreadyActed:
+                  defenderAlreadyActed
+              }
+            );'''
+          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
+
+          if old not in text:
+              raise SystemExit("Chamada de applyBlindnessEffect nao encontrada")
+          text = text.replace(old, new, 1)
+
+          old = '''function executeBattleAction(
+            attacker,
+            defender,
+            action,
+            currentTurn
+          ) {'''
+          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
+
+          new = '''function executeBattleAction(
+            attacker,
+            defender,
+            action,
+            currentTurn,
+            {
+              defenderAlreadyActed = false
+            } = {}
+          ) {'''
+          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
+
+          if old not in text:
+              raise SystemExit("Assinatura de executeBattleAction nao encontrada")
+          text = text.replace(old, new, 1)
+
+          old = '''    return executeBlindnessAction(
+              attacker,
+              defender,
+              action,
+              currentTurn
+            );'''
+          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
+
+          new = '''    return executeBlindnessAction(
+              attacker,
+              defender,
+              action,
+              currentTurn,
+              defenderAlreadyActed
+            );'''
+          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
+
+          if old not in text:
+              raise SystemExit("Chamada de executeBlindnessAction nao encontrada")
+          text = text.replace(old, new, 1)
+
+          old = '''      secondExecution =
+                executeBattleAction(
+                  second.player,
+                  first.player,
+                  second.action,
+                  battle.turn
+                );'''
+          old = "\n".join(line[10:] if line.startswith("          ") else line for line in old.splitlines())
+
+          new = '''      secondExecution =
+                executeBattleAction(
+                  second.player,
+                  first.player,
+                  second.action,
+                  battle.turn,
+                  {
+                    defenderAlreadyActed:
+                      true
+                  }
+                );'''
+          new = "\n".join(line[10:] if line.startswith("          ") else line for line in new.splitlines())
+
+          if old not in text:
+              raise SystemExit("Segunda execucao de batalha nao encontrada")
+          text = text.replace(old, new, 1)
+
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Validar
+        run: |
+          node --check src/systems/skill-effects.js
+          node --check src/durable/PvpCoordinator.js
+          node --check testar_cegueira_pvp.mjs
+          node --check testar_cegueira_ordem_pvp.mjs
+
+          node testar_cegueira_pvp.mjs
+          node testar_cegueira_ordem_pvp.mjs
+          node testar_mensagens_cegueira.mjs
+
+          node testar_veneno_pvp.mjs
+          node testar_queimadura_pvp.mjs
+          node testar_sangramento_pvp.mjs
+          node testar_controle_pvp.mjs
+          node testar_paralisia_pvp.mjs
+          node testar_congelamento_pvp.mjs
+          node testar_atordoamento_pvp.mjs
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add src/systems/skill-effects.js src/durable/PvpCoordinator.js
+
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteracao necessaria."
+            exit 0
+          fi
+
+          git commit -m "Corrige duracao da Cegueira independente da ordem"
+          git push
