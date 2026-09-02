@@ -1,14 +1,16 @@
 # 🛠️ Administração especial de PvP — Marbion RPG V2
 
-Status: planejamento registrado
+Status: comandos de resultado implementados e validados em produção; modificadores especiais permanecem planejados
 
 ## Objetivo
 
-Criar comandos administrativos para encerrar, forçar resultados e futuramente aplicar regras especiais em batalhas de PvP sem depender de jogar turnos até a luta terminar naturalmente.
+Permitir que administradores encerrem ou forcem resultados de batalhas de PvP sem depender de jogar turnos até a luta terminar naturalmente e, futuramente, aplicar regras especiais temporárias em batalhas específicas.
 
-## Comandos imediatos planejados
+## Comandos implementados
 
 ### `!adm pvp empate`
+
+Status: ✔️ implementado e validado em produção
 
 Encerra imediatamente o PvP ativo como empate administrativo.
 
@@ -20,33 +22,48 @@ Regras:
 - `winner = null`;
 - `loser = null`;
 - `draw = true`;
-- `adminDraw = true`;
+- `adminResult = true`;
 - `finishReason = "ADMIN_DRAW"`;
 - preserva a Mentalidade restante de ambos;
 - reutiliza `persistBattleMentalidade()`;
 - reinicia normalmente o relógio de regeneração natural de Mentalidade fora de combate;
 - libera os jogadores imediatamente para outro PvP.
 
-Mensagem sugerida:
+Validação real em produção:
 
 ```txt
-🛠️ ADM | PvP entre @jogador1 e @jogador2 encerrado em empate administrativo.
+@silenceworky: 6/50 Mentalidade
+@acervojuju: 50/50 Mentalidade
+→ !adm pvp empate
+→ PvP encerrado
+→ 6/50 e 50/50 preservados
+→ sem alteração de Elo/estatísticas
+```
+
+Mensagem real validada:
+
+```txt
+🛠️ ADM | PvP entre @silenceworky e @acervojuju encerrado em empate administrativo. Sem alteração de Elo/estatísticas.
 ```
 
 ### `!adm pvp vitória @usuario`
+
+Status: ✔️ implementado e validado em produção
 
 Encerra imediatamente o PvP ativo declarando o usuário informado como vencedor administrativo.
 
 Regras:
 - o usuário precisa estar no PvP ativo;
-- o outro participante vira o perdedor;
-- o comando deve registrar explicitamente que o resultado foi forçado por ADM;
-- por padrão, resultados administrativos NÃO devem alterar XP de Combate / Elo, streak, vitórias ou derrotas ranqueadas, para impedir manipulação acidental de ranking durante testes;
+- o outro participante vira o perdedor administrativo;
+- registra explicitamente que o resultado foi forçado por ADM;
+- não altera XP de Combate / Elo;
+- não altera streak;
+- não altera vitórias, derrotas ou total de PvPs;
 - preserva a Mentalidade restante dos dois jogadores;
 - reutiliza `persistBattleMentalidade()`;
 - libera ambos para novo PvP imediatamente.
 
-Campos sugeridos:
+Campos usados:
 
 ```js
 battle.status = "FINISHED";
@@ -58,15 +75,35 @@ battle.loser = outroJogador;
 battle.finishedAt = Date.now();
 ```
 
-Mensagem sugerida:
+Validação real em produção:
 
 ```txt
-🛠️ ADM | PvP encerrado. @usuario foi definido como vencedor administrativo.
+Antes:
+Elo: Prata III
+XP de Combate: 964
+Vitórias: 4
+Derrotas: 6
+PvPs: 10
+Sequência: 0
+Melhor sequência: 2
+
+→ !adm pvp vitória @SilenceWorky
+
+Depois:
+Elo: Prata III
+XP de Combate: 964
+Vitórias: 4
+Derrotas: 6
+PvPs: 10
+Sequência: 0
+Melhor sequência: 2
 ```
+
+O teste confirmou que o vencedor administrativo é exibido sem contaminar o ranking.
 
 ## Modificadores administrativos de batalha — futuro
 
-A arquitetura deve permitir que cada PvP tenha um objeto de regras especiais, por exemplo:
+A arquitetura deverá permitir que cada PvP tenha um objeto de regras especiais, por exemplo:
 
 ```js
 battle.rules = {
@@ -137,4 +174,4 @@ A mesma base pode permitir:
 
 As regras especiais devem ser snapshot da batalha e verificadas pelo `PvpCoordinator` durante seleção e execução. O perfil persistente nunca deve ser modificado apenas porque um PvP possui uma regra especial.
 
-Resultados administrativos devem permanecer distinguíveis de resultados naturais para auditoria, testes e futuro painel de administração.
+Resultados administrativos permanecem distinguíveis de resultados naturais para auditoria, testes e futuro painel de administração.
