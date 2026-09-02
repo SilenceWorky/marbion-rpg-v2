@@ -64,6 +64,7 @@ async function testAttackMessage() {
         user: "p2",
         damage: 10,
         hpAfter: 50,
+        maxHp: 100,
         remainingTicks: 2
       }
     ],
@@ -135,7 +136,13 @@ async function testAttackMessage() {
 
   assert.ok(
     text.includes(
-      "🩸 Sangramento"
+      "🩸 Início do Turno 2"
+    )
+  );
+
+  assert.ok(
+    text.includes(
+      "sofreu 10 de dano por Lâmina de Ar Cortante"
     )
   );
 
