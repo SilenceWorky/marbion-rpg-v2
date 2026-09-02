@@ -43,6 +43,7 @@ import {
   applyControlEffect,
   applyParalysisEffect,
   applyFreezeEffect,
+  applyStunEffect,
   consumeControlBlock,
   expireBattleEffects,
   executeMeditation,
@@ -777,6 +778,23 @@ function executeBattleAction(
   }
 
   /*
+   * ==============================
+   * ATORDOAMENTO
+   * ==============================
+   */
+  if (
+    controlType ===
+    "atordoamento"
+  ) {
+    return executeStunAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
+
+  /*
   * MEDITAÇÃO
   */
   if (
@@ -967,6 +985,94 @@ function executeFreezeAction(
 
     kind:
       "freeze",
+
+    controlApplied:
+      control.ok,
+
+    control
+  };
+}
+
+function executeStunAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  /*
+   * Atordoamento funciona como:
+   *
+   * dano direto
+   * +
+   * Controle.
+   */
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  /*
+   * Errou:
+   * não atordoa.
+   */
+  if (!base.hit) {
+    return {
+      ...base,
+
+      kind:
+        "stun",
+
+      controlApplied:
+        false,
+
+      control:
+        null
+    };
+  }
+
+
+  /*
+   * O dano direto já derrubou
+   * o adversário.
+   *
+   * Não cria Controle inútil.
+   */
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+
+      kind:
+        "stun",
+
+      controlApplied:
+        false,
+
+      control:
+        null
+    };
+  }
+
+
+  const control =
+    applyStunEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+
+    kind:
+      "stun",
 
     controlApplied:
       control.ok,

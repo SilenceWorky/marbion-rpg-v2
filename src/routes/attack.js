@@ -526,7 +526,9 @@ export async function attackRoute(
       execution.kind ===
         "paralysis" ||
       execution.kind ===
-        "freeze"
+        "freeze" ||
+      execution.kind ===
+        "stun"
     ) {
         if (!execution.hit) {
           return (

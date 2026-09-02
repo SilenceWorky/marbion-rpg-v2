@@ -1633,6 +1633,55 @@ export function applyFreezeEffect(
   );
 }
 
+/*
+ * ==============================
+ * ATORDOAMENTO
+ * ==============================
+ *
+ * Terceira implementação real
+ * do motor genérico de Controle.
+ *
+ * Por padrão:
+ * bloqueia 1 ação.
+ */
+
+export const STUN_DURATION =
+  1;
+
+
+export function applyStunEffect(
+  target,
+  skill,
+  currentTurn
+) {
+  const duration =
+    Math.max(
+      1,
+      Math.floor(
+        Number(
+          skill?.controlDuration
+        ) ||
+        STUN_DURATION
+      )
+    );
+
+
+  return applyControlEffect(
+    target,
+    skill,
+    currentTurn,
+    {
+      effectType:
+        "atordoamento",
+
+      resultKind:
+        "stun",
+
+      duration
+    }
+  );
+}
+
 export function expireBattleEffects(
   user,
   currentTurn
