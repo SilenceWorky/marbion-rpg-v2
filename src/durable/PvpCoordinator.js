@@ -39,6 +39,7 @@ import {
   applyDebuffSkill,
   applyPoisonEffect,
   applyBurnEffect,
+  applyBleedEffect,
   processDamageOverTimeEffects,
   applyControlEffect,
   applyParalysisEffect,
@@ -617,6 +618,78 @@ function executeBurnAction(
   };
 }
 
+function executeBleedAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  if (!base.hit) {
+    return {
+      ...base,
+
+      kind:
+        "bleed",
+
+      bleedApplied:
+        false,
+
+      bleed:
+        null
+    };
+  }
+
+
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+
+      kind:
+        "bleed",
+
+      bleedApplied:
+        false,
+
+      bleed:
+        null
+    };
+  }
+
+
+  const bleed =
+    applyBleedEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+
+    kind:
+      "bleed",
+
+    bleedApplied:
+      bleed.ok,
+
+    bleed
+  };
+}
+
+
 function executeBattleAction(
   attacker,
   defender,
@@ -730,6 +803,25 @@ function executeBattleAction(
     "queimadura"
   ) {
     return executeBurnAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
+
+  /*
+   * ==============================
+   * SANGRAMENTO
+   * ==============================
+   *
+   * Dano direto + DoT físico.
+   */
+  if (
+    dotType ===
+    "sangramento"
+  ) {
+    return executeBleedAction(
       attacker,
       defender,
       action,
@@ -3006,7 +3098,8 @@ export class PvpCoordinator {
           battle.turn,
           [
             "veneno",
-            "queimadura"
+            "queimadura",
+            "sangramento"
           ]
         );
 
@@ -3017,7 +3110,8 @@ export class PvpCoordinator {
           battle.turn,
           [
             "veneno",
-            "queimadura"
+            "queimadura",
+            "sangramento"
           ]
         );
 

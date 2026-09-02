@@ -1210,6 +1210,72 @@ export function processBurnEffects(
 
 /*
  * ==============================
+ * SANGRAMENTO
+ * ==============================
+ *
+ * Dano físico periódico.
+ *
+ * Por padrão:
+ * - 3 ticks;
+ * - primeiro tick no próximo turno;
+ * - 30% do custo de Mentalidade por tick;
+ * - mínimo de 2 de dano por tick.
+ */
+export const BLEED_DURATION =
+  3;
+
+
+export function calculateBleedDamage(
+  skill
+) {
+  const cost =
+    Math.max(
+      0,
+      getNumber(
+        skill?.custoMentalidade
+      )
+    );
+
+
+  return Math.max(
+    2,
+    Math.round(
+      cost * 0.30
+    )
+  );
+}
+
+
+export function applyBleedEffect(
+  target,
+  skill,
+  currentTurn
+) {
+  return applyDamageOverTimeEffect(
+    target,
+    skill,
+    currentTurn,
+    {
+      effectType:
+        "sangramento",
+
+      resultKind:
+        "bleed",
+
+      duration:
+        BLEED_DURATION,
+
+      damagePerTurn:
+        calculateBleedDamage(
+          skill
+        )
+    }
+  );
+}
+
+
+/*
+ * ==============================
  * CONTROLE GENÉRICO
  * ==============================
  *

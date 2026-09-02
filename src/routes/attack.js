@@ -517,6 +517,63 @@ export async function attackRoute(
       return text;
     }
 
+    /*
+     * ==============================
+     * SANGRAMENTO
+     * ==============================
+     */
+    if (
+      execution.kind ===
+      "bleed"
+    ) {
+      if (!execution.hit) {
+        return (
+          `@${execution.attacker} usou ${execution.skill}, ` +
+          `mas errou.`
+        );
+      }
+
+
+      const defenderHpData =
+        hpData.player1.user ===
+        execution.defender
+          ? hpData.player1
+          : hpData.player2;
+
+
+      const hpAfterExecution =
+        Number.isFinite(
+          Number(
+            execution.defenderHp
+          )
+        )
+          ? Number(
+              execution.defenderHp
+            )
+          : defenderHpData.current;
+
+
+      let text =
+        `@${execution.attacker} usou ${execution.skill} ` +
+        `e causou ${execution.damage} de dano em ` +
+        `@${execution.defender}. ` +
+        `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
+
+
+      if (
+        execution.bleedApplied &&
+        execution.bleed
+      ) {
+        text +=
+          ` 🩸 @${execution.defender} ficou Sangrando: ` +
+          `${execution.bleed.damagePerTurn} de dano por turno ` +
+          `por ${execution.bleed.duration} turnos.`;
+      }
+
+
+      return text;
+    }
+
       /*
       * ==============================
       * CONTROLE OFENSIVO
