@@ -391,6 +391,58 @@ export async function attackRoute(
 
     if (
       execution.kind ===
+      "blindness"
+    ) {
+      if (!execution.hit) {
+        return (
+          `@${execution.attacker} usou ${execution.skill}, ` +
+          `mas errou.`
+        );
+      }
+
+
+      const defenderHpData =
+        hpData.player1.user ===
+        execution.defender
+          ? hpData.player1
+          : hpData.player2;
+
+
+      const hpAfterExecution =
+        Number.isFinite(
+          Number(
+            execution.defenderHp
+          )
+        )
+          ? Number(
+              execution.defenderHp
+            )
+          : defenderHpData.current;
+
+
+      let text =
+        `@${execution.attacker} usou ${execution.skill} ` +
+        `e causou ${execution.damage} de dano em ` +
+        `@${execution.defender}. ` +
+        `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
+
+
+      if (
+        execution.blindnessApplied &&
+        execution.blindness
+      ) {
+        text +=
+          ` \u{1F311} @${execution.defender} ficou Cego: ` +
+          `Precis\u00E3o -${execution.blindness.amount} ` +
+          `por ${execution.blindness.duration} turnos.`;
+      }
+
+
+      return text;
+    }
+
+    if (
+      execution.kind ===
       "poison"
     ) {
       if (!execution.hit) {

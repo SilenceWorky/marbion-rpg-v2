@@ -518,6 +518,254 @@ export function applyDebuffSkill(
  */
 
 
+/*
+ * ==============================
+ * CEGUEIRA
+ * ==============================
+ *
+ * Debuff especial de Precisao.
+ *
+ * Regras padrao:
+ * - reduz 20 de Precisao;
+ * - dura 2 turnos;
+ * - nao acumula consigo mesma;
+ * - reaplicacao renova a duracao.
+ */
+export const BLINDNESS_DEFAULT_AMOUNT =
+  20;
+
+export const BLINDNESS_DEFAULT_DURATION =
+  2;
+
+
+export function applyBlindnessEffect(
+  target,
+  skill,
+  currentTurn
+) {
+  if (
+    !Array.isArray(
+      target.effects
+    )
+  ) {
+    target.effects = [];
+  }
+
+
+  const requestedAmount =
+    Math.max(
+      1,
+      Math.round(
+        getNumber(
+          skill?.debuffAmount,
+          BLINDNESS_DEFAULT_AMOUNT
+        )
+      )
+    );
+
+
+  const duration =
+    Math.max(
+      1,
+      Math.floor(
+        getNumber(
+          skill?.debuffDuration,
+          BLINDNESS_DEFAULT_DURATION
+        )
+      )
+    );
+
+
+  const existingIndex =
+    target.effects.findIndex(
+      effect =>
+        effect?.type ===
+          "debuff" &&
+        String(
+          effect?.subtype ?? ""
+        )
+          .trim()
+          .toLowerCase() ===
+          "cegueira" &&
+        effect?.stat ===
+          "accuracy"
+    );
+
+
+  let refreshed =
+    false;
+
+
+  if (
+    existingIndex >= 0
+  ) {
+    const existing =
+      target.effects[
+        existingIndex
+      ];
+
+
+    target.accuracy =
+      Math.max(
+        0,
+        getNumber(
+          target.accuracy
+        ) +
+        Math.max(
+          0,
+          getNumber(
+            existing.amount
+          )
+        )
+      );
+
+
+    target.effects.splice(
+      existingIndex,
+      1
+    );
+
+
+    refreshed =
+      true;
+  }
+
+
+  const before =
+    Math.max(
+      0,
+      getNumber(
+        target.accuracy
+      )
+    );
+
+
+  const after =
+    Math.max(
+      0,
+      before -
+      requestedAmount
+    );
+
+
+  const appliedAmount =
+    before -
+    after;
+
+
+  if (
+    appliedAmount <= 0
+  ) {
+    return {
+      kind:
+        "blindness",
+
+      ok: false,
+
+      error:
+        "BLINDNESS_NO_EFFECT",
+
+      type:
+        "cegueira",
+
+      subtype:
+        "cegueira",
+
+      user:
+        target.user,
+
+      skill:
+        skill?.nome,
+
+      stat:
+        "accuracy",
+
+      amount: 0,
+
+      requestedAmount,
+      before,
+      after,
+      duration,
+      refreshed
+    };
+  }
+
+
+  target.accuracy =
+    after;
+
+
+  const effect = {
+    type:
+      "debuff",
+
+    subtype:
+      "cegueira",
+
+    effectCategory:
+      "debuff",
+
+    source:
+      skill.nome,
+
+    stat:
+      "accuracy",
+
+    amount:
+      appliedAmount,
+
+    requestedAmount,
+
+    appliedAtTurn:
+      Number(currentTurn),
+
+    expiresAtTurn:
+      Number(currentTurn) +
+      duration
+  };
+
+
+  target.effects.push(
+    effect
+  );
+
+
+  return {
+    kind:
+      "blindness",
+
+    ok: true,
+
+    type:
+      "cegueira",
+
+    subtype:
+      "cegueira",
+
+    user:
+      target.user,
+
+    skill:
+      skill.nome,
+
+    stat:
+      "accuracy",
+
+    amount:
+      appliedAmount,
+
+    requestedAmount,
+    before,
+    after,
+    duration,
+    refreshed,
+
+    expiresAtTurn:
+      effect.expiresAtTurn
+  };
+}
+
+
 export function applyDamageOverTimeEffect(
   target,
   skill,

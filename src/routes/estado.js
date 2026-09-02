@@ -138,6 +138,14 @@ function formatBattleEffect(
     ).toLowerCase();
 
 
+  const subtype =
+    String(
+      effect.subtype ??
+      effect.debuffType ??
+      ""
+    ).toLowerCase();
+
+
   const name =
     effect.name ??
     effect.nome ??
@@ -221,6 +229,53 @@ function formatBattleEffect(
     return (
       `${controlInfo.icon} ${name || controlInfo.name} — ` +
       `${remaining} ação(ões) bloqueada(s)`
+    );
+  }
+
+  /*
+   * ==============================
+   * CEGUEIRA
+   * ==============================
+   */
+  if (
+    type === "debuff" &&
+    subtype ===
+      "cegueira" &&
+    effect.stat ===
+      "accuracy" &&
+    Number.isFinite(
+      Number(
+        effect.amount
+      )
+    )
+  ) {
+    const amount =
+      Math.abs(
+        Number(
+          effect.amount
+        )
+      );
+
+
+    const remaining =
+      Number.isFinite(
+        Number(
+          effect.expiresAtTurn
+        )
+      )
+        ? Math.max(
+            0,
+            Number(
+              effect.expiresAtTurn
+            ) -
+            Number(turn)
+          )
+        : 0;
+
+
+    return (
+      `\u{1F311} ${name || "Cegueira"} \u2014 ` +
+      `Precis\u00E3o -${amount} (${remaining}T)`
     );
   }
 

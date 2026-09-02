@@ -37,6 +37,7 @@ import {
   executeHealingSkill,
   executeBuffSkill,
   applyDebuffSkill,
+  applyBlindnessEffect,
   applyPoisonEffect,
   applyBurnEffect,
   applyBleedEffect,
@@ -427,6 +428,78 @@ function executeDebuffAction(
   };
 }
 
+function executeBlindnessAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  if (!base.hit) {
+    return {
+      ...base,
+
+      kind:
+        "blindness",
+
+      blindnessApplied:
+        false,
+
+      blindness:
+        null
+    };
+  }
+
+
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+
+      kind:
+        "blindness",
+
+      blindnessApplied:
+        false,
+
+      blindness:
+        null
+    };
+  }
+
+
+  const blindness =
+    applyBlindnessEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+
+    kind:
+      "blindness",
+
+    blindnessApplied:
+      blindness.ok,
+
+    blindness
+  };
+}
+
+
 function executePoisonAction(
   attacker,
   defender,
@@ -710,6 +783,13 @@ function executeBattleAction(
       .trim()
       .toLowerCase();
 
+  const debuffType =
+    String(
+      action?.skill?.debuffType ?? ""
+    )
+      .trim()
+      .toLowerCase();
+
   const controlType =
     String(
       action?.skill?.controlType ?? ""
@@ -741,6 +821,26 @@ function executeBattleAction(
     return executeBuffSkill(
       attacker,
       action.skill,
+      currentTurn
+    );
+  }
+
+  /*
+   * ==============================
+   * CEGUEIRA
+   * ==============================
+   *
+   * Dano direto + reducao temporaria
+   * de Precisao.
+   */
+  if (
+    debuffType ===
+    "cegueira"
+  ) {
+    return executeBlindnessAction(
+      attacker,
+      defender,
+      action,
       currentTurn
     );
   }
