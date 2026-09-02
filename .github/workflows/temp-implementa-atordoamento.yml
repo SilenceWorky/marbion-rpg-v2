@@ -1,0 +1,196 @@
+name: Implementar Atordoamento
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/temp-implementa-atordoamento.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Implementar Atordoamento e testes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # ==========================================
+          # skill-effects.js
+          # ==========================================
+          effects_path = Path("src/systems/skill-effects.js")
+          effects = effects_path.read_text(encoding="utf-8")
+
+          if "export function applyStunEffect(" not in effects:
+              start = effects.index("export const FREEZE_DURATION =")
+              end = effects.index("export function expireBattleEffects(", start)
+              freeze_block = effects[start:end]
+
+              stun_block = freeze_block
+              stun_block = stun_block.replace("FREEZE_DURATION", "STUN_DURATION")
+              stun_block = stun_block.replace("applyFreezeEffect", "applyStunEffect")
+              stun_block = stun_block.replace('"congelamento"', '"atordoamento"')
+              stun_block = stun_block.replace('"freeze"', '"stun"')
+
+              header = '''/*\n * ==============================\n * ATORDOAMENTO\n * ==============================\n *\n * Terceira implementação real\n * do motor genérico de Controle.\n *\n * Por padrão:\n * bloqueia 1 ação.\n */\n\n'''
+
+              effects = effects[:end] + header + stun_block + effects[end:]
+
+          effects_path.write_text(effects, encoding="utf-8")
+
+          # ==========================================
+          # PvpCoordinator.js
+          # ==========================================
+          pvp_path = Path("src/durable/PvpCoordinator.js")
+          pvp = pvp_path.read_text(encoding="utf-8")
+
+          if "  applyStunEffect," not in pvp:
+              marker = "  applyFreezeEffect,\n  consumeControlBlock,"
+              if marker not in pvp:
+                  raise SystemExit("Import de applyFreezeEffect não encontrado")
+              pvp = pvp.replace(
+                  marker,
+                  "  applyFreezeEffect,\n  applyStunEffect,\n  consumeControlBlock,",
+                  1
+              )
+
+          if "function executeStunAction(" not in pvp:
+              start = pvp.index("function executeFreezeAction(")
+              end = pvp.index("function createControlBlockedExecution(", start)
+              freeze_func = pvp[start:end]
+
+              stun_func = freeze_func
+              stun_func = stun_func.replace("executeFreezeAction", "executeStunAction")
+              stun_func = stun_func.replace("applyFreezeEffect", "applyStunEffect")
+              stun_func = stun_func.replace('"freeze"', '"stun"')
+              stun_func = stun_func.replace("Congelamento", "Atordoamento")
+              stun_func = stun_func.replace("congelamento", "atordoamento")
+              stun_func = stun_func.replace("congela", "atordoa")
+
+              pvp = pvp[:end] + stun_func + pvp[end:]
+
+          if 'controlType ===\n    "atordoamento"' not in pvp:
+              meditation_marker = '''  /*\n  * MEDITAÇÃO\n  */'''
+              if meditation_marker not in pvp:
+                  raise SystemExit("Marker de Meditação não encontrado")
+
+              stun_route = '''  /*\n   * ==============================\n   * ATORDOAMENTO\n   * ==============================\n   */\n  if (\n    controlType ===\n    "atordoamento"\n  ) {\n    return executeStunAction(\n      attacker,\n      defender,\n      action,\n      currentTurn\n    );\n  }\n\n'''
+
+              pvp = pvp.replace(
+                  meditation_marker,
+                  stun_route + meditation_marker,
+                  1
+              )
+
+          pvp_path.write_text(pvp, encoding="utf-8")
+
+          # ==========================================
+          # attack.js
+          # ==========================================
+          attack_path = Path("src/routes/attack.js")
+          attack = attack_path.read_text(encoding="utf-8")
+
+          if 'execution.kind ===\n        "stun"' not in attack:
+              marker = '''      execution.kind ===\n        "freeze"\n    ) {'''
+              if marker not in attack:
+                  raise SystemExit("Branch de Controle ofensivo não encontrado")
+
+              attack = attack.replace(
+                  marker,
+                  '''      execution.kind ===\n        "freeze" ||\n      execution.kind ===\n        "stun"\n    ) {''',
+                  1
+              )
+
+          attack_path.write_text(attack, encoding="utf-8")
+
+          # ==========================================
+          # testar_atordoamento_pvp.mjs
+          # ==========================================
+          source = Path("testar_congelamento_pvp.mjs").read_text(encoding="utf-8")
+
+          test = source
+          replacements = [
+              ("FREEZE_SKILL", "STUN_SKILL"),
+              ("Gelo:Lanca_Glaciar", "Som:Onda_Sonica"),
+              ('element:\n            "Gelo"', 'element:\n            "Som"'),
+              ("Lança Glaciar", "Onda Sônica"),
+              ("CONGELAMENTO", "ATORDOAMENTO"),
+              ("Congelamento", "Atordoamento"),
+              ("congelamento", "atordoamento"),
+              ('"freeze"', '"stun"'),
+              ("❄️", "💫")
+          ]
+
+          for old, new in replacements:
+              test = test.replace(old, new)
+
+          test = test.replace("Onda Sônica custa 22.", "Onda Sônica custa 15.")
+          test = test.replace(
+              '''      battle.player1.mentalidade,\n      78\n''',
+              '''      battle.player1.mentalidade,\n      85\n''',
+              1
+          )
+
+          Path("testar_atordoamento_pvp.mjs").write_text(test, encoding="utf-8")
+
+          # ==========================================
+          # testar_mensagens_atordoamento.mjs
+          # ==========================================
+          source = Path("testar_mensagens_congelamento.mjs").read_text(encoding="utf-8")
+
+          test = source
+          replacements = [
+              ("Lança Glaciar", "Onda Sônica"),
+              ("CONGELAMENTO", "ATORDOAMENTO"),
+              ("Congelamento", "Atordoamento"),
+              ("congelamento", "atordoamento"),
+              ("Congelado", "Atordoado"),
+              ("congelada", "atordoada"),
+              ('"freeze"', '"stun"'),
+              ("❄️", "💫")
+          ]
+
+          for old, new in replacements:
+              test = test.replace(old, new)
+
+          Path("testar_mensagens_atordoamento.mjs").write_text(test, encoding="utf-8")
+          PY
+
+      - name: Validar sintaxe e testes
+        run: |
+          node --check src/systems/skill-effects.js
+          node --check src/durable/PvpCoordinator.js
+          node --check src/routes/attack.js
+          node --check src/routes/estado.js
+          node --check testar_atordoamento_pvp.mjs
+          node --check testar_mensagens_atordoamento.mjs
+          node testar_atordoamento_pvp.mjs
+          node testar_mensagens_atordoamento.mjs
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add \
+            src/systems/skill-effects.js \
+            src/durable/PvpCoordinator.js \
+            src/routes/attack.js \
+            testar_atordoamento_pvp.mjs \
+            testar_mensagens_atordoamento.mjs
+
+          if git diff --cached --quiet; then
+            echo "Nenhuma alteração necessária."
+            exit 0
+          fi
+
+          git commit -m "Implementa Atordoamento no PvP"
+          git push
