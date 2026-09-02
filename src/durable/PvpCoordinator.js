@@ -66,6 +66,12 @@ import {
   consumeConfusionAction
 } from "../systems/confusion.js";
 
+import {
+  applySleepEffect,
+  consumeSleepBlock,
+  wakeSleepOnDirectDamage
+} from "../systems/sleep.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -303,6 +309,13 @@ function executeOffensiveAction(
     );
 
 
+  const sleepWake =
+    wakeSleepOnDirectDamage(
+      defender,
+      result.damage
+    );
+
+
   return {
     kind: "damage",
 
@@ -325,7 +338,9 @@ function executeOffensiveAction(
       result.damage,
 
     defenderHp:
-      defender.hp
+      defender.hp,
+
+    sleepWake
   };
 }
 
@@ -399,6 +414,13 @@ function executeDebuffAction(
     );
 
 
+  const sleepWake =
+    wakeSleepOnDirectDamage(
+      defender,
+      offensive.damage
+    );
+
+
   /*
    * Depois aplica o Debuff.
    */
@@ -434,6 +456,8 @@ function executeDebuffAction(
 
     defenderHp:
       defender.hp,
+
+    sleepWake,
 
     debuffApplied:
       debuff.ok,
@@ -515,6 +539,62 @@ function executeBlindnessAction(
       blindness.ok,
 
     blindness
+  };
+}
+
+
+function executeSleepAction(
+  attacker,
+  defender,
+  action,
+  currentTurn
+) {
+  const base =
+    executeOffensiveAction(
+      attacker,
+      defender,
+      action
+    );
+
+
+  if (!base.hit) {
+    return {
+      ...base,
+      kind: "sleep",
+      sleepApplied: false,
+      sleep: null
+    };
+  }
+
+
+  if (
+    Number(
+      defender.hp
+    ) <= 0
+  ) {
+    return {
+      ...base,
+      kind: "sleep",
+      sleepApplied: false,
+      sleep: null
+    };
+  }
+
+
+  const sleep =
+    applySleepEffect(
+      defender,
+      action.skill,
+      currentTurn
+    );
+
+
+  return {
+    ...base,
+    kind: "sleep",
+    sleepApplied:
+      sleep.ok,
+    sleep
   };
 }
 
@@ -1207,6 +1287,24 @@ function executeBattleAction(
    * controlType adiciona o efeito
    * de Controle.
    */
+  /*
+   * ==============================
+   * SONO
+   * ==============================
+   */
+  if (
+    controlType ===
+    "sono"
+  ) {
+    return executeSleepAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
+
+
   if (
     controlType ===
     "paralisia"
@@ -1588,6 +1686,35 @@ function createSilenceBlockedExecution(
     silence:
       silenceResult?.effect ??
       null
+  };
+}
+
+
+function createSleepBlockedExecution(
+  player,
+  action,
+  sleepResult
+) {
+  return {
+    kind:
+      "sleep_blocked",
+
+    attacker:
+      player.user,
+
+    skill:
+      action.skill.nome,
+
+    blocked:
+      true,
+
+    sleep:
+      sleepResult?.effect ??
+      null,
+
+    remainingBlocks:
+      sleepResult?.remainingBlocks ??
+      0
   };
 }
 
@@ -3533,6 +3660,12 @@ export class PvpCoordinator {
       );
 
 
+    const firstSleep =
+      consumeSleepBlock(
+        first.player
+      );
+
+
     const firstSilence =
       checkSilenceRestriction(
         first.player,
@@ -3559,6 +3692,18 @@ export class PvpCoordinator {
           first.player,
           first.action,
           firstControl
+        );
+    }
+
+
+    else if (
+      firstSleep.blocked
+    ) {
+      firstExecution =
+        createSleepBlockedExecution(
+          first.player,
+          first.action,
+          firstSleep
         );
     }
 
@@ -3709,6 +3854,12 @@ export class PvpCoordinator {
       );
 
 
+    const secondSleep =
+      consumeSleepBlock(
+        second.player
+      );
+
+
     const secondSilence =
       checkSilenceRestriction(
         second.player,
@@ -3725,6 +3876,18 @@ export class PvpCoordinator {
           second.player,
           second.action,
           secondControl
+        );
+    }
+
+
+    else if (
+      secondSleep.blocked
+    ) {
+      secondExecution =
+        createSleepBlockedExecution(
+          second.player,
+          second.action,
+          secondSleep
         );
     }
 

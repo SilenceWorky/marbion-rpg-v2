@@ -332,6 +332,23 @@ export async function attackRoute(
 
     if (
       execution.kind ===
+      "sleep_blocked"
+    ) {
+      const source =
+        execution.sleep?.source
+          ? ` por ${execution.sleep.source}`
+          : "";
+
+
+      return (
+        `💤 @${execution.attacker} tentou usar ${execution.skill}, ` +
+        `mas está Dormindo${source} e perdeu a ação.`
+      );
+    }
+
+
+    if (
+      execution.kind ===
       "confusion_self_hit"
     ) {
       const playerHpData =
@@ -488,6 +505,59 @@ export async function attackRoute(
           ` 🤐 @${execution.defender} ficou Silenciado: ` +
           `apenas habilidades Físicas e Meditação ` +
           `por ${execution.silence.duration} turnos.`;
+      }
+
+
+      return text;
+    }
+
+
+    if (
+      execution.kind ===
+      "sleep"
+    ) {
+      if (!execution.hit) {
+        return (
+          `@${execution.attacker} usou ${execution.skill}, ` +
+          `mas errou.`
+        );
+      }
+
+
+      const defenderHpData =
+        hpData.player1.user ===
+        execution.defender
+          ? hpData.player1
+          : hpData.player2;
+
+
+      const hpAfterExecution =
+        Number.isFinite(
+          Number(
+            execution.defenderHp
+          )
+        )
+          ? Number(
+              execution.defenderHp
+            )
+          : defenderHpData.current;
+
+
+      let text =
+        `@${execution.attacker} usou ${execution.skill} ` +
+        `e causou ${execution.damage} de dano em ` +
+        `@${execution.defender}. ` +
+        `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
+
+
+      if (
+        execution.sleepApplied &&
+        execution.sleep
+      ) {
+        text +=
+          ` 💤 @${execution.defender} adormeceu por até ` +
+          `${execution.sleep.duration} ações. ` +
+          `Dano direto recebido depois da aplicação o acorda.`;
       }
 
 

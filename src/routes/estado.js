@@ -267,6 +267,32 @@ function formatBattleEffect(
 
   /*
    * ==============================
+   * SONO
+   * ==============================
+   */
+  if (
+    type === "sono" &&
+    effect.effectCategory ===
+      "sleep"
+  ) {
+    const remaining =
+      Math.max(
+        0,
+        Number(
+          effect.remainingBlocks
+        ) || 0
+      );
+
+
+    return (
+      `💤 ${name || "Sono"} — ` +
+      `Dormindo (${remaining} ação(ões))`
+    );
+  }
+
+
+  /*
+   * ==============================
    * CONFUSAO
    * ==============================
    */
