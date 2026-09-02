@@ -541,7 +541,10 @@ export const BLINDNESS_DEFAULT_DURATION =
 export function applyBlindnessEffect(
   target,
   skill,
-  currentTurn
+  currentTurn,
+  {
+    targetAlreadyActed = false
+  } = {}
 ) {
   if (
     !Array.isArray(
@@ -695,6 +698,12 @@ export function applyBlindnessEffect(
     after;
 
 
+  const expiryOffset =
+    targetAlreadyActed
+      ? 1
+      : 0;
+
+
   const effect = {
     type:
       "debuff",
@@ -721,7 +730,8 @@ export function applyBlindnessEffect(
 
     expiresAtTurn:
       Number(currentTurn) +
-      duration
+      duration +
+      expiryOffset
   };
 
 

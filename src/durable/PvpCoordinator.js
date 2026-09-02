@@ -432,7 +432,8 @@ function executeBlindnessAction(
   attacker,
   defender,
   action,
-  currentTurn
+  currentTurn,
+  defenderAlreadyActed = false
 ) {
   const base =
     executeOffensiveAction(
@@ -482,7 +483,11 @@ function executeBlindnessAction(
     applyBlindnessEffect(
       defender,
       action.skill,
-      currentTurn
+      currentTurn,
+      {
+        targetAlreadyActed:
+          defenderAlreadyActed
+      }
     );
 
 
@@ -767,7 +772,10 @@ function executeBattleAction(
   attacker,
   defender,
   action,
-  currentTurn
+  currentTurn,
+  {
+    defenderAlreadyActed = false
+  } = {}
 ) {
   const skillType =
     String(
@@ -841,7 +849,8 @@ function executeBattleAction(
       attacker,
       defender,
       action,
-      currentTurn
+      currentTurn,
+      defenderAlreadyActed
     );
   }
 
@@ -3096,7 +3105,11 @@ export class PvpCoordinator {
           second.player,
           first.player,
           second.action,
-          battle.turn
+          battle.turn,
+          {
+            defenderAlreadyActed:
+              true
+          }
         );
 
 
