@@ -1166,6 +1166,222 @@ export class PvpCoordinator {
     };
   }
 
+  async adminFinishBattle(
+    mode,
+    winnerUser = null
+  ) {
+    const normalizedMode =
+      String(
+        mode ?? ""
+      )
+        .trim()
+        .toLowerCase();
+
+
+    const normalizedWinner =
+      normalizeUser(
+        winnerUser
+      );
+
+
+    const data =
+      await this.getData();
+
+
+    const activeBattles =
+      data.battles.filter(
+        battle =>
+          battle.status ===
+          "ACTIVE"
+      );
+
+
+    if (
+      activeBattles.length === 0
+    ) {
+      return {
+        ok: false,
+        error:
+          "NO_ACTIVE_BATTLE"
+      };
+    }
+
+
+    let battle;
+    let winner = null;
+    let loser = null;
+    let draw = false;
+    let finishReason;
+
+
+    if (
+      normalizedMode ===
+      "draw"
+    ) {
+      if (
+        activeBattles.length > 1
+      ) {
+        return {
+          ok: false,
+          error:
+            "MULTIPLE_ACTIVE_BATTLES"
+        };
+      }
+
+
+      battle =
+        activeBattles[0];
+
+      draw =
+        true;
+
+      finishReason =
+        "ADMIN_DRAW";
+    }
+
+    else if (
+      normalizedMode ===
+      "win"
+    ) {
+      if (!normalizedWinner) {
+        return {
+          ok: false,
+          error:
+            "INVALID_WINNER"
+        };
+      }
+
+
+      battle =
+        activeBattles.find(
+          candidate =>
+            candidate.player1.user ===
+              normalizedWinner ||
+            candidate.player2.user ===
+              normalizedWinner
+        );
+
+
+      if (!battle) {
+        return {
+          ok: false,
+          error:
+            "WINNER_NOT_IN_ACTIVE_BATTLE"
+        };
+      }
+
+
+      winner =
+        normalizedWinner;
+
+      loser =
+        battle.player1.user ===
+          winner
+          ? battle.player2.user
+          : battle.player1.user;
+
+      finishReason =
+        "ADMIN_WIN";
+    }
+
+    else {
+      return {
+        ok: false,
+        error:
+          "INVALID_ADMIN_RESULT"
+      };
+    }
+
+
+    const finishedAt =
+      Date.now();
+
+
+    const persistence =
+      await this.persistBattleMentalidade(
+        battle,
+        finishedAt
+      );
+
+
+    if (!persistence.ok) {
+      return {
+        ok: false,
+        error:
+          "MENTALIDADE_PERSIST_FAILED"
+      };
+    }
+
+
+    battle.status =
+      "FINISHED";
+
+    battle.state =
+      "FINISHED";
+
+    battle.draw =
+      draw;
+
+    battle.adminResult =
+      true;
+
+    battle.finishReason =
+      finishReason;
+
+    battle.winner =
+      winner;
+
+    battle.loser =
+      loser;
+
+    battle.rankedResult =
+      null;
+
+    battle.finishedAt =
+      finishedAt;
+
+    battle.player1.action =
+      null;
+
+    battle.player2.action =
+      null;
+
+
+    await this.saveData(
+      data
+    );
+
+
+    return {
+      ok: true,
+      mode:
+        normalizedMode,
+      draw,
+      winner,
+      loser,
+      finishReason,
+      finishedAt,
+
+      player1: {
+        user:
+          battle.player1.user,
+        mentalidade:
+          persistence.player1.mentalidade,
+        maxMentalidade:
+          battle.player1.maxMentalidade
+      },
+
+      player2: {
+        user:
+          battle.player2.user,
+        mentalidade:
+          persistence.player2.mentalidade,
+        maxMentalidade:
+          battle.player2.maxMentalidade
+      }
+    };
+  }
+
   cleanExpiredChallenges(
     data
   ) {
@@ -3217,6 +3433,26 @@ export class PvpCoordinator {
     return Response.json(
         result
     );
+    }
+
+    if (
+      url.pathname ===
+      "/admin-finish"
+    ) {
+      const result =
+        await this.adminFinishBattle(
+          url.searchParams.get(
+            "mode"
+          ),
+          url.searchParams.get(
+            "winner"
+          )
+        );
+
+
+      return Response.json(
+        result
+      );
     }
 
     if (

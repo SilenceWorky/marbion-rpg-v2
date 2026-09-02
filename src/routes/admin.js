@@ -28,6 +28,21 @@ function normalizeCommand(value) {
 }
 
 
+function getCoordinator(
+  env
+) {
+  const id =
+    env.PVP_COORDINATOR.idFromName(
+      "marbion-global-pvp"
+    );
+
+
+  return env.PVP_COORDINATOR.get(
+    id
+  );
+}
+
+
 export async function adminRoute(
   request,
   env
@@ -91,7 +106,7 @@ export async function adminRoute(
 
   if (!rawArgs) {
     return new Response(
-      `@${actor}, uso: !adm level/raça/elemento/skill ...`
+      `@${actor}, uso: !adm level/raça/elemento/pontos/skill/pvp ...`
     );
   }
 
@@ -369,6 +384,178 @@ export async function adminRoute(
 
   /*
    * ==========================
+   * PVP
+   * ==========================
+   *
+   * !adm pvp empate
+   * !adm pvp vitória @usuario
+   */
+  if (
+    command === "pvp"
+  ) {
+    const operation =
+      normalizeCommand(
+        args[1]
+      );
+
+
+    if (!operation) {
+      return new Response(
+        `@${actor}, uso: !adm pvp empate | !adm pvp vitória @usuário`
+      );
+    }
+
+
+    let mode;
+    let winner = null;
+
+
+    if (
+      operation === "empate" ||
+      operation === "draw"
+    ) {
+      mode =
+        "draw";
+    }
+
+    else if (
+      operation === "vitoria" ||
+      operation === "win"
+    ) {
+      winner =
+        normalizeUser(
+          args[2]
+        );
+
+
+      if (!winner) {
+        return new Response(
+          `@${actor}, uso: !adm pvp vitória @usuário`
+        );
+      }
+
+
+      mode =
+        "win";
+    }
+
+    else {
+      return new Response(
+        `@${actor}, use !adm pvp empate ou !adm pvp vitória @usuário.`
+      );
+    }
+
+
+    const coordinator =
+      getCoordinator(
+        env
+      );
+
+
+    const internalUrl =
+      new URL(
+        "https://pvp.internal/admin-finish"
+      );
+
+
+    internalUrl.searchParams.set(
+      "mode",
+      mode
+    );
+
+
+    if (winner) {
+      internalUrl.searchParams.set(
+        "winner",
+        winner
+      );
+    }
+
+
+    const response =
+      await coordinator.fetch(
+        new Request(
+          internalUrl.toString()
+        )
+      );
+
+
+    const result =
+      await response.json();
+
+
+    if (!result.ok) {
+      if (
+        result.error ===
+        "NO_ACTIVE_BATTLE"
+      ) {
+        return new Response(
+          `@${actor}, não existe nenhum PvP ativo.`
+        );
+      }
+
+
+      if (
+        result.error ===
+        "MULTIPLE_ACTIVE_BATTLES"
+      ) {
+        return new Response(
+          `@${actor}, existem múltiplos PvPs ativos; o empate ADM não encerrará uma luta arbitrariamente.`
+        );
+      }
+
+
+      if (
+        result.error ===
+        "WINNER_NOT_IN_ACTIVE_BATTLE"
+      ) {
+        return new Response(
+          `@${actor}, @${winner} não está em um PvP ativo.`
+        );
+      }
+
+
+      if (
+        result.error ===
+        "MENTALIDADE_PERSIST_FAILED"
+      ) {
+        return new Response(
+          `@${actor}, não foi possível preservar a Mentalidade dos jogadores. O PvP não foi encerrado.`
+        );
+      }
+
+
+      return new Response(
+        `@${actor}, não foi possível encerrar o PvP.`
+      );
+    }
+
+
+    const mentalidadeText =
+      `@${result.player1.user}: 🧠 ${result.player1.mentalidade}/${result.player1.maxMentalidade} | ` +
+      `@${result.player2.user}: 🧠 ${result.player2.mentalidade}/${result.player2.maxMentalidade}`;
+
+
+    if (
+      result.mode ===
+      "draw"
+    ) {
+      return new Response(
+        `🛠️ ADM | PvP entre @${result.player1.user} e @${result.player2.user} encerrado em empate administrativo. ` +
+        `Sem alteração de Elo/estatísticas. | ${mentalidadeText}`
+      );
+    }
+
+
+    return new Response(
+      `🛠️ ADM | PvP encerrado. @${result.winner} definido como vencedor administrativo sobre @${result.loser}. ` +
+      `Sem alteração de Elo/estatísticas. | ${mentalidadeText}`
+    );
+  }
+
+
+  /*
+   * ==========================
    * SKILL
    * ==========================
    *
@@ -477,6 +664,6 @@ export async function adminRoute(
 
 
 return new Response(
-  `@${actor}, comando ADM desconhecido. Use level, raça, elemento, pontos ou skill.`
+  `@${actor}, comando ADM desconhecido. Use level, raça, elemento, pontos, skill ou pvp.`
 );
 }
