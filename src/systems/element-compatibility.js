@@ -141,6 +141,16 @@ const ELEMENT_FUSIONS = [
 
   {
     requires: [
+      "Psíquico",
+      "Luz"
+    ],
+    unlocks: [
+      "Ilusão"
+    ]
+  },
+
+  {
+    requires: [
       "Fogo",
       "Eletricidade"
     ],
