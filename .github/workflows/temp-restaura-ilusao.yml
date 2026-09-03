@@ -1,0 +1,98 @@
+name: Restaurar fusao Ilusao
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/temp-restaura-ilusao.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restaurar fusao e teste
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # Restaura Psíquico + Luz -> Ilusão.
+          path = Path("src/systems/element-compatibility.js")
+          text = path.read_text(encoding="utf-8")
+
+          fusion = '''  {
+            requires: [
+              "Psíquico",
+              "Luz"
+            ],
+            unlocks: [
+              "Ilusão"
+            ]
+          },
+
+'''
+
+          marker = '''  {
+            requires: [
+              "Fogo",
+              "Eletricidade"
+            ],
+            unlocks: [
+              "Plasma"
+            ]
+          },
+'''
+
+          if fusion not in text:
+              if marker not in text:
+                  raise SystemExit("Ponto de inserção da fusão Ilusão não encontrado")
+              text = text.replace(marker, fusion + marker, 1)
+              path.write_text(text, encoding="utf-8")
+
+          # Corrige o teste de regressão para refletir a regra verdadeira.
+          test = Path("testar_regressao_sono_debuff_e_ilusao.mjs")
+          t = test.read_text(encoding="utf-8")
+          t = t.replace(
+              '  false,\n  "Psíquico + Luz não pode mais desbloquear Ilusão."',
+              '  true,\n  "Psíquico + Luz deve desbloquear Ilusão."'
+          )
+          t = t.replace(
+              '✅ Psíquico + Luz não gera mais o elemento legado Ilusão.',
+              '✅ Psíquico + Luz gera corretamente a fusão Ilusão.'
+          )
+          t = t.replace(
+              '💤🧠 REGRESSÃO DE SONO + ILUSÃO LEGADA PASSOU.',
+              '💤🧠 REGRESSÃO DE SONO + FUSÃO ILUSÃO PASSOU.'
+          )
+          test.write_text(t, encoding="utf-8")
+          PY
+
+      - name: Validar sintaxe e regressões
+        run: |
+          node --check src/systems/element-compatibility.js
+          node --check src/durable/PvpCoordinator.js
+          node testar_regressao_sono_debuff_e_ilusao.mjs
+          node testar_sono_pvp.mjs
+          node testar_integracao_sono_pvp.mjs
+          node testar_confusao_pvp.mjs
+          node testar_lentidao_pvp.mjs
+          node testar_silencio_pvp.mjs
+          node testar_cegueira_pvp.mjs
+          node testar_controle_pvp.mjs
+          node testar_persistencia_perfil_forte.mjs
+          node testar_regen_mentalidade_pvp.mjs
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/systems/element-compatibility.js testar_regressao_sono_debuff_e_ilusao.mjs
+          git commit -m "Restaura Ilusao como fusao de Psiquico e Luz" || exit 0
+          git push
