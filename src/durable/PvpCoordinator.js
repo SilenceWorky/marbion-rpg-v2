@@ -82,6 +82,12 @@ import {
   REACTION_DAMAGE_TAKEN_MULTIPLIER
 } from "../systems/reactions.js";
 
+import {
+  ensurePlayerSkillCooldowns,
+  getSkillCooldownStatus,
+  startSkillCooldown
+} from "../systems/cooldown.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -2518,6 +2524,10 @@ export class PvpCoordinator {
     async ensurePlayerSnapshot(
         player
     ) {
+    ensurePlayerSkillCooldowns(
+        player
+    );
+
     const requiredStats = [
         "strength",
         "magicStrength",
@@ -3143,6 +3153,9 @@ export class PvpCoordinator {
             challengerProfile
             ),
 
+        skillCooldowns:
+            {},
+
         action:
             null
         },
@@ -3190,6 +3203,9 @@ export class PvpCoordinator {
         getReflectableElements(
         targetProfile
         ),
+
+    skillCooldowns:
+        {},
 
     action:
         null
@@ -3411,6 +3427,35 @@ export class PvpCoordinator {
         expiresAtTurn:
           silenceSelection.effect?.expiresAtTurn ??
           null
+      };
+    }
+
+
+    const cooldownCheck =
+      getSkillCooldownStatus(
+        player,
+        selectedAction,
+        battle.turn
+      );
+
+
+    if (
+      !cooldownCheck.ready
+    ) {
+      return {
+        ok: false,
+        error:
+          "SKILL_COOLDOWN",
+        slot:
+          normalizedSlot,
+        skill:
+          selectedAction.skill.nome,
+        currentTurn:
+          battle.turn,
+        availableAtTurn:
+          cooldownCheck.availableAtTurn,
+        turnsRemaining:
+          cooldownCheck.turnsRemaining
       };
     }
 
@@ -3888,6 +3933,13 @@ export class PvpCoordinator {
           );
 
 
+        startSkillCooldown(
+          first.player,
+          first.action,
+          battle.turn
+        );
+
+
         /*
          * Só consumimos a habilidade
          * porque ela realmente executou.
@@ -4262,6 +4314,13 @@ export class PvpCoordinator {
           firstExecution.triggerSkill =
             second.action.skill.nome;
         }
+
+
+        startSkillCooldown(
+          second.player,
+          second.action,
+          battle.turn
+        );
 
 
         await this.consumeExecutedSkill(

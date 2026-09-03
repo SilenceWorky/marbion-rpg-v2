@@ -105,6 +105,17 @@ export async function attackRoute(
 
     if (
       result.error ===
+      "SKILL_COOLDOWN"
+    ) {
+      return new Response(
+        `@${user}, ${result.skill || `a habilidade ${result.slot}`} ainda está em cooldown. ` +
+        `Aguarde ${result.turnsRemaining} turno(s).`
+      );
+    }
+
+
+    if (
+      result.error ===
       "INSUFFICIENT_MENTALIDADE"
     ) {
       return new Response(
