@@ -26,6 +26,123 @@ function getNumber(
 }
 
 
+export const BASE_CRITICAL_CHANCE =
+  5;
+
+export const BASE_CRITICAL_MULTIPLIER =
+  1.5;
+
+
+export function getSkillCriticalChance(
+  skill
+) {
+  const configured =
+    Number(
+      skill?.critChance
+    );
+
+
+  if (
+    Number.isFinite(
+      configured
+    )
+  ) {
+    return clamp(
+      configured,
+      0,
+      100
+    );
+  }
+
+
+  return BASE_CRITICAL_CHANCE;
+}
+
+
+export function getSkillCriticalMultiplier(
+  skill
+) {
+  const configured =
+    Number(
+      skill?.critMultiplier
+    );
+
+
+  if (
+    Number.isFinite(
+      configured
+    ) &&
+    configured >= 1
+  ) {
+    return configured;
+  }
+
+
+  return BASE_CRITICAL_MULTIPLIER;
+}
+
+
+export function rollCritical(
+  criticalChance
+) {
+  const roll =
+    Math.random() * 100;
+
+
+  return roll <
+    clamp(
+      getNumber(
+        criticalChance,
+        0
+      ),
+      0,
+      100
+    );
+}
+
+
+export function applyCriticalDamage(
+  damage,
+  multiplier =
+    BASE_CRITICAL_MULTIPLIER
+) {
+  const normalizedDamage =
+    Math.max(
+      0,
+      getNumber(
+        damage,
+        0
+      )
+    );
+
+
+  if (
+    normalizedDamage <= 0
+  ) {
+    return 0;
+  }
+
+
+  const normalizedMultiplier =
+    Math.max(
+      1,
+      getNumber(
+        multiplier,
+        BASE_CRITICAL_MULTIPLIER
+      )
+    );
+
+
+  return Math.max(
+    1,
+    Math.round(
+      normalizedDamage *
+      normalizedMultiplier
+    )
+  );
+}
+
+
 /*
  * Retorna o atributo que
  * escala a habilidade.
@@ -222,6 +339,12 @@ export function calculateDamage(
  *
  * Ainda NÃO altera HP.
  * Isso fica a cargo do PvP.
+ *
+ * Ordem:
+ * 1. teste de acerto
+ * 2. dano normal já considerando Defesa
+ * 3. teste crítico
+ * 4. multiplicador crítico apenas no dano direto
  */
 export function resolveOffensiveSkill(
   attacker,
@@ -236,6 +359,18 @@ export function resolveOffensiveSkill(
     );
 
 
+  const criticalChance =
+    getSkillCriticalChance(
+      skill
+    );
+
+
+  const criticalMultiplier =
+    getSkillCriticalMultiplier(
+      skill
+    );
+
+
   const hit =
     rollHit(
       hitChance
@@ -246,12 +381,16 @@ export function resolveOffensiveSkill(
     return {
       hit: false,
       hitChance,
+      critical: false,
+      criticalChance,
+      criticalMultiplier,
+      baseDamage: 0,
       damage: 0
     };
   }
 
 
-  const damage =
+  const baseDamage =
     calculateDamage(
       attacker,
       defender,
@@ -259,9 +398,29 @@ export function resolveOffensiveSkill(
     );
 
 
+  const critical =
+    baseDamage > 0 &&
+    rollCritical(
+      criticalChance
+    );
+
+
+  const damage =
+    critical
+      ? applyCriticalDamage(
+          baseDamage,
+          criticalMultiplier
+        )
+      : baseDamage;
+
+
   return {
     hit: true,
     hitChance,
+    critical,
+    criticalChance,
+    criticalMultiplier,
+    baseDamage,
     damage
   };
 }
