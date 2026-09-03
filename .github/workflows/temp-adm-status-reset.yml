@@ -1,0 +1,37 @@
+name: Adicionar reset ADM de Status
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/temp-adm-status-reset.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Aplicar patch
+        run: python .github/patches/patch_adm_status_reset.py
+
+      - name: Validar sintaxe e teste
+        run: |
+          node --check src/systems/admin.js
+          node --check src/routes/admin.js
+          node testar_adm_status_reset.mjs
+          node testar_persistencia_perfil_forte.mjs
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/systems/admin.js src/routes/admin.js testar_adm_status_reset.mjs
+          git commit -m "Adiciona comando ADM para resetar Status" || exit 0
+          git push
