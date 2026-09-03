@@ -58,8 +58,8 @@ assert.equal(
         .toLowerCase() ===
       "ilusao"
   ),
-  false,
-  "Psíquico + Luz não pode mais desbloquear Ilusão."
+  true,
+  "Psíquico + Luz deve desbloquear Ilusão."
 );
 
 
@@ -68,9 +68,9 @@ console.log(
 );
 
 console.log(
-  "✅ Psíquico + Luz não gera mais o elemento legado Ilusão."
+  "✅ Psíquico + Luz gera corretamente a fusão Ilusão."
 );
 
 console.log(
-  "\n💤🧠 REGRESSÃO DE SONO + ILUSÃO LEGADA PASSOU."
+  "\n💤🧠 REGRESSÃO DE SONO + FUSÃO ILUSÃO PASSOU."
 );
