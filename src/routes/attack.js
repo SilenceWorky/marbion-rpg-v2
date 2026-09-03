@@ -332,6 +332,20 @@ export async function attackRoute(
 
     if (
       execution.kind ===
+      "reaction_stance"
+    ) {
+      const physical =
+        execution.reactionType ===
+        "counter_physical";
+
+      return physical
+        ? `⚔️ @${execution.user} preparou ${execution.skill} contra um golpe Físico.`
+        : `🪞 @${execution.user} preparou ${execution.skill} contra um golpe Elemental compatível.`;
+    }
+
+
+    if (
+      execution.kind ===
       "sleep_blocked"
     ) {
       const source =
@@ -1086,6 +1100,57 @@ export async function attackRoute(
         result.hp
     );
 
+
+    function formatReaction(
+      reaction
+    ) {
+      if (
+        !reaction?.activated
+      ) {
+        return "";
+      }
+
+
+      const physical =
+        reaction.type ===
+        "counter_physical";
+
+      const icon =
+        physical
+          ? "⚔️"
+          : "🪞";
+
+      const label =
+        physical
+          ? "Contra-ataque"
+          : `Refletir${reaction.element ? ` ${reaction.element}` : ""}`;
+
+
+      if (
+        reaction.counterDefeated
+      ) {
+        return (
+          `${icon} ${label} de @${reaction.user} reduziu o dano de ` +
+          `${reaction.rawDamage} para ${reaction.damageTaken}, ` +
+          `mas @${reaction.user} foi derrotado antes de devolver o golpe.`
+        );
+      }
+
+
+      return (
+        `${icon} ${label} de @${reaction.user} reduziu o dano de ` +
+        `${reaction.rawDamage} para ${reaction.damageTaken} e devolveu ` +
+        `${reaction.returnedDamage} de dano para @${reaction.attacker}. ` +
+        `HP de @${reaction.attacker}: ${reaction.attackerHpAfter}.`
+      );
+    }
+
+
+    const reactionText =
+      formatReaction(
+        result.reaction
+      );
+
     const dotText =
       Array.isArray(
         result.dotTicks
@@ -1119,6 +1184,11 @@ export async function attackRoute(
     if (secondText) {
     message +=
         ` ${secondText}`;
+    }
+
+    if (reactionText) {
+      message +=
+        ` ${reactionText}`;
     }
 
     if (dotText) {

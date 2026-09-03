@@ -72,6 +72,16 @@ import {
   wakeSleepOnDirectDamage
 } from "../systems/sleep.js";
 
+import {
+  getReactionType,
+  getReflectableElements,
+  matchReaction,
+  splitReactionDamage,
+  PHYSICAL_COUNTER_TYPE,
+  ELEMENTAL_REFLECT_TYPE,
+  REACTION_DAMAGE_TAKEN_MULTIPLIER
+} from "../systems/reactions.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -292,6 +302,9 @@ function executeOffensiveAction(
       hitChance:
         result.hitChance,
 
+      rawDamage:
+        0,
+
       damage:
         0,
 
@@ -301,18 +314,54 @@ function executeOffensiveAction(
   }
 
 
+  const rawDamage =
+    Math.max(
+      0,
+      Math.floor(
+        Number(
+          result.damage
+        ) || 0
+      )
+    );
+
+
+  const incomingMultiplier =
+    Number.isFinite(
+      Number(
+        defender?.__directDamageMultiplier
+      )
+    )
+      ? Math.max(
+          0,
+          Number(
+            defender.__directDamageMultiplier
+          )
+        )
+      : 1;
+
+
+  const damage =
+    Math.max(
+      0,
+      Math.ceil(
+        rawDamage *
+        incomingMultiplier
+      )
+    );
+
+
   defender.hp =
     Math.max(
       0,
       defender.hp -
-      result.damage
+      damage
     );
 
 
   const sleepWake =
     wakeSleepOnDirectDamage(
       defender,
-      result.damage
+      damage
     );
 
 
@@ -334,8 +383,9 @@ function executeOffensiveAction(
     hitChance:
       result.hitChance,
 
-    damage:
-      result.damage,
+    rawDamage,
+
+    damage,
 
     defenderHp:
       defender.hp,
@@ -351,12 +401,6 @@ function executeDebuffAction(
   action,
   currentTurn
 ) {
-  /*
-   * Primeiro resolve a parte ofensiva.
-   *
-   * O Debuff precisa acertar
-   * o adversário.
-   */
   const offensive =
     resolveOffensiveSkill(
       attacker,
@@ -365,11 +409,6 @@ function executeDebuffAction(
     );
 
 
-  /*
-   * ERROU:
-   * não causa dano
-   * e não aplica Debuff.
-   */
   if (!offensive.hit) {
     return {
       kind:
@@ -390,6 +429,9 @@ function executeDebuffAction(
       hitChance:
         offensive.hitChance,
 
+      rawDamage:
+        0,
+
       damage:
         0,
 
@@ -402,28 +444,57 @@ function executeDebuffAction(
   }
 
 
-  /*
-   * ACERTOU:
-   * primeiro aplica o dano.
-   */
+  const rawDamage =
+    Math.max(
+      0,
+      Math.floor(
+        Number(
+          offensive.damage
+        ) || 0
+      )
+    );
+
+
+  const incomingMultiplier =
+    Number.isFinite(
+      Number(
+        defender?.__directDamageMultiplier
+      )
+    )
+      ? Math.max(
+          0,
+          Number(
+            defender.__directDamageMultiplier
+          )
+        )
+      : 1;
+
+
+  const damage =
+    Math.max(
+      0,
+      Math.ceil(
+        rawDamage *
+        incomingMultiplier
+      )
+    );
+
+
   defender.hp =
     Math.max(
       0,
       defender.hp -
-      offensive.damage
+      damage
     );
 
 
   const sleepWake =
     wakeSleepOnDirectDamage(
       defender,
-      offensive.damage
+      damage
     );
 
 
-  /*
-   * Depois aplica o Debuff.
-   */
   const debuff =
     applyDebuffSkill(
       defender,
@@ -451,8 +522,9 @@ function executeDebuffAction(
     hitChance:
       offensive.hitChance,
 
-    damage:
-      offensive.damage,
+    rawDamage,
+
+    damage,
 
     defenderHp:
       defender.hp,
@@ -1078,6 +1150,43 @@ function executeBattleAction(
     )
       .trim()
       .toLowerCase();
+
+  const reactionType =
+    getReactionType(
+      action?.skill
+    );
+
+  /*
+   * ==============================
+   * COUNTER / REFLETIR
+   * ==============================
+   *
+   * A postura é preparada antes do
+   * ataque adversário por prioridade.
+   */
+  if (
+    reactionType ===
+      PHYSICAL_COUNTER_TYPE ||
+    reactionType ===
+      ELEMENTAL_REFLECT_TYPE
+  ) {
+    return {
+      kind:
+        "reaction_stance",
+
+      user:
+        attacker.user,
+
+      skill:
+        action.skill.nome,
+
+      reactionType,
+
+      activated:
+        false
+    };
+  }
+
 
   /*
    * CURA
@@ -2423,6 +2532,9 @@ export class PvpCoordinator {
         !Array.isArray(
         player.loadout
         ) ||
+        !Array.isArray(
+        player.reflectElements
+        ) ||
         requiredStats.some(
         stat =>
             !Number.isFinite(
@@ -2457,6 +2569,18 @@ export class PvpCoordinator {
     ) {
         player.loadout =
         snapshotLoadout(
+            profile
+        );
+    }
+
+
+    if (
+        !Array.isArray(
+        player.reflectElements
+        )
+    ) {
+        player.reflectElements =
+        getReflectableElements(
             profile
         );
     }
@@ -3014,6 +3138,11 @@ export class PvpCoordinator {
             challengerProfile
             ),
 
+        reflectElements:
+            getReflectableElements(
+            challengerProfile
+            ),
+
         action:
             null
         },
@@ -3054,6 +3183,11 @@ export class PvpCoordinator {
 
     loadout:
         snapshotLoadout(
+        targetProfile
+        ),
+
+    reflectElements:
+        getReflectableElements(
         targetProfile
         ),
 
@@ -3769,6 +3903,9 @@ export class PvpCoordinator {
     let secondExecution =
     null;
 
+    let reaction =
+    null;
+
     let battleOver =
     false;
 
@@ -3868,6 +4005,21 @@ export class PvpCoordinator {
       );
 
 
+    const reactionMatch =
+      firstExecution?.kind ===
+        "reaction_stance"
+        ? matchReaction(
+            first.action.skill,
+            second.action.skill,
+            first.player
+          )
+        : {
+            matched: false,
+            reactionType: null,
+            reason: "NO_STANCE"
+          };
+
+
     if (
       secondControl.blocked
     ) {
@@ -3929,17 +4081,118 @@ export class PvpCoordinator {
         );
 
 
-        secondExecution =
-          executeBattleAction(
-            second.player,
-            first.player,
-            second.action,
-            battle.turn,
-            {
-              defenderAlreadyActed:
-                true
-            }
-          );
+        if (
+          reactionMatch.matched
+        ) {
+          first.player.__directDamageMultiplier =
+            REACTION_DAMAGE_TAKEN_MULTIPLIER;
+        }
+
+
+        try {
+          secondExecution =
+            executeBattleAction(
+              second.player,
+              first.player,
+              second.action,
+              battle.turn,
+              {
+                defenderAlreadyActed:
+                  true
+              }
+            );
+        }
+        finally {
+          delete first.player.__directDamageMultiplier;
+        }
+
+
+        if (
+          reactionMatch.matched &&
+          secondExecution?.hit === true &&
+          Number(
+            secondExecution.rawDamage
+          ) > 0
+        ) {
+          const split =
+            splitReactionDamage(
+              secondExecution.rawDamage
+            );
+
+
+          let returnedDamage =
+            0;
+
+
+          const counterDefeated =
+            Number(
+              first.player.hp
+            ) <= 0;
+
+
+          if (!counterDefeated) {
+            returnedDamage =
+              split.returned;
+
+            second.player.hp =
+              Math.max(
+                0,
+                Number(
+                  second.player.hp
+                ) -
+                returnedDamage
+              );
+          }
+
+
+          reaction = {
+            activated: true,
+
+            type:
+              reactionMatch.reactionType,
+
+            user:
+              first.player.user,
+
+            skill:
+              first.action.skill.nome,
+
+            attacker:
+              second.player.user,
+
+            incomingSkill:
+              second.action.skill.nome,
+
+            element:
+              second.action.skill.elemento ??
+              null,
+
+            rawDamage:
+              split.rawDamage,
+
+            damageTaken:
+              Number(
+                secondExecution.damage
+              ) || 0,
+
+            returnedDamage,
+
+            userHpAfter:
+              first.player.hp,
+
+            attackerHpAfter:
+              second.player.hp,
+
+            counterDefeated
+          };
+
+
+          firstExecution.activated =
+            true;
+
+          firstExecution.triggerSkill =
+            second.action.skill.nome;
+        }
 
 
         await this.consumeExecutedSkill(
@@ -4370,6 +4623,8 @@ export class PvpCoordinator {
     firstExecution,
 
     secondExecution,
+
+    reaction,
 
     hp: {
         player1: {
