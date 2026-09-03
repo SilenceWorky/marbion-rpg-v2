@@ -1,0 +1,123 @@
+name: Corrigir Sono e Ilusao legada
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/temp-corrige-sono-ilusao.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Corrigir roteamento e fusao legada
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          # ------------------------------------------------------------
+          # 1. Sono precisa ter prioridade sobre Debuff genérico.
+          # ------------------------------------------------------------
+          path = Path("src/durable/PvpCoordinator.js")
+          text = path.read_text(encoding="utf-8")
+
+          sleep_block = '''  /*
+           * ==============================
+           * SONO
+           * ==============================
+           */
+          if (
+            controlType ===
+            "sono"
+          ) {
+            return executeSleepAction(
+              attacker,
+              defender,
+              action,
+              currentTurn
+            );
+          }
+
+
+          '''
+
+          if text.count(sleep_block) != 1:
+              raise SystemExit(f"Esperava 1 bloco de Sono, encontrei {text.count(sleep_block)}")
+
+          text = text.replace(sleep_block, "", 1)
+
+          debuff_marker = '''  /*
+          * DEBUFF
+          */
+          if (
+            skillType === "debuff"
+          ) {'''
+
+          if debuff_marker not in text:
+              raise SystemExit("Roteamento genérico de Debuff não encontrado")
+
+          text = text.replace(
+              debuff_marker,
+              sleep_block + debuff_marker,
+              1
+          )
+
+          path.write_text(text, encoding="utf-8")
+
+          # ------------------------------------------------------------
+          # 2. Ilusão era o nome antigo de Psíquico, não uma fusão.
+          # ------------------------------------------------------------
+          path = Path("src/systems/element-compatibility.js")
+          text = path.read_text(encoding="utf-8")
+
+          legacy_fusion = '''  {
+            requires: [
+              "Psíquico",
+              "Luz"
+            ],
+            unlocks: [
+              "Ilusão"
+            ]
+          },
+
+'''
+
+          if legacy_fusion not in text:
+              raise SystemExit("Fusão legada Psíquico + Luz -> Ilusão não encontrada")
+
+          text = text.replace(legacy_fusion, "", 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Validar sintaxe e regressões
+        run: |
+          node --check src/durable/PvpCoordinator.js
+          node --check src/systems/element-compatibility.js
+          node --check src/systems/sleep.js
+          node testar_regressao_sono_debuff_e_ilusao.mjs
+          node testar_sono_pvp.mjs
+          node testar_integracao_sono_pvp.mjs
+          node testar_confusao_pvp.mjs
+          node testar_integracao_confusao_pvp.mjs
+          node testar_lentidao_pvp.mjs
+          node testar_silencio_pvp.mjs
+          node testar_cegueira_pvp.mjs
+          node testar_controle_pvp.mjs
+          node testar_persistencia_perfil_forte.mjs
+          node testar_regen_mentalidade_pvp.mjs
+
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/durable/PvpCoordinator.js src/systems/element-compatibility.js testar_regressao_sono_debuff_e_ilusao.mjs
+          git commit -m "Corrige Sono e remove Ilusao como elemento" || exit 0
+          git push
