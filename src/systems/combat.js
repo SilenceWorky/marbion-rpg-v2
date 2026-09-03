@@ -85,11 +85,7 @@ export function getSkillCriticalMultiplier(
 export function rollCritical(
   criticalChance
 ) {
-  const roll =
-    Math.random() * 100;
-
-
-  return roll <
+  const chance =
     clamp(
       getNumber(
         criticalChance,
@@ -98,6 +94,40 @@ export function rollCritical(
       0,
       100
     );
+
+
+  if (
+    chance <= 0
+  ) {
+    return false;
+  }
+
+
+  if (
+    chance >= 100
+  ) {
+    return true;
+  }
+
+
+  const roll =
+    Math.random() * 100;
+
+
+  /*
+   * Usamos a faixa SUPERIOR do sorteio.
+   *
+   * Exemplo com 5%:
+   * 95 <= roll < 100.
+   *
+   * Isso continua sendo exatamente 5%,
+   * mas preserva testes antigos que usam
+   * Math.random = () => 0 para garantir
+   * acertos normais sem transformar todos
+   * os golpes em críticos.
+   */
+  return roll >=
+    100 - chance;
 }
 
 
