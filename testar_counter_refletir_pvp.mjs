@@ -256,6 +256,28 @@ assert.ok(
 );
 
 
+assert.ok(
+  coordinator.includes(
+    "reactionAttempt"
+  ),
+  "PvP precisa expor quando uma postura foi preparada mas não ativou."
+);
+
+assert.ok(
+  attackRoute.includes(
+    "ELEMENT_NOT_OWNED"
+  ),
+  "A rota precisa explicar quando Refletir falha por elemento incompatível."
+);
+
+assert.ok(
+  attackRoute.includes(
+    "foi recebido normalmente"
+  ),
+  "A mensagem deve deixar explícito que o golpe incompatível não foi refletido."
+);
+
+
 console.log(
   "✅ Contra-ataque reage somente a dano Físico direto."
 );
@@ -273,6 +295,9 @@ console.log(
 );
 console.log(
   "✅ Integração do PvP contém snapshot, redução e devolução de dano."
+);
+console.log(
+  "✅ Falhas de Counter/Refletir agora informam o motivo no chat."
 );
 
 console.log(

@@ -340,7 +340,7 @@ export async function attackRoute(
 
       return physical
         ? `⚔️ @${execution.user} preparou ${execution.skill} contra um golpe Físico.`
-        : `🪞 @${execution.user} preparou ${execution.skill} contra um golpe Elemental compatível.`;
+        : `🪞 @${execution.user} preparou ${execution.skill} para tentar devolver um golpe Elemental do próprio elemento.`;
     }
 
 
@@ -1151,6 +1151,129 @@ export async function attackRoute(
         result.reaction
       );
 
+
+    function formatReactionAttempt(
+      attempt
+    ) {
+      if (
+        !attempt?.attempted ||
+        attempt.activated
+      ) {
+        return "";
+      }
+
+
+      const physical =
+        attempt.type ===
+        "counter_physical";
+
+      const icon =
+        physical
+          ? "⚔️"
+          : "🪞";
+
+      const label =
+        physical
+          ? "Contra-ataque"
+          : "Refletir";
+
+      const incoming =
+        attempt.incomingSkill ||
+        "a ação adversária";
+
+
+      if (
+        attempt.reason ===
+        "ELEMENT_NOT_OWNED"
+      ) {
+        return (
+          `${icon} ${label} de @${attempt.user} falhou: ` +
+          `${attempt.element || "esse elemento"} não pertence aos elementos refletíveis do personagem. ` +
+          `${incoming} foi recebido normalmente.`
+        );
+      }
+
+
+      if (
+        attempt.reason ===
+        "NOT_ELEMENTAL"
+      ) {
+        return (
+          `${icon} ${label} de @${attempt.user} não ativou: ` +
+          `${incoming} não é um golpe Elemental.`
+        );
+      }
+
+
+      if (
+        attempt.reason ===
+        "NOT_PHYSICAL"
+      ) {
+        return (
+          `${icon} ${label} de @${attempt.user} não ativou: ` +
+          `${incoming} não é um golpe Físico.`
+        );
+      }
+
+
+      if (
+        attempt.reason ===
+        "NOT_DIRECT_DAMAGE"
+      ) {
+        return (
+          `${icon} ${label} de @${attempt.user} não ativou porque ` +
+          `${incoming} não causa dano direto compatível.`
+        );
+      }
+
+
+      if (
+        attempt.reason ===
+        "INCOMING_MISSED"
+      ) {
+        return (
+          `${icon} ${label} de @${attempt.user} estava preparado, ` +
+          `mas ${incoming} errou e nada precisou ser devolvido.`
+        );
+      }
+
+
+      if (
+        attempt.reason ===
+        "INCOMING_NOT_EXECUTED"
+      ) {
+        return (
+          `${icon} ${label} de @${attempt.user} não ativou porque ` +
+          `${incoming} não chegou a ser executado.`
+        );
+      }
+
+
+      if (
+        attempt.reason ===
+        "NO_DAMAGE_DEALT"
+      ) {
+        return (
+          `${icon} ${label} de @${attempt.user} não ativou porque ` +
+          `${incoming} não causou dano direto para devolver.`
+        );
+      }
+
+
+      return (
+        `${icon} ${label} de @${attempt.user} foi preparado, ` +
+        `mas não encontrou um golpe compatível para devolver.`
+      );
+    }
+
+
+    const reactionAttemptText =
+      reactionText
+        ? ""
+        : formatReactionAttempt(
+            result.reactionAttempt
+          );
+
     const dotText =
       Array.isArray(
         result.dotTicks
@@ -1189,6 +1312,11 @@ export async function attackRoute(
     if (reactionText) {
       message +=
         ` ${reactionText}`;
+    }
+
+    if (reactionAttemptText) {
+      message +=
+        ` ${reactionAttemptText}`;
     }
 
     if (dotText) {

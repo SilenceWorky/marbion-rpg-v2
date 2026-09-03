@@ -3906,6 +3906,9 @@ export class PvpCoordinator {
     let reaction =
     null;
 
+    let reactionAttempt =
+    null;
+
     let battleOver =
     false;
 
@@ -4021,6 +4024,35 @@ export class PvpCoordinator {
 
 
     if (
+      firstExecution?.kind ===
+        "reaction_stance"
+    ) {
+      reactionAttempt = {
+        attempted: true,
+        activated: false,
+        type:
+          reactionMatch.reactionType,
+        user:
+          first.player.user,
+        skill:
+          first.action.skill.nome,
+        incomingUser:
+          second.player.user,
+        incomingSkill:
+          second.action.skill.nome,
+        incomingType:
+          second.action.skill.tipo ?? null,
+        element:
+          second.action.skill.elemento ?? null,
+        matched:
+          reactionMatch.matched,
+        reason:
+          reactionMatch.reason
+      };
+    }
+
+
+    if (
       secondControl.blocked
     ) {
       secondExecution =
@@ -4107,6 +4139,35 @@ export class PvpCoordinator {
         }
 
 
+        if (reactionAttempt) {
+          if (
+            secondExecution?.kind === "control_blocked" ||
+            secondExecution?.kind === "sleep_blocked" ||
+            secondExecution?.kind === "silence_blocked" ||
+            secondExecution?.kind === "confusion_self_hit"
+          ) {
+            reactionAttempt.reason =
+              "INCOMING_NOT_EXECUTED";
+          }
+          else if (
+            reactionMatch.matched &&
+            secondExecution?.hit === false
+          ) {
+            reactionAttempt.reason =
+              "INCOMING_MISSED";
+          }
+          else if (
+            reactionMatch.matched &&
+            Number(
+              secondExecution?.rawDamage
+            ) <= 0
+          ) {
+            reactionAttempt.reason =
+              "NO_DAMAGE_DEALT";
+          }
+        }
+
+
         if (
           reactionMatch.matched &&
           secondExecution?.hit === true &&
@@ -4189,6 +4250,14 @@ export class PvpCoordinator {
 
           firstExecution.activated =
             true;
+
+          if (reactionAttempt) {
+            reactionAttempt.activated =
+              true;
+
+            reactionAttempt.reason =
+              null;
+          }
 
           firstExecution.triggerSkill =
             second.action.skill.nome;
@@ -4625,6 +4694,8 @@ export class PvpCoordinator {
     secondExecution,
 
     reaction,
+
+    reactionAttempt,
 
     hp: {
         player1: {
