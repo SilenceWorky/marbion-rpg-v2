@@ -1203,6 +1203,24 @@ function executeBattleAction(
   * própria de dano por turno.
   */
   /*
+   * ==============================
+   * SONO
+   * ==============================
+   */
+  if (
+    controlType ===
+    "sono"
+  ) {
+    return executeSleepAction(
+      attacker,
+      defender,
+      action,
+      currentTurn
+    );
+  }
+
+
+  /*
   * DEBUFF
   */
   if (
@@ -1287,24 +1305,6 @@ function executeBattleAction(
    * controlType adiciona o efeito
    * de Controle.
    */
-  /*
-   * ==============================
-   * SONO
-   * ==============================
-   */
-  if (
-    controlType ===
-    "sono"
-  ) {
-    return executeSleepAction(
-      attacker,
-      defender,
-      action,
-      currentTurn
-    );
-  }
-
-
   if (
     controlType ===
     "paralisia"
