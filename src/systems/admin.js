@@ -369,6 +369,157 @@ export async function adminSetElements(
   };
 }
 
+export const ADMIN_STATUS_RESET_VALUES = {
+  strength: 5,
+  magicStrength: 5,
+  speed: 5,
+  evasion: 5,
+  accuracy: 90,
+  defense: 5,
+  statusPoints: 0
+};
+
+
+export function resetProfileStatus(
+  profile
+) {
+  if (
+    !profile ||
+    typeof profile !== "object"
+  ) {
+    return {
+      ok: false,
+      error: "INVALID_PROFILE"
+    };
+  }
+
+
+  const before = {
+    strength:
+      Number(profile.strength) || 0,
+
+    magicStrength:
+      Number(profile.magicStrength) || 0,
+
+    speed:
+      Number(profile.speed) || 0,
+
+    evasion:
+      Number(profile.evasion) || 0,
+
+    accuracy:
+      Number(profile.accuracy) || 0,
+
+    defense:
+      Number(profile.defense) || 0,
+
+    statusPoints:
+      Math.max(
+        0,
+        Number(profile.statusPoints) || 0
+      )
+  };
+
+
+  profile.strength =
+    ADMIN_STATUS_RESET_VALUES.strength;
+
+  profile.magicStrength =
+    ADMIN_STATUS_RESET_VALUES.magicStrength;
+
+  profile.speed =
+    ADMIN_STATUS_RESET_VALUES.speed;
+
+  profile.evasion =
+    ADMIN_STATUS_RESET_VALUES.evasion;
+
+  profile.accuracy =
+    ADMIN_STATUS_RESET_VALUES.accuracy;
+
+  profile.defense =
+    ADMIN_STATUS_RESET_VALUES.defense;
+
+  profile.statusPoints =
+    ADMIN_STATUS_RESET_VALUES.statusPoints;
+
+
+  return {
+    ok: true,
+    before,
+    after: {
+      ...ADMIN_STATUS_RESET_VALUES
+    }
+  };
+}
+
+
+export async function adminResetStatus(
+  env,
+  user
+) {
+  const targetUser =
+    normalizeUser(
+      user
+    );
+
+
+  if (!targetUser) {
+    return {
+      ok: false,
+      error: "INVALID_USER"
+    };
+  }
+
+
+  const profile =
+    await getProfile(
+      env,
+      targetUser
+    );
+
+
+  if (
+    !profile ||
+    !profile.race
+  ) {
+    return {
+      ok: false,
+      error: "CHARACTER_NOT_FOUND",
+      user: targetUser
+    };
+  }
+
+
+  const reset =
+    resetProfileStatus(
+      profile
+    );
+
+
+  if (!reset.ok) {
+    return {
+      ...reset,
+      user: targetUser
+    };
+  }
+
+
+  await saveProfile(
+    env,
+    targetUser,
+    profile
+  );
+
+
+  return {
+    ok: true,
+    user: targetUser,
+    before: reset.before,
+    after: reset.after
+  };
+}
+
+
 export async function adminAddStatusPoints(
   env,
   user,

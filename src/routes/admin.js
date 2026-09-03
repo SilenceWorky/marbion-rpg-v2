@@ -7,6 +7,7 @@ import {
   adminSetRace,
   adminSetElements,
   adminAddStatusPoints,
+  adminResetStatus,
   adminSkill
 } from "../systems/admin.js";
 
@@ -106,7 +107,7 @@ export async function adminRoute(
 
   if (!rawArgs) {
     return new Response(
-      `@${actor}, uso: !adm level/raça/elemento/pontos/skill/pvp ...`
+      `@${actor}, uso: !adm level/raça/elemento/status/pontos/skill/pvp ...`
     );
   }
 
@@ -321,6 +322,75 @@ export async function adminRoute(
       `✅ ADM | Elemento de @${result.user}: ${result.elements.join(" + ")}.`
     );
   }
+
+  /*
+   * ==========================
+   * STATUS RESET
+   * ==========================
+   *
+   * !adm status reset @user
+   *
+   * Zera todos os Status Points guardados
+   * e restaura os atributos de teste/base
+   * definidos pelo ADM.
+   */
+  if (
+    command === "status"
+  ) {
+    const operation =
+      normalizeCommand(
+        args[1]
+      );
+
+    const target =
+      args[2];
+
+
+    if (
+      operation !== "reset" ||
+      !target
+    ) {
+      return new Response(
+        `@${actor}, uso: !adm status reset @usuário`
+      );
+    }
+
+
+    const result =
+      await adminResetStatus(
+        env,
+        target
+      );
+
+
+    if (!result.ok) {
+      if (
+        result.error ===
+        "CHARACTER_NOT_FOUND"
+      ) {
+        return new Response(
+          `@${actor}, @${normalizeUser(target)} ainda não possui personagem.`
+        );
+      }
+
+
+      return new Response(
+        `@${actor}, não foi possível resetar os Status de @${normalizeUser(target)}.`
+      );
+    }
+
+
+    return new Response(
+      `🛠️ ADM | Status de @${result.user} resetados. ` +
+      `Pontos: 0 | Força: ${result.after.strength} | ` +
+      `Força Mágica: ${result.after.magicStrength} | ` +
+      `Velocidade: ${result.after.speed} | ` +
+      `Evasão: ${result.after.evasion} | ` +
+      `Precisão: ${result.after.accuracy} | ` +
+      `Defesa: ${result.after.defense}.`
+    );
+  }
+
 
   /*
   * ==========================
@@ -664,6 +734,6 @@ export async function adminRoute(
 
 
 return new Response(
-  `@${actor}, comando ADM desconhecido. Use level, raça, elemento, pontos, skill ou pvp.`
+  `@${actor}, comando ADM desconhecido. Use level, raça, elemento, status, pontos, skill ou pvp.`
 );
 }
