@@ -80,12 +80,12 @@ const originalRandom =
 try {
   let rolls = [
     0,
-    0.049
+    0.95
   ];
 
   Math.random =
     () =>
-      rolls.shift() ?? 1;
+      rolls.shift() ?? 0;
 
 
   const criticalResult =
@@ -104,7 +104,7 @@ try {
   assert.equal(
     criticalResult.critical,
     true,
-    "Roll de 4.9 deve critar com chance de 5%."
+    "Roll de 95 deve critar com chance de 5%."
   );
 
   assert.equal(
@@ -120,12 +120,12 @@ try {
 
   rolls = [
     0,
-    0.05
+    0.949
   ];
 
   Math.random =
     () =>
-      rolls.shift() ?? 1;
+      rolls.shift() ?? 0;
 
 
   const nonCriticalResult =
@@ -144,7 +144,7 @@ try {
   assert.equal(
     nonCriticalResult.critical,
     false,
-    "Roll exatamente 5.0 não deve critar em chance de 5%."
+    "Roll de 94.9 não deve critar em chance de 5%."
   );
 
   assert.equal(
@@ -189,13 +189,41 @@ try {
 
 
   rolls = [
-    0,
-    0.999
+    0
   ];
 
   Math.random =
     () =>
-      rolls.shift() ?? 1;
+      rolls.shift() ?? 0;
+
+
+  const deterministicNormalHit =
+    resolveOffensiveSkill(
+      attacker,
+      defender,
+      skill
+    );
+
+
+  assert.equal(
+    deterministicNormalHit.hit,
+    true
+  );
+
+  assert.equal(
+    deterministicNormalHit.critical,
+    false,
+    "Math.random = 0 deve continuar gerando acerto normal nos testes antigos."
+  );
+
+
+  rolls = [
+    0
+  ];
+
+  Math.random =
+    () =>
+      rolls.shift() ?? 0;
 
 
   const forcedCritical =
@@ -239,6 +267,9 @@ console.log(
 );
 console.log(
   "✅ Dano zero não critica."
+);
+console.log(
+  "✅ Faixa crítica 95-100 preserva RNG = 0 dos testes antigos."
 );
 console.log(
   "✅ Estrutura aceita critChance/critMultiplier por habilidade no futuro."
