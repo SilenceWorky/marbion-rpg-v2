@@ -366,6 +366,23 @@ export async function attackRoute(
     }
 
     if (
+      execution.blockedByImmunity === true ||
+      execution.elementalImmune === true
+    ) {
+      const element =
+        execution.attackElement ||
+        "elemento do ataque";
+
+      return (
+        "⛔ @" + execution.attacker +
+        " usou " + formatSkillLabel(execution) +
+        ", mas @" + execution.defender +
+        " é imune a " + element +
+        ". Dano: 0."
+      );
+    }
+
+    if (
       execution.kind ===
       "reaction_stance"
     ) {

@@ -308,6 +308,27 @@ function executeOffensiveAction(
       hitChance:
         result.hitChance,
 
+      blockedByImmunity:
+        result.blockedByImmunity === true,
+
+      elementalImmune:
+        result.elementalImmune === true,
+
+      elementalMultiplier:
+        result.elementalMultiplier,
+
+      elementalEffectiveness:
+        result.elementalEffectiveness,
+
+      attackElement:
+        result.attackElement,
+
+      defenderElements:
+        result.defenderElements,
+
+      damageBeforeElemental:
+        result.damageBeforeElemental || 0,
+
       critical:
         false,
 
@@ -401,6 +422,27 @@ function executeOffensiveAction(
     hitChance:
       result.hitChance,
 
+    blockedByImmunity:
+      result.blockedByImmunity === true,
+
+    elementalImmune:
+      result.elementalImmune === true,
+
+    elementalMultiplier:
+      result.elementalMultiplier,
+
+    elementalEffectiveness:
+      result.elementalEffectiveness,
+
+    attackElement:
+      result.attackElement,
+
+    defenderElements:
+      result.defenderElements,
+
+    damageBeforeElemental:
+      result.damageBeforeElemental || 0,
+
     critical:
       result.critical === true,
 
@@ -463,6 +505,27 @@ function executeDebuffAction(
 
       hitChance:
         offensive.hitChance,
+
+      blockedByImmunity:
+        offensive.blockedByImmunity === true,
+
+      elementalImmune:
+        offensive.elementalImmune === true,
+
+      elementalMultiplier:
+        offensive.elementalMultiplier,
+
+      elementalEffectiveness:
+        offensive.elementalEffectiveness,
+
+      attackElement:
+        offensive.attackElement,
+
+      defenderElements:
+        offensive.defenderElements,
+
+      damageBeforeElemental:
+        offensive.damageBeforeElemental || 0,
 
       critical:
         false,
@@ -568,6 +631,27 @@ function executeDebuffAction(
 
     hitChance:
       offensive.hitChance,
+
+    blockedByImmunity:
+      offensive.blockedByImmunity === true,
+
+    elementalImmune:
+      offensive.elementalImmune === true,
+
+    elementalMultiplier:
+      offensive.elementalMultiplier,
+
+    elementalEffectiveness:
+      offensive.elementalEffectiveness,
+
+    attackElement:
+      offensive.attackElement,
+
+    defenderElements:
+      offensive.defenderElements,
+
+    damageBeforeElemental:
+      offensive.damageBeforeElemental || 0,
 
     critical:
       offensive.critical === true,
@@ -2601,6 +2685,9 @@ export class PvpCoordinator {
         player.loadout
         ) ||
         !Array.isArray(
+        player.elements
+        ) ||
+        !Array.isArray(
         player.reflectElements
         ) ||
         requiredStats.some(
@@ -2639,6 +2726,20 @@ export class PvpCoordinator {
         snapshotLoadout(
             profile
         );
+    }
+
+
+    if (
+        !Array.isArray(
+        player.elements
+        )
+    ) {
+        player.elements =
+        Array.isArray(
+            profile.elements
+        )
+            ? [...profile.elements]
+            : [];
     }
 
 
@@ -3201,6 +3302,13 @@ export class PvpCoordinator {
         defense:
             challengerProfile.defense,
 
+        elements:
+            Array.isArray(
+            challengerProfile.elements
+            )
+            ? [...challengerProfile.elements]
+            : [],
+
         loadout:
             snapshotLoadout(
             challengerProfile
@@ -3251,6 +3359,13 @@ export class PvpCoordinator {
 
     defense:
         targetProfile.defense,
+
+    elements:
+        Array.isArray(
+        targetProfile.elements
+        )
+        ? [...targetProfile.elements]
+        : [],
 
     loadout:
         snapshotLoadout(
