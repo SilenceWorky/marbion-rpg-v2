@@ -333,6 +333,30 @@ export async function attackRoute(
    * Agora podemos revelar
    * as habilidades.
    */
+    function formatSkillLabel(
+      execution
+    ) {
+      const skillName =
+        String(
+          execution?.skill ??
+          "habilidade"
+        );
+
+
+      if (
+        execution?.critical === true
+      ) {
+        return (
+          skillName +
+          " 💥 CRÍTICO!"
+        );
+      }
+
+
+      return skillName;
+    }
+
+
     function formatExecution(
     execution,
     hpData
@@ -350,8 +374,8 @@ export async function attackRoute(
         "counter_physical";
 
       return physical
-        ? `⚔️ @${execution.user} preparou ${execution.skill} contra um golpe Físico.`
-        : `🪞 @${execution.user} preparou ${execution.skill} para tentar devolver um golpe Elemental do próprio elemento.`;
+        ? `⚔️ @${execution.user} preparou ${formatSkillLabel(execution)} contra um golpe Físico.`
+        : `🪞 @${execution.user} preparou ${formatSkillLabel(execution)} para tentar devolver um golpe Elemental do próprio elemento.`;
     }
 
 
@@ -366,7 +390,7 @@ export async function attackRoute(
 
 
       return (
-        `💤 @${execution.attacker} tentou usar ${execution.skill}, ` +
+        `💤 @${execution.attacker} tentou usar ${formatSkillLabel(execution)}, ` +
         `mas está Dormindo${source} e perdeu a ação.`
       );
     }
@@ -392,7 +416,7 @@ export async function attackRoute(
       return (
         `😵 @${execution.attacker} se confundiu${source}, ` +
         `se feriu em ${execution.damage} de dano e perdeu a ação ` +
-        `que usaria ${execution.skill}. ` +
+        `que usaria ${formatSkillLabel(execution)}. ` +
         `HP: ${execution.hpAfter}/${playerHpData.max}.`
       );
     }
@@ -408,7 +432,7 @@ export async function attackRoute(
           : "";
 
       return (
-        `🤐 @${execution.attacker} tentou usar ${execution.skill}, ` +
+        `🤐 @${execution.attacker} tentou usar ${formatSkillLabel(execution)}, ` +
         `mas está Silenciado${source} e não conseguiu usar a habilidade por causa do Silêncio.`
       );
     }
@@ -430,7 +454,7 @@ export async function attackRoute(
 
       return (
         `${info.icon} @${execution.attacker} tentou usar ` +
-        `${execution.skill}, mas ficou ${info.adjective}${source} ` +
+        `${formatSkillLabel(execution)}, mas ficou ${info.adjective}${source} ` +
         `e perdeu a ação.`
       );
     }
@@ -440,7 +464,7 @@ export async function attackRoute(
       "heal"
     ) {
       return (
-        `@${execution.user} usou ${execution.skill} ` +
+        `@${execution.user} usou ${formatSkillLabel(execution)} ` +
         `e recuperou ${execution.healing} de HP. ` +
         `HP: ${execution.hpAfter}/${execution.maxHp}.`
       );
@@ -454,7 +478,7 @@ export async function attackRoute(
         execution.ok === false
       ) {
         return (
-          `@${execution.user} usou ${execution.skill}, ` +
+          `@${execution.user} usou ${formatSkillLabel(execution)}, ` +
           `mas o buff não pôde ser aplicado.`
         );
       }
@@ -478,7 +502,7 @@ export async function attackRoute(
 
 
       return (
-        `@${execution.user} usou ${execution.skill} ` +
+        `@${execution.user} usou ${formatSkillLabel(execution)} ` +
         `e recebeu +${execution.amount} de ${statName} ` +
         `por ${execution.duration} turnos.`
       );
@@ -490,7 +514,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -516,7 +540,7 @@ export async function attackRoute(
 
 
       let text =
-        `@${execution.attacker} usou ${execution.skill} ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
         `e causou ${execution.damage} de dano em ` +
         `@${execution.defender}. ` +
         `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
@@ -543,7 +567,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -569,7 +593,7 @@ export async function attackRoute(
 
 
       let text =
-        `@${execution.attacker} usou ${execution.skill} ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
         `e causou ${execution.damage} de dano em ` +
         `@${execution.defender}. ` +
         `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
@@ -596,7 +620,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -622,7 +646,7 @@ export async function attackRoute(
 
 
       let text =
-        `@${execution.attacker} usou ${execution.skill} ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
         `e causou ${execution.damage} de dano em ` +
         `@${execution.defender}. ` +
         `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
@@ -650,7 +674,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -676,7 +700,7 @@ export async function attackRoute(
 
 
       let text =
-        `@${execution.attacker} usou ${execution.skill} ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
         `e causou ${execution.damage} de dano em ` +
         `@${execution.defender}. ` +
         `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
@@ -703,7 +727,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -729,7 +753,7 @@ export async function attackRoute(
 
 
       let text =
-        `@${execution.attacker} usou ${execution.skill} ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
         `e causou ${execution.damage} de dano em ` +
         `@${execution.defender}. ` +
         `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
@@ -755,7 +779,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -772,7 +796,7 @@ export async function attackRoute(
 
 
       let text =
-        `@${execution.attacker} usou ${execution.skill} ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
         `e causou ${execution.damage} de dano em ` +
         `@${execution.defender}.`;
 
@@ -826,7 +850,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -857,7 +881,7 @@ export async function attackRoute(
 
 
       let text =
-        `@${execution.attacker} usou ${execution.skill} ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
         `e causou ${execution.damage} de dano em ` +
         `@${execution.defender}. ` +
         `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
@@ -888,7 +912,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -914,7 +938,7 @@ export async function attackRoute(
 
 
       let text =
-        `@${execution.attacker} usou ${execution.skill} ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
         `e causou ${execution.damage} de dano em ` +
         `@${execution.defender}. ` +
         `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
@@ -949,7 +973,7 @@ export async function attackRoute(
     ) {
         if (!execution.hit) {
           return (
-            `@${execution.attacker} usou ${execution.skill}, ` +
+            `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
             `mas errou.`
           );
         }
@@ -972,7 +996,7 @@ export async function attackRoute(
             : defenderHpData.current;
 
         let text =
-          `@${execution.attacker} usou ${execution.skill} ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
           `e causou ${execution.damage} de dano em ` +
           `@${execution.defender}. ` +
           `HP: ${hpAfterExecution}/${defenderHpData.max}.`;
@@ -1001,7 +1025,7 @@ export async function attackRoute(
     ) {
       if (!execution.hit) {
         return (
-          `@${execution.attacker} usou ${execution.skill}, ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
           `mas errou.`
         );
       }
@@ -1011,7 +1035,7 @@ export async function attackRoute(
         !execution.debuffApplied
       ) {
         return (
-          `@${execution.attacker} usou ${execution.skill} ` +
+          `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
           `e causou ${execution.damage} de dano em ` +
           `@${execution.defender}, mas o Debuff não pôde ser aplicado.`
         );
@@ -1036,7 +1060,7 @@ export async function attackRoute(
 
 
       return (
-        `@${execution.attacker} usou ${execution.skill}, ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
         `causou ${execution.damage} de dano em ` +
         `@${execution.defender} e reduziu ` +
         `${statName} em ${execution.debuff.amount} ` +
@@ -1057,7 +1081,7 @@ export async function attackRoute(
 
     if (!execution.hit) {
         return (
-        `@${execution.attacker} usou ${execution.skill}, ` +
+        `@${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
         `mas errou.`
         );
     }
@@ -1091,7 +1115,7 @@ export async function attackRoute(
 
 
     return (
-      `@${execution.attacker} usou ${execution.skill} ` +
+      `@${execution.attacker} usou ${formatSkillLabel(execution)} ` +
       `e causou ${execution.damage} de dano em ` +
       `@${execution.defender}. ` +
       `HP: ${hpAfterExecution}/${defenderHpData.max}.`

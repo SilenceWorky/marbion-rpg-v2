@@ -308,6 +308,18 @@ function executeOffensiveAction(
       hitChance:
         result.hitChance,
 
+      critical:
+        false,
+
+      criticalChance:
+        result.criticalChance,
+
+      criticalMultiplier:
+        result.criticalMultiplier,
+
+      baseDamage:
+        0,
+
       rawDamage:
         0,
 
@@ -389,6 +401,23 @@ function executeOffensiveAction(
     hitChance:
       result.hitChance,
 
+    critical:
+      result.critical === true,
+
+    criticalChance:
+      result.criticalChance,
+
+    criticalMultiplier:
+      result.criticalMultiplier,
+
+    baseDamage:
+      Math.max(
+        0,
+        Number(
+          result.baseDamage
+        ) || 0
+      ),
+
     rawDamage,
 
     damage,
@@ -434,6 +463,18 @@ function executeDebuffAction(
 
       hitChance:
         offensive.hitChance,
+
+      critical:
+        false,
+
+      criticalChance:
+        offensive.criticalChance,
+
+      criticalMultiplier:
+        offensive.criticalMultiplier,
+
+      baseDamage:
+        0,
 
       rawDamage:
         0,
@@ -527,6 +568,23 @@ function executeDebuffAction(
 
     hitChance:
       offensive.hitChance,
+
+    critical:
+      offensive.critical === true,
+
+    criticalChance:
+      offensive.criticalChance,
+
+    criticalMultiplier:
+      offensive.criticalMultiplier,
+
+    baseDamage:
+      Math.max(
+        0,
+        Number(
+          offensive.baseDamage
+        ) || 0
+      ),
 
     rawDamage,
 
