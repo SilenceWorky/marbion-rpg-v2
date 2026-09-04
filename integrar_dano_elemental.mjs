@@ -349,8 +349,11 @@ attack = replaceOnce(
         "elemento do ataque";
 
       return (
-        `⛔ @${execution.attacker} usou ${formatSkillLabel(execution)}, ` +
-        `mas @${execution.defender} é imune a ${element}. Dano: 0.`
+        "⛔ @" + execution.attacker +
+        " usou " + formatSkillLabel(execution) +
+        ", mas @" + execution.defender +
+        " é imune a " + element +
+        ". Dano: 0."
       );
     }
 
