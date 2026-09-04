@@ -339,10 +339,15 @@ export function getSingleElementMultiplier(
   }
 
 
-  return Number(
-    RELATIONS?.[attack]?.[defender]
-  ) ||
-    ELEMENTAL_MULTIPLIERS.NEUTRAL;
+  const configured =
+    RELATIONS?.[attack]?.[defender];
+
+
+  return Number.isFinite(
+    Number(configured)
+  )
+    ? Number(configured)
+    : ELEMENTAL_MULTIPLIERS.NEUTRAL;
 }
 
 
