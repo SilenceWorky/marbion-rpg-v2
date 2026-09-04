@@ -1,3 +1,9 @@
+import {
+  applyElementalDamage,
+  getElementalMatchup
+} from "./elemental-damage.js";
+
+
 function clamp(
   value,
   min,
@@ -283,7 +289,7 @@ export function rollHit(
 
 
 /*
- * DANO
+ * DANO BASE DE COMBATE
  *
  * dano da habilidade
  * +
@@ -370,11 +376,17 @@ export function calculateDamage(
  * Ainda NÃO altera HP.
  * Isso fica a cargo do PvP.
  *
- * Ordem:
+ * Ordem canônica:
  * 1. teste de acerto
- * 2. dano normal já considerando Defesa
- * 3. teste crítico
- * 4. multiplicador crítico apenas no dano direto
+ * 2. dano da habilidade + escala + Defesa
+ * 3. multiplicador elemental
+ * 4. teste crítico
+ * 5. multiplicador crítico no dano direto
+ *
+ * Imunidade elemental transforma o ataque
+ * em uma execução sem efeito: dano 0 e
+ * hit=false, mas a habilidade foi executada
+ * normalmente para custo/cooldown.
  */
 export function resolveOffensiveSkill(
   attacker,
@@ -411,9 +423,63 @@ export function resolveOffensiveSkill(
     return {
       hit: false,
       hitChance,
+      blockedByImmunity: false,
+      elementalImmune: false,
+      elementalMultiplier: 1,
+      elementalEffectiveness: "neutral",
+      elementalRelations: [],
+      attackElement:
+        skill?.elemento ?? null,
+      defenderElements:
+        Array.isArray(defender?.elements)
+          ? [...defender.elements]
+          : [],
       critical: false,
       criticalChance,
       criticalMultiplier,
+      damageBeforeElemental: 0,
+      baseDamage: 0,
+      damage: 0
+    };
+  }
+
+
+  const damageBeforeElemental =
+    calculateDamage(
+      attacker,
+      defender,
+      skill
+    );
+
+
+  const elemental =
+    getElementalMatchup(
+      skill?.elemento,
+      defender?.elements
+    );
+
+
+  if (
+    elemental.immune
+  ) {
+    return {
+      hit: false,
+      hitChance,
+      blockedByImmunity: true,
+      elementalImmune: true,
+      elementalMultiplier: 0,
+      elementalEffectiveness:
+        "immune",
+      elementalRelations:
+        elemental.relations,
+      attackElement:
+        skill?.elemento ?? null,
+      defenderElements:
+        elemental.defenderElements,
+      critical: false,
+      criticalChance,
+      criticalMultiplier,
+      damageBeforeElemental,
       baseDamage: 0,
       damage: 0
     };
@@ -421,10 +487,9 @@ export function resolveOffensiveSkill(
 
 
   const baseDamage =
-    calculateDamage(
-      attacker,
-      defender,
-      skill
+    applyElementalDamage(
+      damageBeforeElemental,
+      elemental.multiplier
     );
 
 
@@ -447,9 +512,22 @@ export function resolveOffensiveSkill(
   return {
     hit: true,
     hitChance,
+    blockedByImmunity: false,
+    elementalImmune: false,
+    elementalMultiplier:
+      elemental.multiplier,
+    elementalEffectiveness:
+      elemental.effectiveness,
+    elementalRelations:
+      elemental.relations,
+    attackElement:
+      skill?.elemento ?? null,
+    defenderElements:
+      elemental.defenderElements,
     critical,
     criticalChance,
     criticalMultiplier,
+    damageBeforeElemental,
     baseDamage,
     damage
   };
