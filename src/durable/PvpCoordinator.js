@@ -97,6 +97,14 @@ import {
   startSkillCooldown
 } from "../systems/cooldown.js";
 
+import {
+  ensureGlobalPvpQueue,
+  getGlobalActivePvpBattle,
+  findQueuedPvpByUser,
+  enqueueAcceptedPvp,
+  dequeueNextPvp
+} from "../systems/pvp-queue.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -2106,12 +2114,27 @@ export class PvpCoordinator {
     const data =
       await this.state.storage.get(
         "pvp"
-      );
+      ) || {
+        challenges: [],
+        battles: [],
+        queue: []
+      };
 
-    return data || {
-      challenges: [],
-      battles: []
-    };
+
+    if (!Array.isArray(data.challenges)) {
+      data.challenges = [];
+    }
+
+    if (!Array.isArray(data.battles)) {
+      data.battles = [];
+    }
+
+    ensureGlobalPvpQueue(
+      data
+    );
+
+
+    return data;
   }
 
 
@@ -2665,6 +2688,15 @@ export class PvpCoordinator {
     );
 
 
+    const adminQueuePromotion =
+      await this.startNextQueuedBattle();
+
+    const nextQueuedBattle =
+      adminQueuePromotion?.started
+        ? adminQueuePromotion.battle
+        : null;
+
+
     return {
       ok: true,
       mode:
@@ -2674,6 +2706,7 @@ export class PvpCoordinator {
       loser,
       finishReason,
       finishedAt,
+      nextQueuedBattle,
 
       player1: {
         user:
@@ -3105,6 +3138,32 @@ export class PvpCoordinator {
 
 
     if (
+      findQueuedPvpByUser(
+        data,
+        challenger
+      )
+    ) {
+      return {
+        ok: false,
+        error: "CHALLENGER_IN_QUEUE"
+      };
+    }
+
+
+    if (
+      findQueuedPvpByUser(
+        data,
+        target
+      )
+    ) {
+      return {
+        ok: false,
+        error: "TARGET_IN_QUEUE"
+      };
+    }
+
+
+    if (
       this.findChallengeByUser(
         data,
         challenger
@@ -3161,6 +3220,106 @@ export class PvpCoordinator {
       expiresInSeconds:
         CHALLENGE_TIMEOUT / 1000
     };
+  }
+
+
+  async startNextQueuedBattle() {
+    while (true) {
+      const data =
+        await this.getData();
+
+
+      if (
+        getGlobalActivePvpBattle(
+          data
+        )
+      ) {
+        return {
+          started: false,
+          reason: "ACTIVE_BATTLE"
+        };
+      }
+
+
+      const next =
+        dequeueNextPvp(
+          data
+        );
+
+
+      if (!next) {
+        await this.saveData(
+          data
+        );
+
+        return {
+          started: false,
+          reason: "QUEUE_EMPTY"
+        };
+      }
+
+
+      /*
+       * Remove qualquer desafio antigo envolvendo
+       * os jogadores antes de promover a dupla.
+       */
+      data.challenges =
+        data.challenges.filter(
+          challenge =>
+            challenge.challenger !== next.challenger &&
+            challenge.target !== next.challenger &&
+            challenge.challenger !== next.target &&
+            challenge.target !== next.target
+        );
+
+
+      const now =
+        Date.now();
+
+
+      data.challenges.push({
+        challenger:
+          next.challenger,
+        target:
+          next.target,
+        createdAt:
+          now,
+        expiresAt:
+          now + CHALLENGE_TIMEOUT,
+        promotedFromQueue:
+          true
+      });
+
+
+      await this.saveData(
+        data
+      );
+
+
+      const result =
+        await this.acceptChallenge(
+          next.target
+        );
+
+
+      if (
+        result.ok &&
+        result.battle
+      ) {
+        return {
+          started: true,
+          battle:
+            result.battle,
+          queueEntry:
+            next
+        };
+      }
+
+      /*
+       * Entrada inválida (perfil removido etc.).
+       * Ela já saiu da fila; tentamos a próxima.
+       */
+    }
   }
 
 
@@ -3275,6 +3434,77 @@ export class PvpCoordinator {
         error: "PLAYER_IN_BATTLE"
       };
     }
+
+    const activeGlobalBattle =
+      getGlobalActivePvpBattle(
+        data
+      );
+
+
+    if (activeGlobalBattle) {
+      const queued =
+        enqueueAcceptedPvp(
+          data,
+          {
+            challenger:
+              challenge.challenger,
+
+            target:
+              challenge.target,
+
+            acceptedAt:
+              Date.now()
+          }
+        );
+
+
+      if (!queued.ok) {
+        data.challenges.splice(
+          challengeIndex,
+          1
+        );
+
+        await this.saveData(
+          data
+        );
+
+        return {
+          ok: false,
+          error:
+            queued.error ||
+            "PLAYER_ALREADY_QUEUED"
+        };
+      }
+
+
+      data.challenges.splice(
+        challengeIndex,
+        1
+      );
+
+      await this.saveData(
+        data
+      );
+
+
+      return {
+        ok: true,
+        queued: true,
+        position:
+          queued.position,
+        challenger:
+          challenge.challenger,
+        target:
+          challenge.target,
+        activeBattle: {
+          player1:
+            activeGlobalBattle.player1?.user,
+          player2:
+            activeGlobalBattle.player2?.user
+        }
+      };
+    }
+
 
     /*
      * ==============================
@@ -4956,6 +5186,10 @@ export class PvpCoordinator {
      * A quantidade que restou dentro
      * da batalha volta para o perfil.
      */
+    let nextQueuedBattle =
+      null;
+
+
     if (
       battleOver
     ) {
@@ -4964,6 +5198,15 @@ export class PvpCoordinator {
         battle.finishedAt ||
         Date.now()
       );
+
+
+      const naturalQueuePromotion =
+        await this.startNextQueuedBattle();
+
+      nextQueuedBattle =
+        naturalQueuePromotion?.started
+          ? naturalQueuePromotion.battle
+          : null;
     }
 
     return {
@@ -5069,6 +5312,8 @@ export class PvpCoordinator {
         dotDefeats,
 
         draw,
+
+        nextQueuedBattle,
 
         nextTurn:
           battleOver

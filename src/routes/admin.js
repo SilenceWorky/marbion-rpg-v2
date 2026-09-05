@@ -771,20 +771,26 @@ export async function adminRoute(
       `@${result.player2.user}: 🧠 ${result.player2.mentalidade}/${result.player2.maxMentalidade}`;
 
 
+    const nextQueuedBattleText =
+      result.nextQueuedBattle
+        ? ` | ⚔️ Próximo PvP da fila iniciado: @${result.nextQueuedBattle.player1.user} VS @${result.nextQueuedBattle.player2.user} | Turno 1.`
+        : "";
+
+
     if (
       result.mode ===
       "draw"
     ) {
       return new Response(
         `🛠️ ADM | PvP entre @${result.player1.user} e @${result.player2.user} encerrado em empate administrativo. ` +
-        `Sem alteração de Elo/estatísticas. | ${mentalidadeText}`
+        `Sem alteração de Elo/estatísticas. | ${mentalidadeText}${nextQueuedBattleText}`
       );
     }
 
 
     return new Response(
       `🛠️ ADM | PvP encerrado. @${result.winner} definido como vencedor administrativo sobre @${result.loser}. ` +
-      `Sem alteração de Elo/estatísticas. | ${mentalidadeText}`
+      `Sem alteração de Elo/estatísticas. | ${mentalidadeText}${nextQueuedBattleText}`
     );
   }
 

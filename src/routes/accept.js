@@ -99,6 +99,27 @@ export async function acceptRoute(
   }
 
 
+  if (
+    result.queued === true
+  ) {
+    const current =
+      result.activeBattle;
+
+    const currentText =
+      current?.player1 &&
+      current?.player2
+        ? ` | PvP atual: @${current.player1} VS @${current.player2}.`
+        : "";
+
+
+    return new Response(
+      `🎟️ @${result.target} aceitou o desafio de @${result.challenger}. ` +
+      `Dupla adicionada à fila global na posição ${result.position}.` +
+      currentText
+    );
+  }
+
+
   const battle =
     result.battle;
 

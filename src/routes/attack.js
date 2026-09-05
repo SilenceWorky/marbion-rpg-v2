@@ -1508,6 +1508,12 @@ export async function attackRoute(
         dotDefeatText;
     }
 
+    const nextQueuedBattleText =
+      result.nextQueuedBattle
+        ? ` ⚔️ Próximo PvP da fila iniciado: @${result.nextQueuedBattle.player1.user} VS @${result.nextQueuedBattle.player2.user} | Turno 1.`
+        : "";
+
+
     if (
     result.battleOver
     ) {
@@ -1516,7 +1522,8 @@ export async function attackRoute(
       result.draw
     ) {
       message +=
-        ` O PvP terminou em empate.`;
+        ` O PvP terminou em empate.` +
+        nextQueuedBattleText;
 
 
       return new Response(
@@ -1547,6 +1554,12 @@ export async function attackRoute(
     else {
         message +=
         ` | ⚠️ O resultado da luta foi salvo, mas o ranking não pôde ser atualizado.`;
+    }
+
+
+    if (nextQueuedBattleText) {
+      message +=
+        nextQueuedBattleText;
     }
 
 

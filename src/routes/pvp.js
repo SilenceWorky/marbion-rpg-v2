@@ -128,6 +128,26 @@ export async function pvpRoute(
 
     if (
       result.error ===
+      "CHALLENGER_IN_QUEUE"
+    ) {
+      return new Response(
+        `@${challenger}, você já está aguardando um PvP na fila global.`
+      );
+    }
+
+
+    if (
+      result.error ===
+      "TARGET_IN_QUEUE"
+    ) {
+      return new Response(
+        `@${challenger}, esse jogador já está aguardando um PvP na fila global.`
+      );
+    }
+
+
+    if (
+      result.error ===
       "CHALLENGER_HAS_CHALLENGE"
     ) {
       return new Response(
