@@ -66,7 +66,7 @@ console.log("✅ Jogador não pode entrar em múltiplas posições da fila.");
 
 assert.match(
   pvp,
-  /const activeGlobalBattle =/[\s\S]*?enqueueAcceptedPvp/[\s\S]*?queued: true/
+  /const activeGlobalBattle =[\s\S]*?enqueueAcceptedPvp[\s\S]*?queued: true/
 );
 
 assert.match(
