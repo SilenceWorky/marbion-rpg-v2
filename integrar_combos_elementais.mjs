@@ -409,7 +409,9 @@ attack = replaceOnce(
         comboType === "eletrocussao"
       ) {
         label +=
-          ` ⚡ ELETROCUSSÃO! (+${execution.combo.bonusDamage || 0})`;
+          " ⚡ ELETROCUSSÃO! (+" +
+          (execution.combo.bonusDamage || 0) +
+          ")";
       }
 
       else if (
