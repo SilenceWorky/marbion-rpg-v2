@@ -285,7 +285,7 @@ pvp = replaceOnce(
  * multiplicação rawDamage * incomingMultiplier,
  * pertencente ao caminho de Debuff.
  */
-pvp = replaceOnce(
+pvp = replaceAllRequired(
   pvp,
 `        rawDamage *
         incomingMultiplier`,

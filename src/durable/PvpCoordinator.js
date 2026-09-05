@@ -34,6 +34,10 @@ import {
 } from "../systems/combat.js";
 
 import {
+  resolveElementalCombo
+} from "../systems/elemental-combos.js";
+
+import {
   executeHealingSkill,
   executeBuffSkill,
   applyDebuffSkill,
@@ -279,7 +283,8 @@ function spendSkillMentalidade(
 function executeOffensiveAction(
   attacker,
   defender,
-  action
+  action,
+  currentTurn
 ) {
   const result =
     resolveOffensiveSkill(
@@ -364,6 +369,27 @@ function executeOffensiveAction(
     );
 
 
+  const combo =
+    resolveElementalCombo(
+      defender,
+      action.skill,
+      currentTurn,
+      rawDamage
+    );
+
+
+  const effectiveRawDamage =
+    Math.max(
+      0,
+      Math.floor(
+        Number(
+          combo?.directDamageAfterCombo
+        ) ||
+        rawDamage
+      )
+    );
+
+
   const incomingMultiplier =
     Number.isFinite(
       Number(
@@ -383,7 +409,7 @@ function executeOffensiveAction(
     Math.max(
       0,
       Math.ceil(
-        rawDamage *
+        effectiveRawDamage *
         incomingMultiplier
       )
     );
@@ -460,7 +486,13 @@ function executeOffensiveAction(
         ) || 0
       ),
 
-    rawDamage,
+    rawDamageBeforeCombo:
+      rawDamage,
+
+    rawDamage:
+      effectiveRawDamage,
+
+    combo,
 
     damage,
 
@@ -565,6 +597,27 @@ function executeDebuffAction(
     );
 
 
+  const combo =
+    resolveElementalCombo(
+      defender,
+      action.skill,
+      currentTurn,
+      rawDamage
+    );
+
+
+  const effectiveRawDamage =
+    Math.max(
+      0,
+      Math.floor(
+        Number(
+          combo?.directDamageAfterCombo
+        ) ||
+        rawDamage
+      )
+    );
+
+
   const incomingMultiplier =
     Number.isFinite(
       Number(
@@ -584,7 +637,7 @@ function executeDebuffAction(
     Math.max(
       0,
       Math.ceil(
-        rawDamage *
+        effectiveRawDamage *
         incomingMultiplier
       )
     );
@@ -670,7 +723,13 @@ function executeDebuffAction(
         ) || 0
       ),
 
-    rawDamage,
+    rawDamageBeforeCombo:
+      rawDamage,
+
+    rawDamage:
+      effectiveRawDamage,
+
+    combo,
 
     damage,
 
@@ -697,7 +756,8 @@ function executeBlindnessAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -773,7 +833,8 @@ function executeSleepAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -829,7 +890,8 @@ function executeConfusionAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -885,7 +947,8 @@ function executeSlowAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -942,7 +1005,8 @@ function executeSilenceAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -1112,7 +1176,8 @@ function executeBurnAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -1193,7 +1258,8 @@ function executeBleedAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -1648,7 +1714,8 @@ function executeParalysisAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -1736,7 +1803,8 @@ function executeFreezeAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 
@@ -1824,7 +1892,8 @@ function executeStunAction(
     executeOffensiveAction(
       attacker,
       defender,
-      action
+      action,
+      currentTurn
     );
 
 

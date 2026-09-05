@@ -343,17 +343,52 @@ export async function attackRoute(
         );
 
 
+      let label =
+        skillName;
+
+
       if (
         execution?.critical === true
       ) {
-        return (
-          skillName +
-          " 💥 CRÍTICO!"
-        );
+        label +=
+          " 💥 CRÍTICO!";
       }
 
 
-      return skillName;
+      const comboType =
+        String(
+          execution?.combo?.type ??
+          ""
+        )
+          .trim()
+          .toLowerCase();
+
+
+      if (
+        comboType === "molhado"
+      ) {
+        label +=
+          " 💧 MOLHADO!";
+      }
+
+      else if (
+        comboType === "eletrocussao"
+      ) {
+        label +=
+          " ⚡ ELETROCUSSÃO! (+" +
+          (execution.combo.bonusDamage || 0) +
+          ")";
+      }
+
+      else if (
+        comboType === "evaporacao"
+      ) {
+        label +=
+          " ♨️ EVAPORAÇÃO!";
+      }
+
+
+      return label;
     }
 
 
