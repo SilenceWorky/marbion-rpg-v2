@@ -160,18 +160,42 @@ assert.equal(
 console.log("✅ Existe exatamente uma promoção no fim natural e uma no fim ADM.");
 
 
-const rankedCalls =
-  pvp.match(
-    /await this\.applyRankedBattleResult\(/g
-  ) || [];
+/*
+ * O arquivo já possui chamadas legítimas de ranking em ramos
+ * diferentes de encerramento (por exemplo, diferentes formas de
+ * derrota). O que a fila precisa garantir é que PROMOVER a próxima
+ * batalha nunca aplique ranking por conta própria.
+ */
+const startNextStart =
+  pvp.indexOf(
+    "async startNextQueuedBattle()"
+  );
 
-assert.equal(
-  rankedCalls.length,
-  1,
-  "O resultado ranqueado deve ser aplicado uma única vez no fluxo normal da batalha."
+const startNextEnd =
+  pvp.indexOf(
+    "async acceptChallenge(",
+    startNextStart
+  );
+
+assert.ok(
+  startNextStart >= 0 &&
+  startNextEnd > startNextStart,
+  "Não foi possível isolar startNextQueuedBattle()."
 );
 
-console.log("✅ Ranking possui uma única chamada de aplicação no fluxo normal.");
+const startNextSection =
+  pvp.slice(
+    startNextStart,
+    startNextEnd
+  );
+
+assert.doesNotMatch(
+  startNextSection,
+  /applyRankedBattleResult\(/,
+  "Promover a próxima luta da fila nunca deve aplicar Elo/XP de Combate."
+);
+
+console.log("✅ Promoção da fila não aplica ranking à luta recém-iniciada.");
 
 
 const naturalPromotionIndex =
