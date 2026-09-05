@@ -1698,7 +1698,8 @@ function executeBattleAction(
   return executeOffensiveAction(
     attacker,
     defender,
-    action
+    action,
+    currentTurn
   );
 }
 

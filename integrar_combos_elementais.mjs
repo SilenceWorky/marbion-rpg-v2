@@ -148,6 +148,23 @@ pvp = replaceAllRequired(
 
 pvp = replaceOnce(
   pvp,
+`  return executeOffensiveAction(
+    attacker,
+    defender,
+    action
+  );`,
+`  return executeOffensiveAction(
+    attacker,
+    defender,
+    action,
+    currentTurn
+  );`,
+  "Propaga turno para ataque normal padrão"
+);
+
+
+pvp = replaceOnce(
+  pvp,
 `  const rawDamage =
     Math.max(
       0,
