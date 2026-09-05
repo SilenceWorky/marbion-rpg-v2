@@ -190,28 +190,56 @@ assert.ok(
 );
 
 
-const naturalWindow =
-  pvp.slice(
-    Math.max(0, naturalPromotionIndex - 5000),
-    naturalPromotionIndex + 1000
+const naturalChooseStart =
+  pvp.lastIndexOf(
+    "async chooseAction(",
+    naturalPromotionIndex
   );
 
-assert.match(
-  naturalWindow,
-  /battle\.status\s*=\s*[\s\S]*?"FINISHED"/,
+const naturalFinishedAssignment =
+  pvp.lastIndexOf(
+    "battle.status =",
+    naturalPromotionIndex
+  );
+
+const naturalFinishedValue =
+  pvp.indexOf(
+    '"FINISHED"',
+    naturalFinishedAssignment
+  );
+
+assert.ok(
+  naturalChooseStart >= 0 &&
+  naturalFinishedAssignment > naturalChooseStart &&
+  naturalFinishedValue > naturalFinishedAssignment &&
+  naturalFinishedValue < naturalPromotionIndex,
   "A luta encerrada deve estar FINISHED antes da promoção natural."
 );
 
 
-const adminWindow =
-  pvp.slice(
-    Math.max(0, adminPromotionIndex - 3500),
-    adminPromotionIndex + 1000
+const adminMethodStart =
+  pvp.lastIndexOf(
+    "async adminFinishBattle(",
+    adminPromotionIndex
   );
 
-assert.match(
-  adminWindow,
-  /battle\.status\s*=\s*[\s\S]*?"FINISHED"/,
+const adminFinishedAssignment =
+  pvp.lastIndexOf(
+    "battle.status =",
+    adminPromotionIndex
+  );
+
+const adminFinishedValue =
+  pvp.indexOf(
+    '"FINISHED"',
+    adminFinishedAssignment
+  );
+
+assert.ok(
+  adminMethodStart >= 0 &&
+  adminFinishedAssignment > adminMethodStart &&
+  adminFinishedValue > adminFinishedAssignment &&
+  adminFinishedValue < adminPromotionIndex,
   "A luta encerrada deve estar FINISHED antes da promoção ADM."
 );
 
