@@ -11,6 +11,11 @@ import {
   adminSkill
 } from "../systems/admin.js";
 
+import {
+  adminModifyProfileResource,
+  parseAdminResourceChange
+} from "../systems/admin-resources.js";
+
 
 function normalizeUser(value) {
   return String(value ?? "")
@@ -107,7 +112,7 @@ export async function adminRoute(
 
   if (!rawArgs) {
     return new Response(
-      `@${actor}, uso: !adm level/raça/elemento/status/pontos/skill/pvp ...`
+      `@${actor}, uso: !adm level/raça/elemento/status/pontos/skill/pvp/hp/mentalidade ...`
     );
   }
 
@@ -322,6 +327,166 @@ export async function adminRoute(
       `✅ ADM | Elemento de @${result.user}: ${result.elements.join(" + ")}.`
     );
   }
+
+  /*
+   * ==========================
+   * HP / MENTALIDADE
+   * ==========================
+   *
+   * SET absoluto:
+   * !adm hp @user 5
+   * !adm mentalidade @user 20
+   *
+   * Ajuste relativo:
+   * !adm hp @user +5
+   * !adm hp @user -5
+   * !adm hp @user + 5
+   * !adm hp @user - 5
+   * !adm mentalidade @user mais 10
+   * !adm mentalidade @user menos 10
+   */
+  if (
+    command === "hp" ||
+    command === "mentalidade" ||
+    command === "mental"
+  ) {
+    const target =
+      args[1];
+
+    const resource =
+      command === "hp"
+        ? "hp"
+        : "mentalidade";
+
+    const change =
+      parseAdminResourceChange(
+        args.slice(2)
+      );
+
+
+    if (
+      !target ||
+      !change.ok
+    ) {
+      const resourceName =
+        resource === "hp"
+          ? "hp"
+          : "mentalidade";
+
+
+      return new Response(
+        `@${actor}, uso: !adm ${resourceName} @usuário 5 | +5 | -5 | + 5 | - 5`
+      );
+    }
+
+
+    const coordinator =
+      getCoordinator(
+        env
+      );
+
+    const internalUrl =
+      new URL(
+        "https://pvp.internal/admin-resource"
+      );
+
+
+    internalUrl.searchParams.set(
+      "user",
+      normalizeUser(target)
+    );
+
+    internalUrl.searchParams.set(
+      "resource",
+      resource
+    );
+
+    internalUrl.searchParams.set(
+      "mode",
+      change.mode
+    );
+
+    internalUrl.searchParams.set(
+      "amount",
+      String(change.amount)
+    );
+
+
+    const battleResponse =
+      await coordinator.fetch(
+        new Request(
+          internalUrl.toString()
+        )
+      );
+
+    const battleResult =
+      await battleResponse.json();
+
+
+    if (!battleResult.ok) {
+      return new Response(
+        `@${actor}, não foi possível alterar ${resource === "hp" ? "o HP" : "a Mentalidade"}.`
+      );
+    }
+
+
+    let result =
+      battleResult;
+
+
+    if (!battleResult.inBattle) {
+      result =
+        await adminModifyProfileResource(
+          env,
+          target,
+          resource,
+          change
+        );
+    }
+
+
+    if (!result.ok) {
+      if (
+        result.error ===
+        "CHARACTER_NOT_FOUND"
+      ) {
+        return new Response(
+          `@${actor}, @${normalizeUser(target)} ainda não possui personagem.`
+        );
+      }
+
+
+      return new Response(
+        `@${actor}, não foi possível alterar ${resource === "hp" ? "o HP" : "a Mentalidade"}.`
+      );
+    }
+
+
+    const operationText =
+      result.mode === "set"
+        ? `SET ${result.requestedAmount}`
+        : result.requestedAmount >= 0
+          ? `+${result.requestedAmount}`
+          : String(
+              result.requestedAmount
+            );
+
+    const scopeText =
+      result.inBattle
+        ? "PvP"
+        : "perfil";
+
+    const clampText =
+      result.clamped
+        ? " | limitado ao intervalo válido"
+        : "";
+
+
+    return new Response(
+      `🛠️ ADM | @${result.user} | ${result.icon} ${result.label}: ${result.before} → ${result.after}/${result.max} | ${operationText} | ${scopeText}${clampText}.`
+    );
+  }
+
 
   /*
    * ==========================

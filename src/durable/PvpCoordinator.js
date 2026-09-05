@@ -38,6 +38,11 @@ import {
 } from "../systems/elemental-combos.js";
 
 import {
+  applyAdminResourceChange,
+  createAdminResourceChange
+} from "../systems/admin-resources.js";
+
+import {
   executeHealingSkill,
   executeBuffSkill,
   applyDebuffSkill,
@@ -5071,6 +5076,93 @@ export class PvpCoordinator {
     };
     }
 
+  async adminModifyBattleResource(
+    user,
+    resource,
+    mode,
+    amount
+  ) {
+    user =
+      normalizeUser(
+        user
+      );
+
+
+    if (!user) {
+      return {
+        ok: false,
+        error: "INVALID_USER"
+      };
+    }
+
+
+    const change =
+      createAdminResourceChange(
+        mode,
+        amount
+      );
+
+
+    if (!change.ok) {
+      return change;
+    }
+
+
+    const data =
+      await this.getData();
+
+    const battle =
+      this.findBattleByUser(
+        data,
+        user
+      );
+
+
+    if (!battle) {
+      return {
+        ok: true,
+        inBattle: false,
+        user
+      };
+    }
+
+
+    const player =
+      battle.player1.user === user
+        ? battle.player1
+        : battle.player2;
+
+
+    const result =
+      applyAdminResourceChange(
+        player,
+        resource,
+        change
+      );
+
+
+    if (!result.ok) {
+      return {
+        ...result,
+        user
+      };
+    }
+
+
+    await this.saveData(
+      data
+    );
+
+
+    return {
+      ...result,
+      user,
+      inBattle: true,
+      source: "battle"
+    };
+  }
+
+
   async getPlayerState(
     user
   ) {
@@ -5305,6 +5397,33 @@ export class PvpCoordinator {
         result
     );
     }
+
+    if (
+      url.pathname ===
+      "/admin-resource"
+    ) {
+      const result =
+        await this.adminModifyBattleResource(
+          url.searchParams.get(
+            "user"
+          ),
+          url.searchParams.get(
+            "resource"
+          ),
+          url.searchParams.get(
+            "mode"
+          ),
+          url.searchParams.get(
+            "amount"
+          )
+        );
+
+
+      return Response.json(
+        result
+      );
+    }
+
 
     if (
       url.pathname ===
