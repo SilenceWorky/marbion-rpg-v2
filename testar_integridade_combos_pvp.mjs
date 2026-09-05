@@ -44,8 +44,8 @@ assert.equal(
 
 assert.equal(
   comboResolvers,
-  3,
-  "Esperado: import/uso textual inclui exatamente dois resolveElementalCombo em execução mais a referência de import não conta como chamada; verifique os caminhos se este número mudar."
+  2,
+  "Ataque normal e Debuff devem resolver combos elementais."
 );
 
 assert.equal(
@@ -57,4 +57,4 @@ assert.equal(
 console.log("✅ Ataque normal usa dano pós-combo antes de Counter/Refletir.");
 console.log("✅ Debuff usa dano pós-combo antes de Counter/Refletir.");
 console.log("✅ Os dois caminhos preservam o dano anterior ao combo.");
-console.log("\n🔒 INTEGRIDADE DOS COMBOS NO PVP PASSOU.");
+console.log("\n🔒 INTEGRIDADE DOS COMBOS NO PVP PASSOU.\n");
