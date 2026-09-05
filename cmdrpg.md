@@ -4,7 +4,9 @@
 >
 > Regra de manutenção: este arquivo deve ser atualizado sempre que um sistema novo for implementado, alterado ou concluído.
 >
-> Legenda: **✔️ implementado na V2** | **🧪 implementado/em validação** | **⏳ pendente** | **🗃️ legado V1 ainda não migrado**
+> Legenda: **✔️ implementado e validado** | **🧪 implementado/em validação** | **⏳ pendente** | **🗃️ legado V1 ainda não migrado**
+>
+> Última atualização canônica: **05/09/2026**.
 
 ---
 
@@ -13,7 +15,8 @@
 - Worker modular Cloudflare ✔️
 - KV central `MARBION_USERS_V2` ✔️
 - acesso a perfil centralizado por `getProfile()` / `saveProfile()` ✔️
-- Durable Object `PVP_COORDINATOR` para estado de batalha ✔️
+- Durable Object `PVP_COORDINATOR` para estado vivo de batalha ✔️
+- perfil forte/autoritativo para evitar sobrescrita por cópia antiga do KV ✔️
 - conteúdo externo em `worky-live-responses` para `racas.json`, `elementos.json` e `skills.json` ✔️
 - `cmdrpg.md` mantido no próprio repositório `marbion-rpg-v2` ✔️
 - V1 preservada como referência até a V2 ficar completa ✔️
@@ -55,6 +58,7 @@ Expansões futuras:
 - tags
 - Arma Vínculo
 - efeitos persistentes
+- inventário resumido
 - outros dados completos do perfil
 
 ---
@@ -115,14 +119,15 @@ Mostra:
 - Mentalidade atual / máxima
 - turno atual quando estiver em PvP
 - adversário quando estiver em PvP
-- efeitos persistentes
-- buffs/debuffs de batalha quando existirem
-- dano por turno e duração restante de Veneno, Queimadura e futuros DoTs quando existirem
-- Controles ativos, origem e quantidade de ações ainda bloqueadas
+- efeitos ativos
+- buffs/debuffs
+- DoTs e duração restante
+- Controles ativos
+- estados elementais como Molhado enquanto estiverem ativos
 
 Exemplo:
 ```txt
-@SilenceWorky | ⚔️ PvP T8 vs @acervojuju | ❤️ HP: 58/100 | 🧠 Mentalidade: 0/50 | Efeitos: Nenhum
+@SilenceWorky | ⚔️ PvP T8 vs @acervojuju | ❤️ HP: 58/100 | 🧠 Mentalidade: 20/50 | Efeitos: Nenhum
 ```
 
 ---
@@ -130,8 +135,6 @@ Exemplo:
 # 🎁 XP E RECOMPENSAS
 
 ## !daily
-Recompensa diária.
-
 Status V2: ✔️ versão básica
 
 Atualmente:
@@ -140,7 +143,7 @@ Atualmente:
 
 Pendente:
 - streak de daily
-- bônus progressivo de streak
+- bônus progressivo
 - recompensas especiais
 
 ---
@@ -197,7 +200,7 @@ Elemento especial:
 ---
 
 ## Fusões especiais
-Status V2: ✔️ regras de compatibilidade
+Status V2: ✔️
 
 Fusões válidas:
 - Fogo + Terra → Vidro
@@ -230,6 +233,47 @@ Afinidades atuais:
 
 ---
 
+## Matriz de dano elemental
+Status V2: ✔️ **validado em testes e Twitch real**
+
+Multiplicadores:
+```txt
+Vantagem:     1.5x
+Resistência:  0.75x
+Neutro:       1x
+Imunidade:    0x
+Retorno de imunidade: 2x
+```
+
+Regras:
+- defensor com dois elementos multiplica as duas relações
+- não existe cap artificial para elemento duplo
+- uma imunidade domina qualquer segundo multiplicador
+- Neutro é neutro nos dois sentidos
+- Universal é neutro
+- Singularidade permanece neutra nesta versão
+- DoTs não recebem multiplicador elemental por tick nesta versão
+
+Ordem atual do dano direto:
+```txt
+Base / escala
+→ Defesa
+→ Multiplicador elemental
+→ Crítico
+→ Combo elemental
+→ Counter / Refletir
+→ HP
+```
+
+Validações reais:
+```txt
+Eletricidade → Terra = 0x ✅
+Terra → Eletricidade = 2x ✅
+Terra → Fogo = 1.5x ✅
+```
+
+---
+
 # 🧠 HABILIDADES
 
 ## Catálogo de habilidades
@@ -237,10 +281,9 @@ Status V2: ✔️
 
 Catálogo atual:
 - 30 categorias elementais/fusões
-- 50 habilidades por categoria
+- 50 habilidades por categoria elemental/fusão
 - 1500 habilidades elementais/fusões
-- 3 habilidades Universais preservadas
-- total atual: 1503 habilidades
+- habilidades Universais e habilidades especiais de sistema adicionais
 
 Os nomes globais foram validados e desduplicados.
 
@@ -265,25 +308,14 @@ Status V2: ✔️
 
 Sintaxe:
 ```txt
-!slot [número do slot] [número da habilidade]
+!slot [slot] [número da habilidade]
 ```
 
-O primeiro número indica **em qual dos 4 slots** a habilidade será equipada.
-O segundo número indica **qual habilidade da sua lista `!habilidades`** será colocada naquele slot.
-
-Exemplo:
+Exemplos:
 ```txt
 !slot 1 2
-```
-Coloca a **habilidade nº 2** da lista no **slot 1**.
-
-Se a habilidade nº 2 for **Bola de Fogo**, `!slot 1 2` equipa **Bola de Fogo no slot 1**.
-
-Outro exemplo:
-```txt
 !slot 1 25
 ```
-Coloca a **habilidade nº 25** da lista no **slot 1**.
 
 Para limpar o slot e voltar ao Soco:
 ```txt
@@ -307,7 +339,7 @@ Soco não ocupa `profile.skills`.
 Status V2: ✔️
 
 Habilidade universal virtual:
-- custo de Mentalidade: 0
+- custo: 0
 - dano base: 12
 - precisão: 95
 - prioridade: 0
@@ -326,7 +358,7 @@ Integração completa com subida de nível: ⏳
 ---
 
 ## Aprendizado por pergaminho
-Status V2: ✔️ regra de compatibilidade e aprendizado
+Status V2: ✔️
 
 Pode usar:
 - elemento nativo
@@ -345,7 +377,7 @@ Se a habilidade não for Neutro/Universal:
 - fica temporária
 - `usesRemaining: 1`
 - é removida somente depois que realmente executa
-- errar o golpe ainda consome o uso
+- errar ainda consome o uso
 - morrer antes de agir NÃO consome
 - após o último uso é removida de `skills`, `skillMeta`, cooldown e slots
 - slot vazio volta a Soco
@@ -359,51 +391,54 @@ Status V2: ✔️
 
 Regras:
 - cada habilidade pode ter `custoMentalidade`
-- a escolha só é aceita se houver Mentalidade suficiente
-- escolher NÃO gasta Mentalidade
-- executar gasta Mentalidade
-- se o jogador morrer antes de agir, não gasta
+- escolha só é aceita se houver Mentalidade suficiente
+- escolher NÃO gasta
+- executar gasta
+- morrer antes de agir não gasta
 - Soco custa 0
-- `!estado` mostra o valor atual durante a luta
+- valor restante é preservado ao terminar o PvP
 
 ---
 
 ## !meditar
-Recupera Mentalidade como uma ação especial de combate.
-
 Status V2: ✔️ **validado em PvP real**
 
 Regras atuais:
-- recupera 25 de Mentalidade
+- recupera 25
 - respeita `maxMentalidade`
-- não ocupa nenhum dos 4 slots
-- prioridade: -1
-- normalmente age depois de ataques de prioridade 0
-- se o jogador morrer antes da vez da Meditação, não recupera Mentalidade
-- se morrer antes de agir, o cooldown também não é criado
-- não pode meditar com a Mentalidade já cheia
-- após executar, entra em cooldown por 3 turnos completos
-- se meditar no T4, fica bloqueado no T5, T6 e T7 e volta a estar disponível no T8
+- não ocupa slot
+- prioridade -1
+- não pode ser usada com barra cheia
+- se morrer antes de agir não recupera e não cria cooldown
+- cooldown de 3 turnos completos
 
-Teste real validado:
+Exemplo validado:
 ```txt
-Mentalidade: 15/50 → Meditação → 40/50
+15/50 → Meditação → 40/50
 ```
 
 ---
 
-## Recuperação genérica de Mentalidade
-Status V2: ✔️ base estrutural
+## Recuperação genérica
+Status V2: ✔️
 
-`restoreMentalidade()` pode ser reutilizada futuramente por:
+`restoreMentalidade()` pode servir futuramente para:
 - poções
 - livros
 - comidas
 - habilidades de suporte
 - equipamentos
-- outros sistemas de recuperação
 
-Regeneração natural por tempo fora de combate: ⏳
+---
+
+## Regeneração natural fora do combate
+Status V2: ✔️ **implementado e validado**
+
+Regras:
+- ocorre por tempo fora do PvP
+- não interfere na Mentalidade viva de uma batalha em andamento
+- `!estado` fora do PvP aplica e persiste a regeneração quando necessário
+- entrada e saída do PvP preservam corretamente o valor real
 
 ---
 
@@ -412,9 +447,9 @@ Regeneração natural por tempo fora de combate: ⏳
 ## HP real no PvP
 Status V2: ✔️
 
-- cada batalha cria um snapshot de HP máximo
-- dano altera HP dentro do Durable Object
-- HP nunca cai abaixo de 0
+- batalha cria snapshot de HP
+- dano altera HP do snapshot vivo
+- HP nunca fica negativo
 
 ---
 
@@ -422,270 +457,277 @@ Status V2: ✔️
 Status V2: ✔️
 
 - habilidades `tipo: Cura` curam o próprio usuário
-- cura respeita `maxHp`
-- valor realmente curado é separado da cura teórica
+- respeitam `maxHp`
+- cura efetiva é separada da cura teórica
 - gasto de Mentalidade ocorre normalmente
 
 Teste real validado com **Maré Regenerativa**.
 
 ---
 
-# ⬆️ BUFFS
+# ⬆️ BUFFS E DEBUFFS
 
 ## Buff de atributo
 Status V2: ✔️ **validado em PvP real**
 
-Funcionamento atual:
-- habilidades `tipo: Buff` agem sobre o próprio usuário
-- o atributo afetado vem de `skill.escala`
-- atributos suportados: Força, Magia, Velocidade, Evasão, Precisão e Defesa
-- força inicial do buff: `custoMentalidade / 5`
+- age sobre o próprio usuário
+- atributo vem de `skill.escala`
+- suporta Força, Magia, Velocidade, Evasão, Precisão e Defesa
+- força inicial: `custoMentalidade / 5`
 - mínimo +1
 - máximo +10
 - duração base: 2 turnos
-- o bônus é registrado em `player.effects`
-- ao expirar, o valor aplicado é removido do atributo
-- `!estado` pode exibir o efeito enquanto estiver ativo
-
-Teste local validado com **Foco Absoluto**:
-```txt
-Precisão: 90 → 93
-Mentalidade: 50 → 35
-```
-
-Teste real em PvP validado:
-```txt
-Foco Absoluto → +3 de Precisão por 2 turnos
-```
-
-## Expiração de efeitos
-Status V2: ✔️
-
-- `expireBattleEffects()` processa efeitos quando um novo turno começa
-- buff continua ativo durante sua duração
-- ao atingir o turno de expiração, o atributo volta ao valor anterior
-- efeito expirado é removido de `player.effects`
-
-Exemplo validado:
-```txt
-T1: Precisão 90 → 93
-T2: Precisão 93
-T3: Precisão 93 → 90 e efeito removido
-```
+- expiração devolve o atributo ao valor correto
 
 ---
 
-# ☠️ DEBUFFS E DANO POR TURNO
-
-## Debuffs de atributo
+## Debuff de atributo
 Status V2: ✔️ **validado em PvP real**
 
-Funcionamento atual:
-- habilidades `tipo: Debuff` precisam acertar o adversário
-- podem causar dano direto e aplicar Debuff na mesma ação
-- o atributo afetado vem de `skill.debuffStat`
-- atributos suportados: Força, Magia, Velocidade, Evasão, Precisão e Defesa
-- força inicial do Debuff usa `custoMentalidade / 5`
-- mínimo de 1
-- máximo de 10
+- precisa acertar o adversário
+- pode causar dano direto e Debuff na mesma execução
+- atributo vem de `skill.debuffStat`
+- mínimo de 1 e máximo de 10
 - atributo nunca fica abaixo de 0
-- somente a quantidade realmente retirada é registrada
 - duração base: 2 turnos
-- ao expirar, o atributo retirado é devolvido exatamente
-- se o golpe errar, não causa dano e não aplica Debuff
-- mesmo errando, a habilidade executada consome Mentalidade
-- `!estado` mostra o Debuff enquanto estiver ativo
+- expiração devolve exatamente o valor retirado
 
-Teste real validado com **Brasa Ascendente**:
-```txt
-Defesa: 5 → 3
-Efeito: ⬇️ Defesa -2
-Após expiração: Defesa volta para 5
-```
+---
+
+# ☠️ DANO POR TURNO (DoT)
+
+## Motor genérico de DoT
+Status V2: ✔️
+
+Regras:
+- DoTs processam no início do novo turno
+- efeitos diferentes podem coexistir
+- reaplicar o mesmo tipo renova duração
+- mantém o maior dano por turno na reaplicação
+- registra o dano realmente causado
+- pode encerrar a luta antes das novas ações
+- suporta empate por morte simultânea
+- `killedBy` identifica a causa real
+
+Tipos integrados:
+- ☠️ Veneno ✔️
+- 🔥 Queimadura ✔️
+- 🩸 Sangramento ✔️
+
+Planejados sobre a mesma base:
+- ☢️ Radiação
+- 🧬 Deterioração
+- 🌋 Lava e outros efeitos periódicos
 
 ---
 
 ## Veneno
 Status V2: ✔️ **validado em PvP real**
 
-Habilidades `tipo: Veneno` podem produzir três efeitos na mesma execução:
-```txt
-Dano direto
-+
-Debuff de atributo
-+
-Envenenamento periódico
-```
-
-Regras atuais:
-- o golpe precisa acertar para envenenar
-- Veneno não é aplicado se o dano direto já derrubar o alvo
 - duração base: 3 ticks
-- primeiro tick acontece no início do turno seguinte
+- primeiro tick no início do turno seguinte
 - dano por tick = `Math.max(2, Math.round(custoMentalidade * 0.35))`
-- reaplicar Veneno renova a duração
-- vários Venenos não acumulam infinitamente
-- ao reaplicar, permanece o maior dano por turno
-- o dano periódico acontece antes das novas ações do turno
-- se o Veneno reduzir HP a 0, a batalha termina antes das ações daquele novo turno
-- se os dois jogadores morrerem simultaneamente por Veneno, o PvP termina empatado
-- após o último tick, o efeito é removido automaticamente
-- mensagens de combate mostram separadamente o HP após a ação e o HP após o tick de Veneno
-
-Exibição no `!estado`:
-```txt
-☠️ Nuvem Tóxica — 8 dano/turno (2T)
-```
-
-Teste real validado com **Nuvem Tóxica**:
-```txt
-Dano direto
-→ Debuff de Força
-→ Envenenado
-
-Início do T2 → -8 HP
-Início do T3 → -8 HP
-Início do T4 → -8 HP
-→ efeito removido
-```
-
-Também foram validados:
-- morte causada pelo último tick de Veneno
-- encerramento da luta antes das novas ações quando o Veneno mata
-- empate quando os dois jogadores chegam a 0 pelo Veneno no mesmo início de turno
-
----
-
-## Motor genérico de dano periódico (DoT)
-Status V2: ✔️ **validado com Veneno e Queimadura**
-
-O processamento de dano periódico foi generalizado para que novos efeitos reutilizem a mesma infraestrutura.
-
-Regras atuais:
-- todos os DoTs são processados no início do novo turno, antes das novas ações
-- cada tipo de DoT mantém sua própria instância ativa
-- efeitos diferentes podem coexistir no mesmo personagem
-- reaplicar o mesmo DoT renova sua duração e mantém o maior dano por turno
-- o tick registra o dano realmente causado, sem permitir HP negativo
-- o efeito que leva o personagem de HP positivo para 0 é marcado como letal
-- `killedBy` registra exatamente o tipo e a habilidade responsáveis pela derrota
-- depois que um DoT é letal, efeitos seguintes não geram ticks falsos de 0 de dano
-- mensagens de derrota usam a causa real dinamicamente, permitindo Veneno, Queimadura e futuros DoTs
-
-Tipos atualmente integrados ao motor:
-```txt
-☠️ Veneno
-🔥 Queimadura
-```
-
-Planejado sobre a mesma base:
-```txt
-🩸 Sangramento
-☢️ Radiação
-🧬 Deterioração
-🌋 Lava / outros efeitos periódicos
-```
+- pode coexistir com outros DoTs
 
 ---
 
 ## Queimadura
 Status V2: ✔️ **validado em PvP real**
 
-A Queimadura é um efeito adicional da habilidade e não substitui o tipo principal dela.
-
-Exemplo piloto no catálogo:
-```json
-{
-  "nome": "Chama Devastadora",
-  "tipo": "Elemental",
-  "elemento": "Fogo",
-  "dotType": "queimadura"
-}
-```
-
-Regras atuais:
-- a habilidade precisa acertar para aplicar Queimadura
-- Queimadura não é aplicada se o dano direto já derrubar o alvo
 - duração base: 2 ticks
-- primeiro tick acontece no início do turno seguinte
+- primeiro tick no início do turno seguinte
 - dano por tick = `Math.max(2, Math.round(custoMentalidade * 0.45))`
-- reaplicar Queimadura renova os 2 ticks
-- ao reaplicar, permanece o maior dano por turno
-- Queimadura pode coexistir com Veneno
-- após o segundo tick, o efeito é removido automaticamente
-- `!estado` mostra dano por turno e ticks restantes
-- a mensagem de combate separa o HP do golpe direto do HP após o tick
-- se Queimadura levar o HP a 0, `killedBy` identifica Queimadura como causa da derrota
-- em empate por DoT, cada jogador pode ter uma causa de derrota diferente
+- Chama Devastadora é habilidade piloto validada
 
-Exibição validada no `!estado`:
+---
+
+## Sangramento
+Status V2: ✔️
+
+- usa o motor genérico de DoT
+- representa dano físico periódico
+- integrado à resolução do PvP
+
+---
+
+# 🌀 CONTROLES E RESTRIÇÕES
+
+## Motor genérico de Controle
+Status V2: ✔️
+
+Controles/restrições já integrados e testados:
+- Paralisia ✔️
+- Congelamento ✔️
+- Atordoamento ✔️
+- Sono ✔️
+- Confusão ✔️
+- Silêncio ✔️
+- Lentidão ✔️
+- Cegueira ✔️
+
+Regras gerais:
+- efeitos ofensivos só são aplicados quando o golpe realmente acerta, quando aplicável
+- bloqueio antes da execução não deve gastar Mentalidade nem iniciar cooldown
+- controles mantêm estado no `player.effects`
+
+---
+
+# ⏳ COOLDOWN
+
+## Cooldown real de habilidades
+Status V2: ✔️ **validado em produção**
+
+Regra canônica:
 ```txt
-🔥 Chama Devastadora — 9 dano/turno (1T)
+availableAtTurn = executedTurn + cooldown + 1
 ```
 
-Teste real validado com **Chama Devastadora**:
+Exemplo:
 ```txt
-T1: dano direto → Queimadura aplicada (9 dano/turno por 2 turnos)
-Início do T2: -9 HP → Queimadura permanece com 1T
-Início do T3: -9 HP → efeito removido
-!estado após T3: Efeitos: Nenhum
+Cooldown 3 usado no T1
+→ bloqueia T2, T3 e T4
+→ volta no T5
 ```
 
-Também foram validados localmente:
-- Queimadura causa exatamente 2 ticks
-- reaplicação renova duração e mantém a mais forte
-- Veneno + Queimadura coexistem
-- Queimadura pode derrubar o alvo
-- Chama Devastadora real do catálogo executa como `burn` no PvP
-- mensagem identifica dinamicamente derrota por Queimadura
-- empate pode identificar causas diferentes, por exemplo Veneno em um jogador e Queimadura no outro
+Regras:
+- cooldown só começa quando a habilidade realmente executa
+- não começa se a ação foi bloqueada antes da execução
+- errar o golpe após executar inicia cooldown normalmente
+- Soco fica fora do motor genérico
+- Meditação possui cooldown próprio
+- Counter/Refletir iniciam cooldown ao preparar a postura, mesmo se não houver ataque compatível
+
+---
+
+# 💥 CRÍTICO
+
+## Crítico geral
+Status V2: ✔️ **validado em testes e produção**
+
+Padrão:
+```txt
+Chance: 5%
+Multiplicador: 1.5x
+```
+
+Regras:
+- rolagem só ocorre depois de confirmar acerto
+- dano direto 0 não critica
+- DoT não critica por tick
+- porção direta de habilidade com DoT pode critar
+- cura, buff e Meditação não criticam
+- habilidades podem sobrescrever `critChance` e `critMultiplier`
+- crítico acontece depois do multiplicador elemental
+
+Marcador no chat:
+```txt
+💥 CRÍTICO!
+```
+
+---
+
+# ⚔️ COUNTER / REFLETIR
+
+## Contra-ataque
+Status V2: ✔️ **validado em PvP real**
+
+- reage a dano Físico direto
+- divide o dano compatível em 50% recebido + 50% devolvido
+- custo atual do Counter físico: 0
+
+---
+
+## Refletir
+Status V2: ✔️ **validado em PvP real**
+
+- reage a ataque Elemental compatível com os elementos refletíveis do personagem
+- fusões desbloqueadas podem contar para Refletir
+- divide o dano compatível em 50% recebido + 50% devolvido
+- custo atual: 10 de Mentalidade
+
+Counter/Refletir recebem o dano já processado por:
+```txt
+Defesa → Elemento → Crítico → Combo elemental
+```
+
+---
+
+# 💧⚡ COMBOS ELEMENTAIS
+
+## Combos Elementais V1
+Status V2: ✔️ **100% validado em produção**
+
+### Molhado
+Água aplica:
+```txt
+💧 Molhado
+```
+
+Regras:
+- duração: 2 turnos
+- aplicado no T1 permanece ativo durante o T2
+- expira ao abrir o T3 se não for consumido ou renovado
+- nova aplicação de Água renova a duração sem duplicar o efeito
+
+### Eletrocussão
+```txt
+Molhado + Eletricidade
+→ ⚡ Eletrocussão
+→ consome Molhado
+→ +25% de dano direto
+```
+
+Validação real:
+```txt
+52 de dano
++13 de Eletrocussão
+= 65 de dano total
+```
+
+### Evaporação
+```txt
+Molhado + Fogo
+→ ♨️ Evaporação
+→ consome Molhado
+→ sem bônus de dano na V1
+```
+
+Foi validada ao vivo usando **Onda Absoluto → Chama Devastadora**.
+A Queimadura própria de Chama Devastadora continua independente da Evaporação.
 
 ---
 
 # ⚔️ PVP
 
 ## !pvp @usuario
-Desafia outro jogador.
-
 Status V2: ✔️
-
-Exemplo:
-```txt
-!pvp @acervojuju
-```
 
 Convite expira após 2 minutos.
 
 ---
 
 ## !aceitar
-Aceita o desafio recebido.
-
 Status V2: ✔️
 
 ---
 
 ## !ataque 1-4
-Escolhe um dos 4 slots de habilidade durante o turno.
-
 Status V2: ✔️
 
 Regras:
-- escolha fica travada no turno
-- primeiro jogador revela somente o número do slot
-- habilidade real só é revelada quando os dois escolherem
-- se a escolha for inválida por falta de Mentalidade, o jogador pode escolher outro slot
+- uma escolha por turno
+- primeiro jogador revela somente o slot
+- habilidades só são reveladas na resolução
+- falta de Mentalidade permite escolher outra ação
 
 ---
 
 ## Ordem das ações
 Status V2: ✔️
 
-1. prioridade da habilidade/ação
+1. prioridade
 2. Velocidade
-3. empate total → 50/50 aleatório
-
-A Meditação participa desta mesma ordem com prioridade -1.
+3. empate total → 50/50
 
 ---
 
@@ -694,25 +736,26 @@ Status V2: ✔️
 
 Inclui:
 - precisão da habilidade
-- Accuracy do atacante
-- Evasão do defensor
+- Accuracy
+- Evasão
 - chance mínima de acerto
-- dano base
-- atributo de escala
+- dano base e atributo de escala
 - Defesa com retorno decrescente
+- dano elemental
+- crítico
+- combos elementais
+- Counter/Refletir
 - HP real
 
 ---
 
-## PvP simultâneo global
+## PvP simultâneo global / fila única
 Status V2: ⏳
 
-Objetivo definido:
-- apenas 1 PvP pode acontecer por vez na transmissão
-- outros desafios entram em uma fila global
-- próximo combate inicia quando o atual terminar
-
-Observação: o coordenador atual já controla batalhas por jogador, mas a fila global única ainda precisa ser implementada.
+Objetivo:
+- apenas 1 PvP por vez na transmissão
+- outros desafios entram em fila
+- próximo combate inicia após o atual
 
 ---
 
@@ -732,20 +775,10 @@ Planejado:
 ## XP de Combate
 Status V2: ✔️
 
-É separado do XP normal do personagem.
-Serve para medir desempenho PvP.
-
-Sistema matemático:
-- Elo
-- K = 32
-- vencedor ganha XP de Combate
-- perdedor perde XP de Combate
-- diferença depende da força relativa dos dois ratings
-
-Rating inicial:
-```txt
-1000
-```
+- separado do XP normal
+- Elo com K = 32
+- vencedor ganha e perdedor perde conforme ratings relativos
+- rating inicial: 1000
 
 ---
 
@@ -772,15 +805,13 @@ Status V2: ✔️
 - Imperador I: 2700+
 
 Prodígios:
-- somente jogadores com 2700+ podem ocupar as vagas
+- somente jogadores com 2700+ podem ocupar vagas
 - limite de 7 posições
 - Prodígio I até Prodígio VII
 
 ---
 
 ## !rank
-Mostra o ranking PvP do jogador.
-
 Status V2: ✔️
 
 Inclui:
@@ -795,8 +826,6 @@ Inclui:
 ---
 
 ## !toprank
-Mostra o topo do ranking PvP.
-
 Status V2: ✔️
 
 ---
@@ -804,8 +833,6 @@ Status V2: ✔️
 # 🛠️ ADMINISTRAÇÃO
 
 ## !adm
-Comando central de administração.
-
 Status V2: ✔️
 
 Subcomandos atuais:
@@ -813,24 +840,71 @@ Subcomandos atuais:
 !adm level @usuario 20
 !adm raça @usuario Terrariano
 !adm elemento @usuario Fogo Terra
+!adm status reset @usuario
 !adm pontos @usuario 10
 !adm skill @usuario add Nome da Habilidade
 !adm skill @usuario rem Nome da Habilidade
+!adm pvp empate
+!adm pvp vitória @usuario
+```
+
+---
+
+## !adm hp
+Status V2: ✔️ **validado fora e dentro do PvP**
+
+SET absoluto:
+```txt
+!adm hp @usuario 5
+```
+
+Ajustes relativos:
+```txt
+!adm hp @usuario +5
+!adm hp @usuario -5
+!adm hp @usuario + 5
+!adm hp @usuario - 5
+!adm hp @usuario mais 5
+!adm hp @usuario menos 5
 ```
 
 Regras:
-- somente usuários autorizados
-- protegido por chave administrativa
-- `!adm pontos` adiciona Status Points disponíveis sem alterar diretamente os atributos
-- ADM pode forçar habilidades incompatíveis com os elementos do personagem para testes/administração
+- SET define o valor exato; não soma
+- `+` adiciona
+- `-` remove
+- mínimo 0
+- máximo `maxHp`
+- em PvP altera o snapshot vivo
+- fora do PvP altera o perfil
+- `HP 0` por ADM não concede vitória automaticamente
+
+---
+
+## !adm mentalidade
+Status V2: ✔️ **validado fora e dentro do PvP**
+
+Usa a mesma sintaxe de SET / `+` / `-` do HP.
+
+Exemplos:
+```txt
+!adm mentalidade @usuario 20
+!adm mentalidade @usuario +10
+!adm mentalidade @usuario -10
+```
+
+Regras:
+- mínimo 0
+- máximo `maxMentalidade`
+- em PvP altera o snapshot vivo
+- fora do PvP altera o perfil persistente
 
 ---
 
 # 🏷️ TAGS
 
-Sistema de tags: ⏳ migração V2
+Status V2: ⏳ migração
 
-Comandos planejados/legados:
+Planejado/legado:
 - `!tag`
 - `!tags`
 - `!settag`
@@ -844,7 +918,7 @@ Comandos planejados/legados:
 
 Status V2: 🗃️ legado V1 ainda não migrado
 
-Sistemas existentes na V1 que devem ser reimplementados modularmente:
+Reimplementar modularmente:
 - spawn automático
 - spawn manual
 - raridade
@@ -867,7 +941,7 @@ Comandos legados:
 
 Status V2: 🗃️ legado V1 ainda não migrado
 
-Sistemas a preservar/reimplementar:
+Preservar/reimplementar:
 - spawn manual/automático
 - fila
 - boss impede mob
@@ -889,13 +963,13 @@ Comandos legados:
 
 # 🗡️ ARMAS VÍNCULOS E ARMAS ADM
 
-Status V2: 🗃️ legado V1 / estrutura de perfil preservada, sistema completo ainda não migrado
+Status V2: 🗃️ estrutura preservada; sistema completo ainda não migrado
 
-Objetivos preservados:
+Objetivos:
 - 1 Arma Vínculo por perfil
 - arma ligada à alma
 - durabilidade
-- quebra causa morte
+- quebra pode causar morte
 - Armas ADM especiais
 - efeitos individuais
 
@@ -912,13 +986,7 @@ Comandos legados/planejados:
 
 Status V2: ⏳
 
-O perfil V2 já possui campos para morte/reencarnação, mas o fluxo completo ainda precisa ser integrado aos comandos e combates.
-
-Regras preservadas do projeto:
-- morte normal não é rebuff
-- reencarnação via raça
-- limite de mortes/ciclos conforme design final
-- quebra de Arma Vínculo pode causar morte
+O perfil já possui campos preparados, mas o fluxo completo ainda precisa ser integrado.
 
 ---
 
@@ -926,13 +994,13 @@ Regras preservadas do projeto:
 
 Status V2: ⏳
 
-Regras de referência da V1 preservadas para futura migração:
+Referência V1 preservada:
 - rebuff voluntário
 - reseta progressão
 - mantém regras especiais de arma
 - concede bônus permanentes
 
-Requisitos antigos:
+Requisitos antigos, ainda sujeitos a revisão:
 - Rebuff 1: nível 50
 - Rebuff 2: nível 100
 - Rebuff 3: nível 200
@@ -944,15 +1012,13 @@ Requisitos antigos:
 - Rebuff 9: nível 7500
 - Rebuff 10: nível 10000
 
-Esses valores ainda devem ser revisados antes da implementação definitiva na V2.
-
 ---
 
 # 🎒 ITENS E INVENTÁRIO
 
 Status V2: ⏳
 
-O perfil já possui `inventory`, mas os comandos completos ainda não foram migrados.
+O perfil já possui `inventory`.
 
 Planejado:
 - `!inventario`
@@ -960,8 +1026,9 @@ Planejado:
 - `!giveitem`
 - drops
 - itens customizados
-- pergaminhos de habilidades
-- poções e efeitos persistentes
+- pergaminhos
+- poções
+- efeitos persistentes
 
 ---
 
@@ -969,91 +1036,99 @@ Planejado:
 
 Status V2: ⏳
 
-Projeto futuro definido:
-- comando como `!skin` ou `!personagem`
-- link para site personalizado
-- login/vínculo pela conta Twitch
-- editor de personagem em pixel art
-- skin salva no perfil do jogador
-- PvP mostra os dois personagens na tela da transmissão
-- animações simples de ataque inicialmente
-- futuramente animações específicas por habilidade
-- boss também aparece em pixel art na tela
-- animação do boss durante combate
+Planejado:
+- `!skin` / `!personagem`
+- site personalizado
+- login/vínculo Twitch
+- editor em pixel art
+- skin salva no perfil
+- PvP com personagens na transmissão
+- animações de ataque
+- animações específicas por habilidade
+- boss em pixel art
 
 ---
 
-# 🔮 Sistemas Futuros
+# 🔮 ROADMAP / SISTEMAS FUTUROS
+
+## ✅ NÚCLEO DE COMBATE JÁ FECHADO
+
+- HP real ✔️
+- Mentalidade real ✔️
+- regeneração natural de Mentalidade ✔️
+- Cura ✔️
+- Buff ✔️
+- Debuff ✔️
+- Meditação ✔️
+- DoT genérico ✔️
+- Veneno ✔️
+- Queimadura ✔️
+- Sangramento ✔️
+- Controles/restrições principais ✔️
+- Cooldown real ✔️
+- Crítico geral ✔️
+- Counter ✔️
+- Refletir ✔️
+- matriz de dano elemental ✔️
+- resistências/fraquezas ✔️
+- imunidades 0x / retorno 2x ✔️
+- elementos duplos ✔️
+- Combos Elementais V1 ✔️
+- comandos ADM de HP/Mentalidade ✔️
 
 ## 🌟 PRIORIDADE ATUAL
 
-- Buffs reais em combate ✔️
-- Expiração de buffs por turno ✔️
-- Meditação / recuperação de Mentalidade em PvP ✔️
-- Debuffs reais em combate ✔️
-- Veneno / dano por turno ✔️
-- Queimadura / dano por turno ✔️
-- Motor genérico de DoT ✔️
-- Motor genérico de Controle ✔️
-- Paralisia ✔️
-- Congelamento ✔️
-- Regeneração natural de Mentalidade fora do combate ⏳
-- Counter ⏳
-- Cooldown real de habilidades ⏳
-- Crítico geral de habilidades ⏳
-- Dano elemental ⏳
-- Resistências e fraquezas elementais ⏳
-- Combos elementais ⏳
-- Fila global de PvP (1 luta por vez) ⏳
-- Recusar/desistir/timeout PvP ⏳
+1. Fila global de PvP — 1 luta por vez ⏳
+2. `!recusar`, desistência/forfeit e timeout de turno ⏳
+3. Hardening final do ciclo de batalha e recuperação de lutas abandonadas ⏳
+4. Habilidades de Suporte com efeitos reais ⏳
+5. Aprendizado automático de habilidades por nível ⏳
+6. Combos Elementais V2 / novas reações ⏳
+7. Efeitos especiais de Tempo, Espaço, Gravidade e Matéria ⏳
 
-## ⚔️ HABILIDADES
+## 🎒 PROGRESSÃO / ITENS
 
-- 1503 habilidades cadastradas ✔️
-- Cura real ✔️
-- Mentalidade real ✔️
-- Buff ✔️
-- Meditação ✔️
-- Debuff ✔️
-- Suporte ⏳
-- DoT ✔️ Veneno + Queimadura
-- Controle ✔️ Paralisia + Congelamento
-- Counter ⏳
-- efeitos especiais de Tempo/Espaço/Gravidade/Matéria ⏳
-- sistema de crítico ⏳
+- inventário completo ⏳
+- itens consumíveis ⏳
+- pergaminhos como item real ⏳
+- drops ⏳
+- `!checkin` ⏳
+- `!xpchest` ⏳
+- streak do `!daily` ⏳
+- morte/reencarnação ⏳
+- Rebuff ⏳
 
-## 👑 BOSSES
+## 👹 CONTEÚDO PVE
 
-- migração modular da V1 ⏳
+- migração modular de Mobs V1 → V2 ⏳
+- combate contra mobs ⏳
+- drops de mobs ⏳
+- migração de Boss V1 → V2 ⏳
 - Raid Boss global ⏳
-- boss em pixel art na transmissão ⏳
-- animações de boss ⏳
 - múltiplas fases ⏳
 - boss enfurecido ⏳
-- overlay de raid ⏳
-- overlay de loot ⏳
 
-## 🖥️ OVERLAYS / VISUAL
+## 🗡️ EQUIPAMENTOS
+
+- Armas Vínculos V2 ⏳
+- Armas ADM V2 ⏳
+- armas normais equipáveis ⏳
+- armaduras ⏳
+- durabilidade ⏳
+- ferreiro/reparo ⏳
+- drops de equipamentos ⏳
+
+## 🖥️ OVERLAY / VISUAL
 
 - personagens PvP em pixel art ⏳
-- site de criação de skin/personagem ⏳
-- vínculo com Twitch ⏳
+- site de criação de personagem ⏳
+- vínculo Twitch ⏳
 - animação de ataques ⏳
-- animações específicas de habilidade ⏳
 - overlay PvP completo ⏳
 - kill feed ⏳
-- overlay de level up ⏳
-- HUD MMORPG completa ⏳
-
-## 🗡️ ARMAS
-
-- migração das Armas Vínculos V1 → V2 ⏳
-- Armas ADM V2 ⏳
-- armaduras ⏳
-- ferreiro/reparo ⏳
-- drops reais de armas ⏳
-- armas normais equipáveis ⏳
-- armas proceduralmente numerosas ⏳
+- level up visual ⏳
+- boss em pixel art ⏳
+- overlay de raid/loot ⏳
 
 ## 🏛️ SOCIAL
 
@@ -1067,7 +1142,7 @@ Projeto futuro definido:
 
 ## 💰 ECONOMIA
 
-- economia ⏳
+- moeda/economia ⏳
 - loja ⏳
 - trade ⏳
 - marketplace ⏳
