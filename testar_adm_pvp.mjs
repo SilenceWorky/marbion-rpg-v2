@@ -10,13 +10,23 @@ import {
 
 class FakeStorage {
   constructor(data) {
-    this.data = { pvp: data };
+    this.data = {};
+
+    if (data !== undefined) {
+      this.data.pvp = data;
+    }
   }
+
   async get(key) {
     return this.data[key] ?? null;
   }
+
   async put(key, value) {
     this.data[key] = value;
+  }
+
+  async delete(key) {
+    delete this.data[key];
   }
 }
 
@@ -124,13 +134,51 @@ async function makeEnv() {
     MARBION_ADMIN_KEY: "test-key"
   };
 
-  const coordinator = new PvpCoordinator({ storage }, env);
+  const globalCoordinator =
+    new PvpCoordinator(
+      { storage },
+      env
+    );
+
+  const coordinatorById =
+    new Map([
+      [
+        "marbion-global-pvp",
+        globalCoordinator
+      ]
+    ]);
 
   env.PVP_COORDINATOR = {
-    idFromName() {
-      return "test";
+    idFromName(name) {
+      return String(name);
     },
-    get() {
+
+    get(id) {
+      const normalizedId =
+        String(id);
+
+      if (
+        !coordinatorById.has(
+          normalizedId
+        )
+      ) {
+        coordinatorById.set(
+          normalizedId,
+          new PvpCoordinator(
+            {
+              storage:
+                new FakeStorage()
+            },
+            env
+          )
+        );
+      }
+
+      const coordinator =
+        coordinatorById.get(
+          normalizedId
+        );
+
       return {
         fetch(request) {
           return coordinator.fetch(request);
