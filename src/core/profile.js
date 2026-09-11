@@ -108,6 +108,15 @@ export function createBaseProfile(user) {
       rank: "Prata III",
 
       /*
+       * Histórico móvel usado pelo
+       * anti-farm do Ranking Dinâmico V2.
+       *
+       * Chave: username normalizado do adversário.
+       * Valor: timestamps das partidas recentes.
+       */
+      recentOpponents: {},
+
+      /*
       * null = não é Prodígio.
       *
       * 1 até 7 representa sua
@@ -158,7 +167,15 @@ export function ensureProfileDefaults(profile, user = null) {
 
     pvp: {
       ...defaults.pvp,
-      ...(profile.pvp || {})
+      ...(profile.pvp || {}),
+
+      recentOpponents: {
+        ...defaults.pvp.recentOpponents,
+        ...(
+          profile?.pvp?.recentOpponents ||
+          {}
+        )
+      }
     }
   };
 }
