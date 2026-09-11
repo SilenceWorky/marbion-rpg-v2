@@ -6,7 +6,7 @@
 >
 > Legenda: **✔️ implementado e validado** | **🧪 implementado/em validação** | **⏳ pendente** | **🗃️ legado V1 ainda não migrado**
 >
-> Última atualização canônica: **05/09/2026**.
+> Última atualização canônica: **11/09/2026**.
 
 ---
 
@@ -20,6 +20,8 @@
 - conteúdo externo em `worky-live-responses` para `racas.json`, `elementos.json` e `skills.json` ✔️
 - `cmdrpg.md` mantido no próprio repositório `marbion-rpg-v2` ✔️
 - V1 preservada como referência até a V2 ficar completa ✔️
+
+Infraestrutura V1 ainda preservada como referência e NÃO deve ser desligada até a migração completa de Mobs, Bosses, tags, armas e demais sistemas legados.
 
 ---
 
@@ -55,6 +57,9 @@ Atualmente inclui:
 - XP atual / XP necessário
 
 Expansões futuras:
+- nome próprio do personagem
+- gênero
+- idade
 - tags
 - Arma Vínculo
 - efeitos persistentes
@@ -122,13 +127,8 @@ Mostra:
 - efeitos ativos
 - buffs/debuffs
 - DoTs e duração restante
-- Controles ativos
+- controles ativos
 - estados elementais como Molhado enquanto estiverem ativos
-
-Exemplo:
-```txt
-@SilenceWorky | ⚔️ PvP T8 vs @acervojuju | ❤️ HP: 58/100 | 🧠 Mentalidade: 20/50 | Efeitos: Nenhum
-```
 
 ---
 
@@ -290,8 +290,6 @@ Os nomes globais foram validados e desduplicados.
 ---
 
 ## !habilidades
-Lista as habilidades que o jogador possui.
-
 Status V2: ✔️
 
 Regras:
@@ -302,19 +300,11 @@ Regras:
 ---
 
 ## !slot
-Equipa uma habilidade em um dos 4 slots de batalha.
-
 Status V2: ✔️
 
 Sintaxe:
 ```txt
 !slot [slot] [número da habilidade]
-```
-
-Exemplos:
-```txt
-!slot 1 2
-!slot 1 25
 ```
 
 Para limpar o slot e voltar ao Soco:
@@ -326,12 +316,11 @@ Para limpar o slot e voltar ao Soco:
 ---
 
 ## !slots
-Mostra os 4 slots atuais.
-
 Status V2: ✔️
 
-Slot vazio usa **Soco** virtualmente.
-Soco não ocupa `profile.skills`.
+- mostra os 4 slots atuais
+- slot vazio usa **Soco** virtualmente
+- Soco não ocupa `profile.skills`
 
 ---
 
@@ -344,6 +333,7 @@ Habilidade universal virtual:
 - precisão: 95
 - prioridade: 0
 - escala: Força
+- não usa o cooldown genérico
 
 ---
 
@@ -412,11 +402,6 @@ Regras atuais:
 - se morrer antes de agir não recupera e não cria cooldown
 - cooldown de 3 turnos completos
 
-Exemplo validado:
-```txt
-15/50 → Meditação → 40/50
-```
-
 ---
 
 ## Recuperação genérica
@@ -435,9 +420,9 @@ Status V2: ✔️
 Status V2: ✔️ **implementado e validado**
 
 Regras:
-- ocorre por tempo fora do PvP
+- +1 de Mentalidade a cada 5 minutos fora do PvP
+- não existe regeneração natural durante uma luta
 - não interfere na Mentalidade viva de uma batalha em andamento
-- `!estado` fora do PvP aplica e persiste a regeneração quando necessário
 - entrada e saída do PvP preservam corretamente o valor real
 
 ---
@@ -527,7 +512,6 @@ Status V2: ✔️ **validado em PvP real**
 - duração base: 3 ticks
 - primeiro tick no início do turno seguinte
 - dano por tick = `Math.max(2, Math.round(custoMentalidade * 0.35))`
-- pode coexistir com outros DoTs
 
 ---
 
@@ -597,6 +581,8 @@ Regras:
 - Meditação possui cooldown próprio
 - Counter/Refletir iniciam cooldown ao preparar a postura, mesmo se não houver ataque compatível
 
+Validação em produção incluiu ciclo completo `3 → 2 → 1 → disponível` e casos de miss/execução.
+
 ---
 
 # 💥 CRÍTICO
@@ -632,7 +618,7 @@ Marcador no chat:
 Status V2: ✔️ **validado em PvP real**
 
 - reage a dano Físico direto
-- divide o dano compatível em 50% recebido + 50% devolvido
+- divide o dano compatível em aproximadamente 50% recebido + 50% devolvido
 - custo atual do Counter físico: 0
 
 ---
@@ -642,7 +628,8 @@ Status V2: ✔️ **validado em PvP real**
 
 - reage a ataque Elemental compatível com os elementos refletíveis do personagem
 - fusões desbloqueadas podem contar para Refletir
-- divide o dano compatível em 50% recebido + 50% devolvido
+- pergaminho não concede refletibilidade permanente
+- divide o dano compatível em aproximadamente 50% recebido + 50% devolvido
 - custo atual: 10 de Mentalidade
 
 Counter/Refletir recebem o dano já processado por:
@@ -677,13 +664,6 @@ Molhado + Eletricidade
 → +25% de dano direto
 ```
 
-Validação real:
-```txt
-52 de dano
-+13 de Eletrocussão
-= 65 de dano total
-```
-
 ### Evaporação
 ```txt
 Molhado + Fogo
@@ -693,7 +673,14 @@ Molhado + Fogo
 ```
 
 Foi validada ao vivo usando **Onda Absoluto → Chama Devastadora**.
-A Queimadura própria de Chama Devastadora continua independente da Evaporação.
+
+## Combos Elementais V2
+Status V2: ⏳
+
+Planejado:
+- novas reações
+- novos estados elementais
+- ampliar interações entre os elementos além da V1
 
 ---
 
@@ -702,7 +689,8 @@ A Queimadura própria de Chama Devastadora continua independente da Evaporação
 ## !pvp @usuario
 Status V2: ✔️
 
-Convite expira após 2 minutos.
+- cria desafio
+- convite expira após 2 minutos
 
 ---
 
@@ -749,36 +737,78 @@ Inclui:
 
 ---
 
-## PvP simultâneo global / fila única
-Status V2: ⏳
+## Fila Global de PvP — 1 luta por vez
+Status V2: ✔️ **validado em produção**
 
-Objetivo:
-- apenas 1 PvP por vez na transmissão
-- outros desafios entram em fila
-- próximo combate inicia após o atual
+Regras:
+- existe apenas 1 batalha PvP global ativa por vez
+- se outra dupla aceitar um desafio enquanto há luta ativa, entra na fila global
+- um jogador não pode ocupar múltiplas posições da fila
+- ordem da fila é FIFO
+- posição da dupla é informada no chat
+- ao terminar a luta ativa, a próxima dupla é promovida automaticamente
+- promoção automática funciona tanto após encerramento natural quanto após encerramento administrativo
+- a luta promovida reutiliza o fluxo normal de aceite/inicialização
+
+Validação:
+- testes locais do motor ✔️
+- integração ✔️
+- hardening ✔️
+- Twitch real com duas duplas distintas ✔️
 
 ---
 
-## Recusar / desistir / timeout
+## !recusar
+Status V2: ⏳
+
+Regra planejada:
+- somente o jogador desafiado pode recusar
+- remove o desafio pendente
+- sem perda de Elo
+- estatística `refused` poderá ser atualizada
+
+---
+
+## !desistir / forfeit
+Status V2: ⏳
+
+Regra canônica planejada:
+- encerra a luta como derrota de quem desistiu
+- desistente perde **2x** a perda de Elo calculada para aquele confronto
+- cap planejado de perda por desistência: `-300`
+- após o encerramento, a próxima dupla da fila deve ser promovida normalmente
+
+Proteção anti-farm:
+- desistência antes do Turno 3: desistente recebe a penalidade 2x, mas o adversário recebe **0 Elo**
+- a partir do Turno 3, o vencedor pode receber Elo normalmente, ainda sujeito ao anti-farm por repetição da dupla
+
+---
+
+## Timeout de turno / luta abandonada
 Status V2: ⏳
 
 Planejado:
-- `!recusar`
-- desistência/forfeit
 - timeout de turno
-- limpeza automática de batalha abandonada
+- detectar abandono
+- encerrar luta travada
+- liberar/promover a fila corretamente
+- recuperação segura após restart/erro
+- duração exata do timeout ainda deve ser fechada antes da implementação
 
 ---
 
 # 🏆 RANKING PVP / XP DE COMBATE
 
-## XP de Combate
-Status V2: ✔️
+## Sistema atual
+Status V2: ✔️ **legado funcional a ser substituído pelo Ranking Dinâmico V2**
 
-- separado do XP normal
-- Elo com K = 32
-- vencedor ganha e perdedor perde conforme ratings relativos
+Atualmente:
+- XP de Combate separado do XP normal
 - rating inicial: 1000
+- motor Elo tradicional com `K = 32`
+- vencedor ganha e perdedor perde o mesmo valor calculado
+
+Este motor continua ativo somente até a migração para o Ranking Dinâmico V2.
 
 ---
 
@@ -827,6 +857,118 @@ Inclui:
 
 ## !toprank
 Status V2: ✔️
+
+---
+
+## Ranking Dinâmico V2
+Status V2: ⏳ **PRÓXIMA IMPLEMENTAÇÃO**
+
+Objetivo:
+- quanto maior o próprio rating, mais difícil continuar subindo
+- jogador de rating alto ganha menos por vitória e perde mais por derrota
+- diferença de rating entre adversários também altera risco/recompensa
+- sistema deixa de ser zero-sum
+
+### Dificuldade pessoal
+
+```txt
+D(R) = clamp(1 + 0.8 * ((R - 1000) / 1700), 1.0, 2.2)
+```
+
+Ganho base:
+```txt
+winBase = 30 / D(R)
+```
+
+Perda base:
+```txt
+lossBase = 30 * D(R)
+```
+
+### Vitória contra adversário mais forte
+
+```txt
+delta = opponentRating - playerRating
+winMultiplier = 1 + min(1.5, delta / 800)
+```
+
+Máximo: `2.5x`.
+
+### Vitória contra adversário mais fraco
+
+```txt
+winMultiplier = max(0.08, 1 / (1 + abs(delta) / 200))
+```
+
+Em diferenças extremas, um favorito pode ganhar apenas 1 ou 2 pontos.
+
+### Derrota do jogador mais fraco contra jogador mais forte
+
+```txt
+lossMultiplier = 1
+```
+
+Perder para alguém muito acima NÃO adiciona punição extra pela diferença de rating.
+
+### Derrota do jogador mais forte contra jogador mais fraco
+
+```txt
+lossMultiplier = min(3, 1 + abs(delta) / 600)
+```
+
+### Caps planejados
+
+- ganho normal máximo: `+75`
+- perda normal máxima: `-150`
+- perda máxima por desistência: `-300`
+- rating nunca abaixo de `0`
+- vitória normal sempre rende pelo menos `+1`, salvo partida amistosa/anti-farm
+
+### Princípio
+
+O ganho do vencedor e a perda do derrotado são calculados separadamente.
+
+Exemplo conceitual:
+```txt
+favorito vence jogador muito abaixo
+→ pode ganhar +2
+
+favorito perde para jogador muito abaixo
+→ pode perder -100 ou mais
+```
+
+Coeficientes devem ficar centralizados/configuráveis para permitir balanceamento posterior sem reescrever o motor.
+
+---
+
+## Anti-farm por repetição de adversário
+Status V2: ⏳ **será implementado junto do Ranking Dinâmico V2**
+
+Janela canônica: **24 horas**.
+
+Para a mesma dupla A x B:
+```txt
+1ª partida → ranqueada
+2ª partida → ranqueada
+3ª partida → ranqueada
+4ª partida e seguintes → amistosa, ±0 Elo
+```
+
+Regras:
+- conta partidas entre a dupla, não vitórias consecutivas
+- A x B e B x A são a mesma dupla
+- alternar propositalmente o vencedor não reinicia a contagem
+- da 4ª em diante a luta continua funcionando normalmente, mas não altera rating
+- partidas amistosas também devem participar da janela móvel para impedir farming contínuo
+- quando a janela móvel permitir novamente menos de 3 confrontos recentes, a dupla volta a poder disputar partidas ranqueadas
+
+Partida amistosa por anti-farm não deve alterar:
+- rating
+- peakRating
+- wins/losses ranqueados
+- duels ranqueados
+- streak
+- bestStreak
 
 ---
 
@@ -885,18 +1027,120 @@ Status V2: ✔️ **validado fora e dentro do PvP**
 
 Usa a mesma sintaxe de SET / `+` / `-` do HP.
 
-Exemplos:
-```txt
-!adm mentalidade @usuario 20
-!adm mentalidade @usuario +10
-!adm mentalidade @usuario -10
-```
-
 Regras:
 - mínimo 0
 - máximo `maxMentalidade`
 - em PvP altera o snapshot vivo
 - fora do PvP altera o perfil persistente
+
+---
+
+## Reset administrativo de Elo
+Status V2: ⏳
+
+Comandos planejados:
+```txt
+!adm elo reset @usuario
+!adm elo reset geral
+```
+
+Reset individual:
+- rating volta para 1000
+- rank é recalculado
+- posição de Prodígio é removida/recalculada
+- histórico pode ser preservado separadamente
+
+Reset geral:
+- todos os jogadores voltam para 1000
+- ranking/Prodígios são recalculados
+- deve exigir confirmação administrativa forte para evitar execução acidental
+
+---
+
+# 🗓️ TEMPORADAS E PASSE
+
+## Temporadas ranqueadas
+Status V2: ⏳ **especificação definida**
+
+Duração inicial planejada: **30 dias**.
+
+Cada temporada deverá possuir:
+- ID e nome
+- data de início
+- data de encerramento
+- XP de temporada separado do XP normal
+- níveis do passe
+- trilha de recompensas
+- itens / consumíveis / cosméticos
+- título exclusivo no final da trilha
+- snapshot final do ranking
+- histórico dos campeões / Prodígios da temporada
+
+Comandos planejados:
+```txt
+!temporada
+!passe
+!adm temporada iniciar
+!adm temporada encerrar
+```
+
+`!temporada`:
+- temporada atual
+- tempo restante
+- posição/rating do jogador
+
+`!passe`:
+- XP de temporada
+- nível do passe
+- próxima recompensa
+- progresso
+
+---
+
+## Passe de batalha — Temporada 1
+Status V2: ⏳
+
+Planejado:
+- XP de temporada por atividades válidas
+- níveis progressivos
+- recompensas de XP normal
+- itens
+- consumíveis futuros
+- cosméticos/títulos
+- título exclusivo no nível final
+
+Quantidade exata de níveis e nome do título final ainda serão definidos.
+
+---
+
+## Soft reset de Elo ao fim da temporada
+Status V2: ⏳ **fórmula definida**
+
+Para rating acima de 1000:
+```txt
+newRating = 1000 + round((rating - 1000) * 0.75)
+```
+
+Isso remove 25% do excesso acima de 1000 e preserva 75% da progressão.
+
+Exemplos:
+```txt
+1200 → 1150
+1500 → 1375
+1800 → 1600
+2100 → 1825
+2400 → 2050
+2700 → 2275
+```
+
+Fluxo de encerramento:
+1. congelar/salvar ranking final
+2. conceder recompensas/títulos
+3. registrar campeões e Prodígios
+4. aplicar soft reset
+5. limpar/recalcular posições de Prodígio
+6. zerar XP/nível do passe encerrado
+7. iniciar a próxima temporada
 
 ---
 
@@ -926,6 +1170,7 @@ Reimplementar modularmente:
 - despawn
 - elementos
 - drops
+- combate contra mobs
 - bloqueio durante boss
 
 Comandos legados:
@@ -951,6 +1196,7 @@ Preservar/reimplementar:
 - música dinâmica
 - alertas animados
 - overlays
+- Raid Boss global futuro
 
 Comandos legados:
 - `!boss`
@@ -961,17 +1207,21 @@ Comandos legados:
 
 ---
 
-# 🗡️ ARMAS VÍNCULOS E ARMAS ADM
+# 🗡️ ARMAS VÍNCULOS E EQUIPAMENTOS
 
 Status V2: 🗃️ estrutura preservada; sistema completo ainda não migrado
 
 Objetivos:
-- 1 Arma Vínculo por perfil
+- 1 Arma Vínculo especial por perfil
 - arma ligada à alma
 - durabilidade
-- quebra pode causar morte
+- quebra podendo causar consequência grave/morte
 - Armas ADM especiais
 - efeitos individuais
+- armas normais equipáveis
+- armaduras
+- ferreiro/reparo
+- drops de equipamentos
 
 Comandos legados/planejados:
 - `!arma`
@@ -986,7 +1236,14 @@ Comandos legados/planejados:
 
 Status V2: ⏳
 
-O perfil já possui campos preparados, mas o fluxo completo ainda precisa ser integrado.
+O perfil já possui campos estruturais preparados para:
+- morte
+- número de mortes
+- ciclos
+- reencarnações
+- causa/data da morte
+
+Fluxo completo ainda precisa ser integrado.
 
 ---
 
@@ -1026,26 +1283,120 @@ Planejado:
 - `!giveitem`
 - drops
 - itens customizados
-- pergaminhos
+- pergaminhos como item real
 - poções
 - efeitos persistentes
 
 ---
 
-# 🖼️ PERSONAGEM / SKIN / OVERLAY
+# 🧬 INDIVIDUALIDADE DO PERSONAGEM
 
+Status V2: ⏳ **conceito registrado**
+
+Planejado depois de fechar o bloco PvP atual:
+- nome próprio do personagem separado do username Twitch
+- futuro `!nome <nome>`
+- gênero gerado no nascimento/criação
+- idade inicial normalmente 14 ou 15 anos
+- base para títulos
+
+Futuro avançado:
+- envelhecimento por XP/atividade/tempo no RPG
+- longevidade diferente por raça
+- títulos ligados à idade e feitos
+
+Morte automática por idade NÃO será implementada por enquanto.
+
+---
+
+# 🌐 PLATAFORMA MULTI-STREAMER
+
+Status V2: ⏳ **especificação registrada / grande próxima fase de infraestrutura**
+
+Objetivo:
+- RPG compartilhado entre múltiplas lives da Twitch
+- personagem pertence ao jogador, não ao canal
+- mesmo personagem/raça/elementos/nível/inventário/ranking em qualquer canal participante
+
+Identidade futura canônica:
+```txt
+Twitch User ID
+→ Marbion Player ID
+→ perfil global
+```
+
+Antes de abrir para vários canais:
+- migrar username atual → Twitch User ID
+- preservar personagens atuais
+- aliases para compatibilidade
+- testar um mesmo jogador em múltiplos canais
+
+---
+
+## Marbion Bot próprio
+Status V2: ⏳
+
+Estratégia preferencial:
+- bot central do Marbion entra nos canais autorizados
+- comandos ficam centralizados
+- atualizações aparecem para todos sem instalar comando por comando
+- StreamElements continua suportado como compatibilidade, mas não deve ser dependência obrigatória do núcleo
+
+---
+
+## Site público / painel
+Status V2: ⏳
+
+Jogador:
+- Início
+- Personagem
+- Comandos
+- Conta
+
+Streamer:
+- Painel do Streamer
+- Overlays
+- Permissões
+- Regras de Streamers
+- Vídeo de Introdução
+- Integrações
+- Configuração do RPG
+
+---
+
+## Cargos e permissões
+Status V2: ⏳
+
+Planejado com RBAC + permissões granulares:
+- PRIMARY_OWNER
+- OWNER
+- TRUSTED_STREAMER
+- PARTNER_STREAMER
+- PLAYER
+
+Permissões sensíveis devem ser verificadas no backend e auditadas.
+
+Página privada `Streamers`:
+- exclusiva do PRIMARY_OWNER inicialmente
+- aprovar novos streamers
+- escolher cargo-base
+- aplicar overrides individuais
+- suspender/bloquear/remover acesso de canal
+- bloquear canal nunca apaga personagens globais
+
+---
+
+## Overlays Multi-Streamer
 Status V2: ⏳
 
 Planejado:
-- `!skin` / `!personagem`
-- site personalizado
-- login/vínculo Twitch
-- editor em pixel art
-- skin salva no perfil
-- PvP com personagens na transmissão
-- animações de ataque
-- animações específicas por habilidade
-- boss em pixel art
+- catálogo de overlays para Boss, Mob, PvP, personagens, HUD, loot, ranking e eventos
+- templates oficiais + configuração própria de cada canal
+- customização de visual/conteúdo/áudio
+- link Browser Source para OBS
+- URL somente leitura e revogável
+- mesmo evento global pode ter apresentações diferentes em cada live
+- sincronização futura em tempo real por WebSocket ou mecanismo equivalente
 
 ---
 
@@ -1075,16 +1426,24 @@ Planejado:
 - elementos duplos ✔️
 - Combos Elementais V1 ✔️
 - comandos ADM de HP/Mentalidade ✔️
+- Fila Global de PvP ✔️
 
-## 🌟 PRIORIDADE ATUAL
+## 🌟 PRIORIDADE ATUAL — ORDEM CANÔNICA
 
-1. Fila global de PvP — 1 luta por vez ⏳
-2. `!recusar`, desistência/forfeit e timeout de turno ⏳
-3. Hardening final do ciclo de batalha e recuperação de lutas abandonadas ⏳
-4. Habilidades de Suporte com efeitos reais ⏳
-5. Aprendizado automático de habilidades por nível ⏳
-6. Combos Elementais V2 / novas reações ⏳
-7. Efeitos especiais de Tempo, Espaço, Gravidade e Matéria ⏳
+1. **Ranking Dinâmico V2** — novo cálculo assimétrico de ganho/perda ⏳
+2. **Anti-farm A x B** — 3 partidas ranqueadas/24h; 4ª+ amistosa ⏳
+3. **`!recusar`** ⏳
+4. **`!desistir` / forfeit** — penalidade 2x e proteção contra desistência precoce ⏳
+5. **Timeout de turno + hardening de lutas abandonadas** ⏳
+6. **Reset administrativo de Elo individual/geral** ⏳
+7. **Temporadas ranqueadas + soft reset** ⏳
+8. **Passe de batalha da Temporada 1** ⏳
+9. **Habilidades de Suporte com efeitos reais** ⏳
+10. **Aprendizado automático de habilidades por nível** ⏳
+11. **Combos Elementais V2 / novas reações** ⏳
+12. **Efeitos especiais de Tempo, Espaço, Gravidade e Matéria** ⏳
+13. **Individualidade básica do personagem** ⏳
+14. **Fundação Multi-Streamer / site / bot próprio** ⏳
 
 ## 🎒 PROGRESSÃO / ITENS
 
@@ -1163,3 +1522,39 @@ Planejado:
 - mineração ⏳
 - alquimia ⏳
 - pets ⏳
+
+---
+
+# 📚 DOCUMENTOS DE ESPECIFICAÇÃO RELACIONADOS
+
+- `docs/ranking-temporadas-roadmap-2026-09-11.md`
+- `docs/individualidade-personagem.md`
+- `docs/plataforma-multistreamer.md`
+- `docs/administracao-streamers.md`
+- `docs/overlays-multistreamer.md`
+- `docs/counter-refletir.md`
+- `docs/regeneracao-mentalidade.md`
+
+---
+
+# 📌 PONTO EXATO DE CONTINUIDADE — 11/09/2026
+
+Último sistema concluído em produção:
+```txt
+Fila Global de PvP ✔️
+```
+
+Próximo desenvolvimento:
+```txt
+Ranking Dinâmico V2
+→ Anti-farm por repetição da mesma dupla
+```
+
+Depois:
+```txt
+!recusar
+→ !desistir
+→ timeout/hardening
+→ reset de Elo
+→ temporadas/passe
+```
