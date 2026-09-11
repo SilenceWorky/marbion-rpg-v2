@@ -1,6 +1,13 @@
 export const PVP_STARTING_RATING =
   1000;
 
+/*
+ * Legado do Elo tradicional.
+ *
+ * Mantido exportado por compatibilidade
+ * com código/testes antigos. O Ranking
+ * Dinâmico V2 não usa este K.
+ */
 export const PVP_ELO_K =
   32;
 
@@ -9,6 +16,30 @@ export const PRODIGY_MIN_RATING =
 
 export const PRODIGY_LIMIT =
   7;
+
+export const PVP_DYNAMIC_BASE =
+  30;
+
+export const PVP_DIFFICULTY_MIN =
+  1;
+
+export const PVP_DIFFICULTY_MAX =
+  2.2;
+
+export const PVP_MAX_WIN_GAIN =
+  75;
+
+export const PVP_MAX_NORMAL_LOSS =
+  150;
+
+export const PVP_MAX_FORFEIT_LOSS =
+  300;
+
+export const PVP_PAIR_WINDOW_MS =
+  24 * 60 * 60 * 1000;
+
+export const PVP_RANKED_MATCHES_PER_PAIR =
+  3;
 
 
 const RANKS = [
@@ -120,6 +151,33 @@ const RANKS = [
     division: "III"
   }
 ];
+
+
+function clamp(
+  value,
+  min,
+  max
+) {
+  return Math.min(
+    max,
+    Math.max(
+      min,
+      value
+    )
+  );
+}
+
+
+function normalizeUser(
+  value
+) {
+  return String(
+    value ?? ""
+  )
+    .trim()
+    .replace(/^@/, "")
+    .toLowerCase();
+}
 
 
 function normalizeRating(
@@ -238,8 +296,8 @@ export function getDisplayRank(
 
 
 /*
- * Probabilidade matemática de A
- * derrotar B no sistema Elo.
+ * Legado matemático do Elo tradicional.
+ * Mantido exportado para compatibilidade.
  */
 export function calculateExpectedScore(
   ratingA,
@@ -270,11 +328,9 @@ export function calculateExpectedScore(
 
 
 /*
- * Calcula quanto o vencedor ganha.
+ * Legado do cálculo Elo K=32.
  *
- * Como estamos usando o mesmo K
- * para ambos, o perdedor perde
- * o mesmo valor.
+ * O motor V2 usa calculateDynamicRatingResult().
  */
 export function calculateRatingChange(
   winnerRating,
@@ -312,6 +368,345 @@ export function calculateRatingChange(
     1,
     change
   );
+}
+
+
+export function getRatingDifficulty(
+  rating
+) {
+  const normalized =
+    normalizeRating(
+      rating
+    );
+
+  const difficulty =
+    1 +
+    0.8 *
+    (
+      (
+        normalized -
+        PVP_STARTING_RATING
+      ) /
+      1700
+    );
+
+
+  return clamp(
+    difficulty,
+    PVP_DIFFICULTY_MIN,
+    PVP_DIFFICULTY_MAX
+  );
+}
+
+
+export function calculateWinnerGain(
+  winnerRating,
+  loserRating
+) {
+  const winner =
+    normalizeRating(
+      winnerRating
+    );
+
+  const loser =
+    normalizeRating(
+      loserRating
+    );
+
+  const difficulty =
+    getRatingDifficulty(
+      winner
+    );
+
+  const base =
+    PVP_DYNAMIC_BASE /
+    difficulty;
+
+  const delta =
+    loser -
+    winner;
+
+
+  let multiplier =
+    1;
+
+
+  if (
+    delta > 0
+  ) {
+    multiplier =
+      1 +
+      Math.min(
+        1.5,
+        delta / 800
+      );
+  }
+
+  else if (
+    delta < 0
+  ) {
+    multiplier =
+      Math.max(
+        0.08,
+        1 /
+        (
+          1 +
+          Math.abs(delta) / 200
+        )
+      );
+  }
+
+
+  return clamp(
+    Math.round(
+      base *
+      multiplier
+    ),
+    1,
+    PVP_MAX_WIN_GAIN
+  );
+}
+
+
+export function calculateLoserLoss(
+  winnerRating,
+  loserRating
+) {
+  const winner =
+    normalizeRating(
+      winnerRating
+    );
+
+  const loser =
+    normalizeRating(
+      loserRating
+    );
+
+  const difficulty =
+    getRatingDifficulty(
+      loser
+    );
+
+  const base =
+    PVP_DYNAMIC_BASE *
+    difficulty;
+
+
+  let multiplier =
+    1;
+
+
+  if (
+    loser > winner
+  ) {
+    const gap =
+      loser -
+      winner;
+
+    multiplier =
+      Math.min(
+        3,
+        1 +
+        gap / 600
+      );
+  }
+
+
+  return clamp(
+    Math.round(
+      base *
+      multiplier
+    ),
+    1,
+    PVP_MAX_NORMAL_LOSS
+  );
+}
+
+
+export function calculateDynamicRatingResult(
+  winnerRating,
+  loserRating,
+  options = {}
+) {
+  const winner =
+    normalizeRating(
+      winnerRating
+    );
+
+  const loser =
+    normalizeRating(
+      loserRating
+    );
+
+  const forfeit =
+    options?.forfeit === true;
+
+  const earlyForfeit =
+    options?.earlyForfeit === true;
+
+
+  const normalWinnerGain =
+    calculateWinnerGain(
+      winner,
+      loser
+    );
+
+  const normalLoserLoss =
+    calculateLoserLoss(
+      winner,
+      loser
+    );
+
+
+  const requestedWinnerGain =
+    earlyForfeit
+      ? 0
+      : normalWinnerGain;
+
+  const requestedLoserLoss =
+    forfeit
+      ? Math.min(
+          PVP_MAX_FORFEIT_LOSS,
+          normalLoserLoss * 2
+        )
+      : normalLoserLoss;
+
+
+  return {
+    winnerGain:
+      requestedWinnerGain,
+
+    loserLoss:
+      Math.min(
+        loser,
+        requestedLoserLoss
+      ),
+
+    requestedLoserLoss,
+    normalWinnerGain,
+    normalLoserLoss,
+    forfeit,
+    earlyForfeit,
+
+    winnerDifficulty:
+      getRatingDifficulty(
+        winner
+      ),
+
+    loserDifficulty:
+      getRatingDifficulty(
+        loser
+      )
+  };
+}
+
+
+function ensureRecentOpponents(
+  pvp
+) {
+  if (
+    !pvp.recentOpponents ||
+    typeof pvp.recentOpponents !==
+      "object" ||
+    Array.isArray(
+      pvp.recentOpponents
+    )
+  ) {
+    pvp.recentOpponents = {};
+  }
+
+
+  return pvp.recentOpponents;
+}
+
+
+function normalizeRecentTimestamps(
+  values,
+  now
+) {
+  if (!Array.isArray(values)) {
+    return [];
+  }
+
+
+  const cutoff =
+    now -
+    PVP_PAIR_WINDOW_MS;
+
+
+  return [
+    ...new Set(
+      values
+        .map(
+          value =>
+            Number(value)
+        )
+        .filter(
+          value =>
+            Number.isFinite(value) &&
+            value > cutoff &&
+            value <= now
+        )
+    )
+  ]
+    .sort(
+      (a, b) =>
+        a - b
+    );
+}
+
+
+function pruneRecentOpponents(
+  pvp,
+  now
+) {
+  const recentOpponents =
+    ensureRecentOpponents(
+      pvp
+    );
+
+  const cleaned = {};
+
+
+  for (
+    const [
+      rawOpponent,
+      timestamps
+    ] of Object.entries(
+      recentOpponents
+    )
+  ) {
+    const opponent =
+      normalizeUser(
+        rawOpponent
+      );
+
+    if (!opponent) {
+      continue;
+    }
+
+
+    const normalized =
+      normalizeRecentTimestamps(
+        timestamps,
+        now
+      );
+
+
+    if (
+      normalized.length > 0
+    ) {
+      cleaned[opponent] =
+        normalized;
+    }
+  }
+
+
+  pvp.recentOpponents =
+    cleaned;
+
+
+  return cleaned;
 }
 
 
@@ -358,19 +753,146 @@ function ensurePvp(
     ) || 0;
 
 
+  ensureRecentOpponents(
+    pvp
+  );
+
+
   return pvp;
 }
 
 
+function registerPairMatch(
+  winnerProfile,
+  loserProfile,
+  winnerPvp,
+  loserPvp,
+  now,
+  options = {}
+) {
+  const winnerUser =
+    normalizeUser(
+      options?.winnerUser ??
+      winnerProfile?.user
+    );
+
+  const loserUser =
+    normalizeUser(
+      options?.loserUser ??
+      loserProfile?.user
+    );
+
+
+  pruneRecentOpponents(
+    winnerPvp,
+    now
+  );
+
+  pruneRecentOpponents(
+    loserPvp,
+    now
+  );
+
+
+  if (
+    !winnerUser ||
+    !loserUser ||
+    winnerUser === loserUser
+  ) {
+    return {
+      tracked: false,
+      previousMatchesInWindow: 0,
+      matchesInWindow: 0,
+      friendly: false
+    };
+  }
+
+
+  const winnerHistory =
+    normalizeRecentTimestamps(
+      winnerPvp
+        .recentOpponents[
+          loserUser
+        ],
+      now
+    );
+
+  const loserHistory =
+    normalizeRecentTimestamps(
+      loserPvp
+        .recentOpponents[
+          winnerUser
+        ],
+      now
+    );
+
+
+  const merged =
+    [
+      ...new Set([
+        ...winnerHistory,
+        ...loserHistory
+      ])
+    ]
+      .sort(
+        (a, b) =>
+          a - b
+      );
+
+
+  const previousMatchesInWindow =
+    merged.length;
+
+  const friendly =
+    previousMatchesInWindow >=
+    PVP_RANKED_MATCHES_PER_PAIR;
+
+
+  const updated =
+    normalizeRecentTimestamps(
+      [
+        ...merged,
+        now
+      ],
+      now
+    );
+
+
+  winnerPvp.recentOpponents[
+    loserUser
+  ] = updated;
+
+  loserPvp.recentOpponents[
+    winnerUser
+  ] = updated;
+
+
+  return {
+    tracked: true,
+    winnerUser,
+    loserUser,
+    previousMatchesInWindow,
+    matchesInWindow:
+      updated.length,
+    friendly
+  };
+}
+
+
 /*
- * Aplica o resultado de uma
- * partida ranqueada aos perfis.
+ * Aplica o resultado de uma partida aos perfis.
+ *
+ * Ranking Dinâmico V2:
+ * - ganho/perda assimétricos;
+ * - anti-farm por repetição da dupla;
+ * - suporte estrutural a forfeit.
  *
  * Esta função NÃO salva no KV.
  */
 export function applyRankedResult(
   winnerProfile,
-  loserProfile
+  loserProfile,
+  options = {}
 ) {
   const winnerPvp =
     ensurePvp(
@@ -389,24 +911,121 @@ export function applyRankedResult(
   const loserBefore =
     loserPvp.rating;
 
-
-  const change =
-    calculateRatingChange(
-      winnerBefore,
-      loserBefore
+  const now =
+    Math.max(
+      0,
+      Number(
+        options?.now
+      ) ||
+      Date.now()
     );
+
+
+  const pair =
+    registerPairMatch(
+      winnerProfile,
+      loserProfile,
+      winnerPvp,
+      loserPvp,
+      now,
+      options
+    );
+
+
+  const friendly =
+    pair.friendly === true;
+
+
+  if (friendly) {
+    const winnerRank =
+      getRankFromRating(
+        winnerPvp.rating
+      );
+
+    const loserRank =
+      getRankFromRating(
+        loserPvp.rating
+      );
+
+
+    winnerPvp.rank =
+      winnerRank.label;
+
+    loserPvp.rank =
+      loserRank.label;
+
+
+    return {
+      rated: false,
+      friendly: true,
+      antiFarm: true,
+      pairTracked:
+        pair.tracked,
+      previousPairMatchesInWindow:
+        pair.previousMatchesInWindow,
+      pairMatchesInWindow:
+        pair.matchesInWindow,
+      windowMs:
+        PVP_PAIR_WINDOW_MS,
+
+      /*
+       * Compatibilidade: change não deve mais
+       * ser usado como fonte de verdade.
+       */
+      change: 0,
+
+      winner: {
+        before:
+          winnerBefore,
+        after:
+          winnerPvp.rating,
+        gain: 0,
+        rank:
+          winnerRank.label,
+        wins:
+          winnerPvp.wins,
+        streak:
+          winnerPvp.streak
+      },
+
+      loser: {
+        before:
+          loserBefore,
+        after:
+          loserPvp.rating,
+        loss: 0,
+        rank:
+          loserRank.label,
+        losses:
+          loserPvp.losses
+      }
+    };
+  }
+
+
+  const calculation =
+    calculateDynamicRatingResult(
+      winnerBefore,
+      loserBefore,
+      options
+    );
+
+  const winnerGain =
+    calculation.winnerGain;
+
+  const loserLoss =
+    calculation.loserLoss;
 
 
   winnerPvp.rating =
     winnerBefore +
-    change;
-
+    winnerGain;
 
   loserPvp.rating =
     Math.max(
       0,
       loserBefore -
-      change
+      loserLoss
     );
 
 
@@ -425,7 +1044,6 @@ export function applyRankedResult(
       winnerPvp.streak
     );
 
-
   loserPvp.streak =
     0;
 
@@ -435,7 +1053,6 @@ export function applyRankedResult(
       winnerPvp.peakRating,
       winnerPvp.rating
     );
-
 
   loserPvp.peakRating =
     Math.max(
@@ -463,7 +1080,31 @@ export function applyRankedResult(
 
 
   return {
-    change,
+    rated: true,
+    friendly: false,
+    antiFarm: false,
+    pairTracked:
+      pair.tracked,
+    previousPairMatchesInWindow:
+      pair.previousMatchesInWindow,
+    pairMatchesInWindow:
+      pair.matchesInWindow,
+    windowMs:
+      PVP_PAIR_WINDOW_MS,
+
+    forfeit:
+      calculation.forfeit,
+
+    earlyForfeit:
+      calculation.earlyForfeit,
+
+    /*
+     * Compatibilidade legada.
+     * Agora representa APENAS o ganho do vencedor.
+     * Código novo deve usar winner.gain / loser.loss.
+     */
+    change:
+      winnerGain,
 
     winner: {
       before:
@@ -472,6 +1113,9 @@ export function applyRankedResult(
       after:
         winnerPvp.rating,
 
+      gain:
+        winnerGain,
+
       rank:
         winnerRank.label,
 
@@ -479,7 +1123,10 @@ export function applyRankedResult(
         winnerPvp.wins,
 
       streak:
-        winnerPvp.streak
+        winnerPvp.streak,
+
+      difficulty:
+        calculation.winnerDifficulty
     },
 
     loser: {
@@ -489,11 +1136,20 @@ export function applyRankedResult(
       after:
         loserPvp.rating,
 
+      loss:
+        loserLoss,
+
+      requestedLoss:
+        calculation.requestedLoserLoss,
+
       rank:
         loserRank.label,
 
       losses:
-        loserPvp.losses
+        loserPvp.losses,
+
+      difficulty:
+        calculation.loserDifficulty
     }
   };
 }
