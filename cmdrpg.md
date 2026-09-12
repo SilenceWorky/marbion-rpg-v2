@@ -690,10 +690,16 @@ Planejado:
 # ⚔️ PVP
 
 ## !pvp @usuario
-Status V2: ✔️
+Status V2: ✔️ **validado em produção**
 
 - cria desafio
 - convite expira após 2 minutos
+- se o alvo não responder dentro dos 2 minutos, o desafio é cancelado automaticamente
+- o cancelamento é publicado autonomamente no chat pela saída Twitch do Worker
+- expirar um desafio NÃO aplica strike AFK
+- expirar um desafio NÃO altera Elo
+- expirar um desafio NÃO altera vitórias, derrotas ou outras estatísticas
+- o timeout do convite compartilha o Durable Object Alarm com os eventos de 60/90 segundos das batalhas
 
 ---
 
@@ -793,7 +799,7 @@ Validado em produção nos Turnos 1, 2, 3 e 5, incluindo penalidade dinâmica de
 ---
 
 ## Timeout de turno / AFK
-Status V2: 🧪 **implementado; regra disciplinar nova em validação**
+Status V2: ✔️ **implementado e validado em produção**
 
 Regra canônica:
 ```txt
@@ -822,7 +828,7 @@ Disciplina entre partidas:
 - enquanto houver bloqueio, o jogador não pode desafiar nem aceitar PvP
 - AFKs adicionais da mesma luta enquanto um bloqueio já está ativo não escalam imediatamente a punição
 
-Mensagens/eventos previstos:
+Mensagens/eventos validados:
 ```txt
 ⏰ @user, você ainda não escolheu uma ação. Restam 30 segundos.
 💤 @user não executou uma ação a tempo e perdeu a vez. AFK: 1/3.
@@ -830,8 +836,11 @@ Mensagens/eventos previstos:
 ```
 
 Observação de infraestrutura:
-- o Worker já pode registrar os eventos automaticamente
-- publicação espontânea dessas mensagens no chat depende da saída Twitch/bot próprio, pois `customapi` do StreamElements só responde quando um comando é chamado
+- o Worker registra e agenda os eventos automaticamente via Durable Object Alarm
+- a saída autônoma para o chat pela API oficial da Twitch está operacional e validada em produção
+- avisos de 60s, perdas de turno por AFK, derrota por inatividade e timeout de desafios podem ser publicados sem depender de novo comando no chat
+- o StreamElements continua sendo usado na camada de comandos compatível, mas essas mensagens espontâneas não dependem do `customapi`
+- o bot central dedicado do Marbion continua como etapa futura da plataforma Multi-Streamer
 ---
 
 # 🏆 RANKING PVP / XP DE COMBATE
@@ -1073,7 +1082,7 @@ Regras:
 ---
 
 ## Reset administrativo de tempo
-Status V2: ✔️ **implementado e validado em produção; escopo AFK em integração**
+Status V2: ✔️ **implementado e validado em produção**
 
 Sintaxes equivalentes:
 ```txt
@@ -1424,6 +1433,11 @@ Antes de abrir para vários canais:
 ## Marbion Bot próprio
 Status V2: ⏳
 
+Base já operacional:
+- saída autônoma do Worker para o chat via API oficial da Twitch ✔️
+- publicação automática de eventos de AFK e timeout de desafios ✔️
+- o bot central dedicado do Marbion, com identidade própria e uso Multi-Streamer, continua pendente
+
 Estratégia preferencial:
 - bot central do Marbion entra nos canais autorizados
 - comandos ficam centralizados
@@ -1522,6 +1536,9 @@ Planejado:
 - Soco universal via `!ataque soco` ✔️
 - reset administrativo de tempos ✔️
 - timeout de 90s via Durable Object Alarm ✔️
+- disciplina progressiva de AFK ✔️
+- saída autônoma Twitch para eventos PvP ✔️
+- timeout automático de desafios pendentes após 2 minutos ✔️
 
 ## 🌟 PRIORIDADE ATUAL — ORDEM CANÔNICA
 
@@ -1529,7 +1546,7 @@ Planejado:
 2. **Anti-farm A x B** — 3 partidas ranqueadas/24h; 4ª+ amistosa ✔️
 3. **`!recusar`** ✔️
 4. **`!desistir` / forfeit** — penalidade 2x e proteção precoce ✔️
-5. **Timeout/AFK + disciplina progressiva + hardening** 🧪
+5. **Timeout/AFK + disciplina progressiva** ✔️ | **hardening de resultado/Alarm** 🧪
 6. **Reset administrativo de Elo individual/geral** ⏳
 7. **Temporadas ranqueadas + soft reset** ⏳
 8. **Passe de batalha da Temporada 1** ⏳
@@ -1538,7 +1555,7 @@ Planejado:
 11. **Combos Elementais V2 / novas reações** ⏳
 12. **Efeitos especiais de Tempo, Espaço, Gravidade e Matéria** ⏳
 13. **Individualidade básica do personagem** ⏳
-14. **Fundação Multi-Streamer / site / bot próprio / saída autônoma para mensagens AFK** ⏳
+14. **Fundação Multi-Streamer / site / bot próprio** ⏳
 
 ## 🎒 PROGRESSÃO / ITENS
 
@@ -1632,24 +1649,28 @@ Planejado:
 
 ---
 
-# 📌 PONTO EXATO DE CONTINUIDADE — 11/09/2026
+# 📌 PONTO EXATO DE CONTINUIDADE — 12/09/2026
 
-Último sistema concluído em produção:
+Últimos sistemas concluídos e validados em produção:
 ```txt
-Fila Global de PvP ✔️
+Timeout/AFK de 60s/90s via Durable Object Alarm ✔️
+Disciplina progressiva de AFK ✔️
+Saída autônoma para o chat via API oficial da Twitch ✔️
+Timeout automático de desafio PvP após 2 minutos ✔️
+Cancelamento sem AFK, Elo ou estatísticas ✔️
 ```
 
 Próximo desenvolvimento:
 ```txt
-Ranking Dinâmico V2
-→ Anti-farm por repetição da mesma dupla
+Hardening do resultado PvP
+→ idempotência/exact-once
+→ proteção contra aplicação dupla de Elo/penalidade
+→ endurecimento de Alarm e persistência
 ```
 
 Depois:
 ```txt
-!recusar
-→ !desistir
-→ timeout/hardening
-→ reset de Elo
-→ temporadas/passe
+reset administrativo de Elo
+→ temporadas ranqueadas / soft reset
+→ passe de batalha
 ```
