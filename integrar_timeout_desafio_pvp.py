@@ -275,7 +275,7 @@ text = re.sub(
 
 # 5) Ao criar um novo desafio, arma o Alarm para os 2 minutos.
 create_start = text.find("  async createChallenge(\n")
-create_end = text.find("  async startNextQueuedBattle(\n", create_start)
+create_end = text.find("  async startNextQueuedBattle() {\n", create_start)
 
 if create_start == -1 or create_end == -1:
     raise RuntimeError("Não encontrei createChallenge")

@@ -125,6 +125,12 @@ import {
 } from "../systems/pvp-afk.js";
 
 import {
+  partitionExpiredChallenges,
+  getNextChallengeExpiry,
+  formatChallengeTimeoutMessage
+} from "../systems/pvp-challenge-timeout.js";
+
+import {
   sendTwitchChatMessage
 } from "../integrations/twitch-chat.js";
 
@@ -2334,47 +2340,163 @@ export class PvpCoordinator {
   }
 
 
-  async scheduleBattleTurnAlarm(
-    battle
+  async scheduleCoordinatorAlarm(
+    data = null,
+    preferredBattle = null
   ) {
-    const clock =
-      ensureBattleTurnClock(
-        battle
-      );
+    const currentData =
+      data ||
+      await this.getData();
 
-    if (!clock.ok) {
-      return clock;
+    const now =
+      Date.now();
+
+    const candidates = [];
+
+    const activeBattle =
+      preferredBattle?.status === "ACTIVE"
+        ? preferredBattle
+        : getGlobalActivePvpBattle(
+            currentData
+          );
+
+    if (activeBattle) {
+      const clock =
+        ensureBattleTurnClock(
+          activeBattle,
+          now
+        );
+
+      if (clock.ok) {
+        const nextBattleAlarm =
+          getNextBattleTurnAlarmAt(
+            activeBattle
+          );
+
+        if (
+          nextBattleAlarm.ok &&
+          Number.isFinite(
+            Number(
+              nextBattleAlarm.alarmAt
+            )
+          )
+        ) {
+          candidates.push({
+            kind: "battle",
+            stage:
+              nextBattleAlarm.stage,
+            at:
+              Number(
+                nextBattleAlarm.alarmAt
+              )
+          });
+        }
+      }
     }
 
-    const nextAlarm =
-      getNextBattleTurnAlarmAt(
-        battle
+    const nextChallengeAt =
+      getNextChallengeExpiry(
+        currentData.challenges,
+        now
       );
 
-    if (!nextAlarm.ok) {
-      return nextAlarm;
+    if (
+      Number.isFinite(
+        Number(nextChallengeAt)
+      )
+    ) {
+      candidates.push({
+        kind: "challenge",
+        stage: "CHALLENGE_TIMEOUT",
+        at:
+          Number(nextChallengeAt)
+      });
     }
+
+    if (candidates.length === 0) {
+      await this.state.storage.deleteAlarm();
+
+      return {
+        ok: true,
+        scheduled: false
+      };
+    }
+
+    candidates.sort(
+      (a, b) =>
+        a.at - b.at
+    );
+
+    const next =
+      candidates[0];
+
+    const alarmAt =
+      Math.max(
+        now + 1,
+        next.at
+      );
 
     await this.state.storage.setAlarm(
-      nextAlarm.alarmAt
+      alarmAt
     );
 
     return {
       ok: true,
-      turn: clock.turn,
-      stage: nextAlarm.stage,
-      alarmAt: nextAlarm.alarmAt,
-      turnWarningAt: clock.turnWarningAt,
-      turnDeadline: clock.turnDeadline
+      scheduled: true,
+      kind: next.kind,
+      stage: next.stage,
+      alarmAt
     };
   }
 
 
+  async scheduleBattleTurnAlarm(
+    battle
+  ) {
+    return this.scheduleCoordinatorAlarm(
+      null,
+      battle
+    );
+  }
+
+
   async clearBattleTurnAlarm() {
+    const data =
+      await this.getData();
+
+    const nextChallengeAt =
+      getNextChallengeExpiry(
+        data.challenges,
+        Date.now()
+      );
+
+    if (
+      Number.isFinite(
+        Number(nextChallengeAt)
+      )
+    ) {
+      const alarmAt =
+        Math.max(
+          Date.now() + 1,
+          Number(nextChallengeAt)
+        );
+
+      await this.state.storage.setAlarm(
+        alarmAt
+      );
+
+      return {
+        ok: true,
+        challengeAlarmPreserved: true,
+        alarmAt
+      };
+    }
+
     await this.state.storage.deleteAlarm();
 
     return {
-      ok: true
+      ok: true,
+      challengeAlarmPreserved: false
     };
   }
 
@@ -2963,18 +3085,52 @@ export class PvpCoordinator {
     };
   }
 
-  cleanExpiredChallenges(
-    data
+  async cleanExpiredChallenges(
+    data,
+    now = Date.now()
   ) {
-    const now =
-      Date.now();
+    const partition =
+      partitionExpiredChallenges(
+        data.challenges,
+        now
+      );
+
+    if (partition.expired.length === 0) {
+      return data;
+    }
 
     data.challenges =
-      data.challenges.filter(
-        challenge =>
-          challenge.expiresAt >
-          now
-      );
+      partition.active;
+
+    /*
+     * Persistimos a remoção ANTES de publicar.
+     * Assim, uma nova chamada não dispara a mesma
+     * expiração duas vezes caso a Twitch falhe.
+     */
+    await this.saveData(
+      data
+    );
+
+    for (
+      const challenge
+      of partition.expired
+    ) {
+      const message =
+        formatChallengeTimeoutMessage(
+          challenge
+        );
+
+      if (message) {
+        await sendTwitchChatMessage(
+          this.env,
+          message
+        );
+      }
+    }
+
+    await this.scheduleCoordinatorAlarm(
+      data
+    );
 
     return data;
   }
@@ -3400,7 +3556,7 @@ export class PvpCoordinator {
 
 
     data =
-      this.cleanExpiredChallenges(
+      await this.cleanExpiredChallenges(
         data
       );
 
@@ -3503,6 +3659,10 @@ export class PvpCoordinator {
 
 
     await this.saveData(
+      data
+    );
+
+    await this.scheduleCoordinatorAlarm(
       data
     );
 
@@ -3639,7 +3799,7 @@ export class PvpCoordinator {
 
 
     data =
-      this.cleanExpiredChallenges(
+      await this.cleanExpiredChallenges(
         data
       );
 
@@ -3726,7 +3886,7 @@ export class PvpCoordinator {
 
 
     data =
-      this.cleanExpiredChallenges(
+      await this.cleanExpiredChallenges(
         data
       );
 
@@ -4275,7 +4435,7 @@ export class PvpCoordinator {
 
 
     data =
-        this.cleanExpiredChallenges(
+        await this.cleanExpiredChallenges(
         data
         );
 
@@ -6455,8 +6615,17 @@ export class PvpCoordinator {
   }
 
   async alarm() {
-    const data =
+    let data =
       await this.getData();
+
+    const alarmNow =
+      Date.now();
+
+    data =
+      await this.cleanExpiredChallenges(
+        data,
+        alarmNow
+      );
 
     const battle =
       getGlobalActivePvpBattle(
@@ -6464,7 +6633,9 @@ export class PvpCoordinator {
       );
 
     if (!battle) {
-      await this.clearBattleTurnAlarm();
+      await this.scheduleCoordinatorAlarm(
+        data
+      );
 
       return {
         ok: true,
@@ -6526,8 +6697,9 @@ export class PvpCoordinator {
         data
       );
 
-      await this.state.storage.setAlarm(
-        clock.turnDeadline
+      await this.scheduleCoordinatorAlarm(
+        data,
+        battle
       );
 
       return {
