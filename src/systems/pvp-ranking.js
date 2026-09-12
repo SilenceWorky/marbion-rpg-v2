@@ -935,6 +935,185 @@ export function applyRankedResult(
   const friendly =
     pair.friendly === true;
 
+  const forfeit =
+    options?.forfeit === true;
+
+  const earlyForfeit =
+    options?.earlyForfeit === true;
+
+
+  /*
+   * ==============================
+   * DESISTÊNCIA / FORFEIT
+   * ==============================
+   *
+   * O desistente sempre recebe a penalidade
+   * de 2x da perda normal, limitada pelo cap
+   * global de forfeit. A proteção anti-farm
+   * pode bloquear a recompensa do vencedor,
+   * mas não remove a punição de quem desistiu.
+   *
+   * Antes do Turno 3:
+   * - vencedor recebe +0 rating;
+   * - não recebe vitória nem streak;
+   * - ambos registram participação no PvP.
+   *
+   * A partir do Turno 3:
+   * - vencedor recebe resultado normal se a
+   *   dupla ainda for elegível para ranqueada;
+   * - se o anti-farm estiver ativo, o vencedor
+   *   não recebe rating nem estatísticas para
+   *   impedir farming por desistência.
+   */
+  if (forfeit) {
+    const calculation =
+      calculateDynamicRatingResult(
+        winnerBefore,
+        loserBefore,
+        {
+          ...options,
+          forfeit: true,
+          earlyForfeit
+        }
+      );
+
+
+    const winnerGain =
+      earlyForfeit ||
+      friendly
+        ? 0
+        : calculation.winnerGain;
+
+    const loserLoss =
+      calculation.loserLoss;
+
+
+    winnerPvp.rating =
+      winnerBefore +
+      winnerGain;
+
+    loserPvp.rating =
+      Math.max(
+        0,
+        loserBefore -
+        loserLoss
+      );
+
+
+    loserPvp.losses += 1;
+    loserPvp.duels += 1;
+    loserPvp.streak = 0;
+
+
+    if (earlyForfeit) {
+      winnerPvp.duels += 1;
+    }
+
+    else if (!friendly) {
+      winnerPvp.wins += 1;
+      winnerPvp.duels += 1;
+      winnerPvp.streak += 1;
+
+      winnerPvp.bestStreak =
+        Math.max(
+          winnerPvp.bestStreak,
+          winnerPvp.streak
+        );
+    }
+
+
+    winnerPvp.peakRating =
+      Math.max(
+        winnerPvp.peakRating,
+        winnerPvp.rating
+      );
+
+    loserPvp.peakRating =
+      Math.max(
+        loserPvp.peakRating,
+        loserPvp.rating
+      );
+
+
+    const winnerRank =
+      getRankFromRating(
+        winnerPvp.rating
+      );
+
+    const loserRank =
+      getRankFromRating(
+        loserPvp.rating
+      );
+
+
+    winnerPvp.rank =
+      winnerRank.label;
+
+    loserPvp.rank =
+      loserRank.label;
+
+
+    return {
+      rated: true,
+      friendly: false,
+      antiFarm:
+        friendly,
+      winnerRewardSuppressed:
+        earlyForfeit ||
+        friendly,
+      pairTracked:
+        pair.tracked,
+      previousPairMatchesInWindow:
+        pair.previousMatchesInWindow,
+      pairMatchesInWindow:
+        pair.matchesInWindow,
+      windowMs:
+        PVP_PAIR_WINDOW_MS,
+      forfeit: true,
+      earlyForfeit,
+      change:
+        winnerGain,
+
+      winner: {
+        before:
+          winnerBefore,
+        after:
+          winnerPvp.rating,
+        gain:
+          winnerGain,
+        rank:
+          winnerRank.label,
+        wins:
+          winnerPvp.wins,
+        duels:
+          winnerPvp.duels,
+        streak:
+          winnerPvp.streak,
+        difficulty:
+          calculation.winnerDifficulty
+      },
+
+      loser: {
+        before:
+          loserBefore,
+        after:
+          loserPvp.rating,
+        loss:
+          loserLoss,
+        requestedLoss:
+          calculation.requestedLoserLoss,
+        rank:
+          loserRank.label,
+        losses:
+          loserPvp.losses,
+        duels:
+          loserPvp.duels,
+        difficulty:
+          calculation.loserDifficulty
+      }
+    };
+  }
+
 
   if (friendly) {
     const winnerRank =

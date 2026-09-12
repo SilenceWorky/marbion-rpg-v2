@@ -11,6 +11,7 @@ import { slotsRoute } from "./routes/slots.js";
 import { pvpTestRoute } from "./routes/pvptest.js";
 import { pvpRoute } from "./routes/pvp.js";
 import { refuseRoute } from "./routes/refuse.js";
+import { forfeitRoute } from "./routes/forfeit.js";
 import { acceptRoute } from "./routes/accept.js";
 import { attackRoute } from "./routes/attack.js";
 import { rankRoute } from "./routes/rank.js";
@@ -114,6 +115,13 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/recusar") {
     return refuseRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/desistir") {
+    return forfeitRoute(
       request,
       env
     );

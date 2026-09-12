@@ -2985,7 +2985,8 @@ export class PvpCoordinator {
 
     async applyRankedBattleResult(
     winnerUser,
-    loserUser
+    loserUser,
+    options = {}
     ) {
     const [
         winnerProfile,
@@ -3016,15 +3017,21 @@ export class PvpCoordinator {
     }
 
 
+    const now =
+        Date.now();
+
+
     const result =
         applyRankedResult(
         winnerProfile,
-        loserProfile
+        loserProfile,
+        {
+            ...options,
+            winnerUser,
+            loserUser,
+            now
+        }
         );
-
-
-    const now =
-        Date.now();
 
 
     winnerProfile.lastCombat =
@@ -5439,6 +5446,184 @@ export class PvpCoordinator {
     };
     }
 
+  async forfeitBattle(
+    user
+  ) {
+    user =
+      normalizeUser(
+        user
+      );
+
+
+    if (!user) {
+      return {
+        ok: false,
+        error: "INVALID_USER"
+      };
+    }
+
+
+    const data =
+      await this.getData();
+
+    const battle =
+      this.findBattleByUser(
+        data,
+        user
+      );
+
+
+    if (!battle) {
+      return {
+        ok: false,
+        error: "NOT_IN_BATTLE"
+      };
+    }
+
+
+    const winner =
+      battle.player1.user === user
+        ? battle.player2.user
+        : battle.player1.user;
+
+    const loser =
+      user;
+
+    const turn =
+      Math.max(
+        1,
+        Number(
+          battle.turn
+        ) || 1
+      );
+
+    const earlyForfeit =
+      turn < 3;
+
+
+    const rankedResult =
+      await this.applyRankedBattleResult(
+        winner,
+        loser,
+        {
+          forfeit: true,
+          earlyForfeit
+        }
+      );
+
+
+    if (!rankedResult?.ok) {
+      return {
+        ok: false,
+        error:
+          rankedResult?.error ||
+          "RANKED_RESULT_FAILED"
+      };
+    }
+
+
+    const finishedAt =
+      Date.now();
+
+    const persistence =
+      await this.persistBattleMentalidade(
+        battle,
+        finishedAt
+      );
+
+
+    if (!persistence.ok) {
+      return {
+        ok: false,
+        error:
+          "MENTALIDADE_PERSIST_FAILED"
+      };
+    }
+
+
+    battle.status =
+      "FINISHED";
+
+    battle.state =
+      "FINISHED";
+
+    battle.draw =
+      false;
+
+    battle.forfeit =
+      true;
+
+    battle.forfeitedBy =
+      loser;
+
+    battle.finishReason =
+      "FORFEIT";
+
+    battle.winner =
+      winner;
+
+    battle.loser =
+      loser;
+
+    battle.rankedResult =
+      rankedResult;
+
+    battle.finishedAt =
+      finishedAt;
+
+    battle.player1.action =
+      null;
+
+    battle.player2.action =
+      null;
+
+
+    await this.saveData(
+      data
+    );
+
+
+    const queuePromotion =
+      await this.startNextQueuedBattle();
+
+    const nextQueuedBattle =
+      queuePromotion?.started
+        ? queuePromotion.battle
+        : null;
+
+
+    return {
+      ok: true,
+      forfeit: true,
+      earlyForfeit,
+      turn,
+      winner,
+      loser,
+      finishedAt,
+      rankedResult,
+      nextQueuedBattle,
+
+      player1: {
+        user:
+          battle.player1.user,
+        mentalidade:
+          persistence.player1.mentalidade,
+        maxMentalidade:
+          battle.player1.maxMentalidade
+      },
+
+      player2: {
+        user:
+          battle.player2.user,
+        mentalidade:
+          persistence.player2.mentalidade,
+        maxMentalidade:
+          battle.player2.maxMentalidade
+      }
+    };
+  }
+
+
   async adminModifyBattleResource(
     user,
     resource,
@@ -5786,6 +5971,24 @@ export class PvpCoordinator {
         result
     );
     }
+
+    if (
+      url.pathname ===
+      "/forfeit"
+    ) {
+      const result =
+        await this.forfeitBattle(
+          url.searchParams.get(
+            "user"
+          )
+        );
+
+
+      return Response.json(
+        result
+      );
+    }
+
 
     if (
       url.pathname ===
