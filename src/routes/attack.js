@@ -1542,15 +1542,38 @@ export async function attackRoute(
     if (
         ranked?.ok
     ) {
-        message +=
-        ` | XP de Combate: ` +
-        `@${result.winner} +${ranked.change} → ${ranked.winner.after} ` +
-        `[${ranked.winner.rank}] | ` +
-        `@${result.loser} -${ranked.change} → ${ranked.loser.after} ` +
-        `[${ranked.loser.rank}] | ` +
-        `Sequência: ${ranked.winner.streak}`;
+        if (
+          ranked.friendly === true
+        ) {
+          message +=
+            ` | 🤝 Partida amistosa | ` +
+            `Esta dupla já atingiu o limite de 3 partidas ranqueadas ` +
+            `nas últimas 24h. XP de Combate: ±0.`;
+        }
+
+        else {
+          const winnerGain =
+            Number(
+              ranked.winner?.gain
+            ) || 0;
+
+          const loserLoss =
+            Number(
+              ranked.loser?.loss
+            ) || 0;
+
+
+          message +=
+            ` | XP de Combate: ` +
+            `@${result.winner} +${winnerGain} → ${ranked.winner.after} ` +
+            `[${ranked.winner.rank}] | ` +
+            `@${result.loser} -${loserLoss} → ${ranked.loser.after} ` +
+            `[${ranked.loser.rank}] | ` +
+            `Sequência: ${ranked.winner.streak}`;
+        }
     }
 
+  
     else {
         message +=
         ` | ⚠️ O resultado da luta foi salvo, mas o ranking não pôde ser atualizado.`;
