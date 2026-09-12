@@ -5,7 +5,7 @@ import { profileRoute } from "./routes/profile.js";
 import { statusRoute } from "./routes/status.js";
 import { dailyRoute } from "./routes/daily.js";
 import { skillsRoute } from "./routes/skills.js";
-import { adminRoute } from "./routes/admin.js";
+import { adminDispatcherRoute } from "./routes/admin-dispatcher.js";
 import { slotRoute } from "./routes/slot.js";
 import { slotsRoute } from "./routes/slots.js";
 import { pvpTestRoute } from "./routes/pvptest.js";
@@ -77,7 +77,7 @@ export async function handleRequest(request, env, ctx) {
   }
 
   if (path === "/adm") {
-    return adminRoute(
+    return adminDispatcherRoute(
       request,
       env
     );
