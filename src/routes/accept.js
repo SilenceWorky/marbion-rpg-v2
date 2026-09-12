@@ -1,3 +1,21 @@
+function formatBlockTime(ms) {
+  const totalMinutes =
+    Math.max(
+      1,
+      Math.ceil(
+        (Number(ms) || 0) /
+        60000
+      )
+    );
+
+  if (totalMinutes < 60) {
+    return `${totalMinutes} min`;
+  }
+
+  return `${Math.ceil(totalMinutes / 60)}h`;
+}
+
+
 function getCoordinator(
   env
 ) {
@@ -79,6 +97,26 @@ export async function acceptRoute(
     ) {
       return new Response(
         `@${user}, um dos personagens do desafio não existe mais.`
+      );
+    }
+
+
+    if (
+      result.error ===
+      "TARGET_AFK_BLOCKED"
+    ) {
+      return new Response(
+        `🚫 @${user}, você está temporariamente impedido de participar de PvP por reincidência de AFK. Tempo restante: ${formatBlockTime(result.remainingMs)}.`
+      );
+    }
+
+
+    if (
+      result.error ===
+      "CHALLENGER_AFK_BLOCKED"
+    ) {
+      return new Response(
+        `🚫 @${user}, o desafiante está temporariamente impedido de participar de PvP por reincidência de AFK.`
       );
     }
 

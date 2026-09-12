@@ -535,7 +535,7 @@ export async function adminRoute(
       !scope
     ) {
       return new Response(
-        `@${actor}, uso: !adm tempo reset @usuário tudo|pvp|habilidades|habilidade 1-4|meditar|antifarm @oponente|daily|checkin|xpchest|reroll|cura`
+        `@${actor}, uso: !adm tempo reset @usuário tudo|pvp|afk|habilidades|habilidade 1-4|meditar|antifarm @oponente|daily|checkin|xpchest|reroll|cura`
       );
     }
 
@@ -605,6 +605,7 @@ export async function adminRoute(
       new Set([
         "tudo",
         "pvp",
+        "afk",
         "habilidades",
         "habilidade",
         "meditar"
@@ -675,6 +676,18 @@ export async function adminRoute(
     if (scope === "habilidade") {
       return new Response(
         `🕒 ADM | Cooldown do slot ${Number(extra)} de @${profileResult.user} resetado.`
+      );
+    }
+
+
+    if (scope === "afk") {
+      const activeText =
+        battleResult?.inBattle
+          ? " | contador AFK da batalha zerado"
+          : "";
+
+      return new Response(
+        `🕒 ADM | AFK de @${profileResult.user} resetado: bloqueio, reincidência e janela de 30 min removidos${activeText}.`
       );
     }
 

@@ -1,3 +1,6 @@
+export const TURN_WARNING_MS =
+  60 * 1000;
+
 export const TURN_TIMEOUT_MS =
   90 * 1000;
 
@@ -115,6 +118,16 @@ export function startBattleTurnClock(
   battle.turnStartedAt =
     safeNow;
 
+  battle.turnWarningAt =
+    safeNow +
+    TURN_WARNING_MS;
+
+  battle.turnWarningProcessed =
+    false;
+
+  battle.turnWarningUsers =
+    [];
+
   battle.turnDeadline =
     safeNow +
     TURN_TIMEOUT_MS;
@@ -124,6 +137,10 @@ export function startBattleTurnClock(
     turn,
     turnStartedAt:
       battle.turnStartedAt,
+    turnWarningAt:
+      battle.turnWarningAt,
+    turnWarningProcessed:
+      battle.turnWarningProcessed === true,
     turnDeadline:
       battle.turnDeadline
   };
@@ -170,17 +187,167 @@ export function ensureBattleTurnClock(
     );
   }
 
+  const startedAt =
+    Number(battle.turnStartedAt) ||
+    Math.max(
+      0,
+      deadline - TURN_TIMEOUT_MS
+    );
+
+  const rawWarningAt =
+    Number(battle.turnWarningAt);
+
+  const warningAt =
+    Number.isFinite(rawWarningAt) &&
+    rawWarningAt > 0
+      ? rawWarningAt
+      : startedAt + TURN_WARNING_MS;
+
+  battle.turnStartedAt =
+    startedAt;
+
+  battle.turnWarningAt =
+    warningAt;
+
+  if (
+    typeof battle.turnWarningProcessed !==
+    "boolean"
+  ) {
+    battle.turnWarningProcessed =
+      false;
+  }
+
+  if (!Array.isArray(battle.turnWarningUsers)) {
+    battle.turnWarningUsers = [];
+  }
+
   return {
     ok: true,
     turn,
     turnStartedAt:
-      Number(battle.turnStartedAt) ||
-      Math.max(
-        0,
-        deadline - TURN_TIMEOUT_MS
-      ),
+      startedAt,
+    turnWarningAt:
+      warningAt,
+    turnWarningProcessed:
+      battle.turnWarningProcessed === true,
     turnDeadline:
       deadline
+  };
+}
+
+
+export function getNextBattleTurnAlarmAt(
+  battle,
+  now = Date.now()
+) {
+  const clock =
+    ensureBattleTurnClock(
+      battle,
+      now
+    );
+
+  if (!clock.ok) {
+    return clock;
+  }
+
+  const safeNow =
+    Math.max(
+      0,
+      Number(now) || Date.now()
+    );
+
+  const desiredAt =
+    !clock.turnWarningProcessed
+      ? clock.turnWarningAt
+      : clock.turnDeadline;
+
+  return {
+    ok: true,
+    turn: clock.turn,
+    stage:
+      !clock.turnWarningProcessed
+        ? "WARNING"
+        : "TIMEOUT",
+    alarmAt:
+      Math.max(
+        safeNow + 1,
+        desiredAt
+      ),
+    turnWarningAt:
+      clock.turnWarningAt,
+    turnDeadline:
+      clock.turnDeadline
+  };
+}
+
+
+export function registerTurnWarning(
+  battle,
+  users,
+  now = Date.now()
+) {
+  const state =
+    ensureBattleTimeoutState(
+      battle
+    );
+
+  if (!state.ok) {
+    return state;
+  }
+
+  const uniqueUsers =
+    [
+      ...new Set(
+        (Array.isArray(users) ? users : [])
+          .filter(
+            user =>
+              user &&
+              state.users.includes(user)
+          )
+      )
+    ];
+
+  battle.turnWarningProcessed =
+    true;
+
+  battle.turnWarningUsers =
+    uniqueUsers;
+
+  if (!Array.isArray(battle.timeoutWarningEvents)) {
+    battle.timeoutWarningEvents = [];
+  }
+
+  const event = {
+    turn:
+      Math.max(
+        1,
+        Number(battle.turn) || 1
+      ),
+    at:
+      Math.max(
+        0,
+        Number(now) || Date.now()
+      ),
+    users:
+      uniqueUsers
+  };
+
+  battle.timeoutWarningEvents.push(
+    event
+  );
+
+  if (
+    battle.timeoutWarningEvents.length > 20
+  ) {
+    battle.timeoutWarningEvents =
+      battle.timeoutWarningEvents.slice(-20);
+  }
+
+  return {
+    ok: true,
+    event,
+    users:
+      uniqueUsers
   };
 }
 

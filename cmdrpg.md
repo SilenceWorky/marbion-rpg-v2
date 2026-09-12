@@ -6,7 +6,7 @@
 >
 > Legenda: **✔️ implementado e validado** | **🧪 implementado/em validação** | **⏳ pendente** | **🗃️ legado V1 ainda não migrado**
 >
-> Última atualização canônica: **11/09/2026**.
+> Última atualização canônica: **12/09/2026**.
 
 ---
 
@@ -325,16 +325,19 @@ Status V2: ✔️
 ---
 
 ## Soco
-Status V2: ✔️
+Status V2: ✔️ **validado em produção**
 
-Habilidade universal virtual:
+Ação universal virtual e fixa:
+- comando público: `!ataque soco`
+- funciona como uma 5ª ação virtual, fora dos 4 slots equipáveis
+- não pode ser trocada/removida
 - custo: 0
 - dano base: 12
 - precisão: 95
 - prioridade: 0
 - escala: Força
 - não usa o cooldown genérico
-
+- mensagem de espera identifica corretamente **Soco**, sem chamar de “habilidade 5”
 ---
 
 ## Aprendizado por nível
@@ -699,15 +702,17 @@ Status V2: ✔️
 
 ---
 
-## !ataque 1-4
+## !ataque 1-4 / !ataque soco
 Status V2: ✔️
 
 Regras:
 - uma escolha por turno
-- primeiro jogador revela somente o slot
+- slots 1-4 usam habilidades equipadas
+- `!ataque soco` usa a ação universal fixa
+- primeira escolha fica aguardando o adversário
 - habilidades só são reveladas na resolução
 - falta de Mentalidade permite escolher outra ação
-
+- ação já escolhida não pode ser substituída no mesmo turno
 ---
 
 ## Ordem das ações
@@ -759,57 +764,89 @@ Validação:
 ---
 
 ## !recusar
-Status V2: ⏳
+Status V2: ✔️ **validado em produção**
 
-Regra planejada:
+Regras:
 - somente o jogador desafiado pode recusar
-- remove o desafio pendente
+- remove imediatamente o desafio pendente
 - sem perda de Elo
-- estatística `refused` poderá ser atualizada
-
+- não interfere em PvP já ativo
+- não remove dupla que já entrou na fila global
 ---
 
 ## !desistir / forfeit
-Status V2: ⏳
+Status V2: ✔️ **validado em produção**
 
-Regra canônica planejada:
+Regra canônica:
 - encerra a luta como derrota de quem desistiu
-- desistente perde **2x** a perda de Elo calculada para aquele confronto
-- cap planejado de perda por desistência: `-300`
-- após o encerramento, a próxima dupla da fila deve ser promovida normalmente
+- desistente perde **2x** a perda normal calculada para aquele confronto
+- cap máximo da perda por desistência: `-300`
+- rating nunca fica abaixo de 0
+- vencedor NÃO recebe recompensa dobrada
+- a próxima dupla da fila é promovida normalmente
 
-Proteção anti-farm:
-- desistência antes do Turno 3: desistente recebe a penalidade 2x, mas o adversário recebe **0 Elo**
-- a partir do Turno 3, o vencedor pode receber Elo normalmente, ainda sujeito ao anti-farm por repetição da dupla
+Proteção contra desistência precoce:
+- antes do Turno 3: desistente recebe a penalidade 2x, mas o adversário recebe **0 Elo**
+- a partir do Turno 3: vencedor recebe Elo normal, sujeito ao anti-farm
 
+Validado em produção nos Turnos 1, 2, 3 e 5, incluindo penalidade dinâmica de desistência.
 ---
 
-## Timeout de turno / luta abandonada
-Status V2: ⏳
+## Timeout de turno / AFK
+Status V2: 🧪 **implementado; regra disciplinar nova em validação**
 
-Planejado:
-- timeout de turno
-- detectar abandono
-- encerrar luta travada
-- liberar/promover a fila corretamente
-- recuperação segura após restart/erro
-- duração exata do timeout ainda deve ser fechada antes da implementação
+Regra canônica:
+```txt
+T+60s sem ação
+→ aviso: restam 30 segundos
 
+T+90s sem ação
+→ jogador perde a ação
+→ recebe 1 strike AFK
+→ ação do adversário é resolvida normalmente
+
+3 strikes AFK na mesma luta
+→ derrota automática por inatividade
+```
+
+O relógio usa **Durable Object Alarm**, portanto não depende de alguém enviar outro comando para destravar a luta.
+
+Disciplina entre partidas:
+- 1º incidente AFK abre uma janela de observação de 30 minutos
+- novo AFK dentro da janela → bloqueio de PvP por 15 minutos
+- após cumprir o bloqueio, existe nova janela de 30 minutos
+- reincidência dentro dela → 1 hora
+- próximas punições seguem progressão `x4`: 4h, 16h, 64h etc.
+- partidas normais entre os incidentes NÃO limpam a janela
+- se a janela de 30 minutos expirar sem novo AFK, a reincidência volta ao estágio inicial
+- enquanto houver bloqueio, o jogador não pode desafiar nem aceitar PvP
+- AFKs adicionais da mesma luta enquanto um bloqueio já está ativo não escalam imediatamente a punição
+
+Mensagens/eventos previstos:
+```txt
+⏰ @user, você ainda não escolheu uma ação. Restam 30 segundos.
+💤 @user não executou uma ação a tempo e perdeu a vez. AFK: 1/3.
+💤 @user ficou AFK por 3 turnos e perdeu o PvP por inatividade.
+```
+
+Observação de infraestrutura:
+- o Worker já pode registrar os eventos automaticamente
+- publicação espontânea dessas mensagens no chat depende da saída Twitch/bot próprio, pois `customapi` do StreamElements só responde quando um comando é chamado
 ---
 
 # 🏆 RANKING PVP / XP DE COMBATE
 
 ## Sistema atual
-Status V2: ✔️ **legado funcional a ser substituído pelo Ranking Dinâmico V2**
+Status V2: ✔️ **Ranking Dinâmico V2 validado em produção**
 
-Atualmente:
 - XP de Combate separado do XP normal
 - rating inicial: 1000
-- motor Elo tradicional com `K = 32`
-- vencedor ganha e perdedor perde o mesmo valor calculado
-
-Este motor continua ativo somente até a migração para o Ranking Dinâmico V2.
-
+- ganho e perda são calculados separadamente
+- o sistema não é zero-sum
+- dificuldade de progressão aumenta conforme o próprio rating
+- diferença de rating entre adversários altera risco/recompensa
+- vitória normal rende pelo menos +1, salvo partida amistosa/anti-farm
+- rating nunca fica abaixo de 0
 ---
 
 ## Elos
@@ -861,7 +898,7 @@ Status V2: ✔️
 ---
 
 ## Ranking Dinâmico V2
-Status V2: ⏳ **PRÓXIMA IMPLEMENTAÇÃO**
+Status V2: ✔️ **implementado, testado e validado em produção**
 
 Objetivo:
 - quanto maior o próprio rating, mais difícil continuar subindo
@@ -942,7 +979,7 @@ Coeficientes devem ficar centralizados/configuráveis para permitir balanceament
 ---
 
 ## Anti-farm por repetição de adversário
-Status V2: ⏳ **será implementado junto do Ranking Dinâmico V2**
+Status V2: ✔️ **implementado e validado em produção**
 
 Janela canônica: **24 horas**.
 
@@ -1032,6 +1069,57 @@ Regras:
 - máximo `maxMentalidade`
 - em PvP altera o snapshot vivo
 - fora do PvP altera o perfil persistente
+
+---
+
+## Reset administrativo de tempo
+Status V2: ✔️ **implementado e validado em produção; escopo AFK em integração**
+
+Sintaxes equivalentes:
+```txt
+!adm tempo reset @usuario escopo [extra]
+!adm reset tempo @usuario escopo [extra]
+```
+
+Escopos:
+```txt
+tudo
+pvp
+afk
+habilidades
+habilidade 1-4
+meditar
+antifarm @oponente
+daily
+checkin
+xpchest
+reroll
+cura
+```
+
+Regras:
+- `antifarm` limpa o histórico da dupla dos dois lados
+- `habilidade N` limpa somente o cooldown do slot escolhido
+- `pvp` limpa tempos/restrições temporais ligados ao PvP
+- `afk` limpa bloqueio, nível de reincidência, janela de 30 minutos e strikes vivos da batalha
+- `tudo` inclui também o estado temporal/disciplinar de AFK
+- não apaga raça, elementos, Elo, vitórias/derrotas, inventário ou identidade do personagem
+
+---
+
+## Recursos máximos por ADM
+Status V2: ✔️
+
+Comandos:
+```txt
+!adm maxhp @usuario valor
+!adm maxmentalidade @usuario valor
+```
+
+Regras:
+- altera o máximo no perfil e no snapshot vivo quando aplicável
+- aumentar o máximo não cura/preenche automaticamente
+- diminuir o máximo limita o valor atual se necessário
 
 ---
 
@@ -1427,14 +1515,21 @@ Planejado:
 - Combos Elementais V1 ✔️
 - comandos ADM de HP/Mentalidade ✔️
 - Fila Global de PvP ✔️
+- Ranking Dinâmico V2 ✔️
+- Anti-farm A x B ✔️
+- `!recusar` ✔️
+- `!desistir` ✔️
+- Soco universal via `!ataque soco` ✔️
+- reset administrativo de tempos ✔️
+- timeout de 90s via Durable Object Alarm ✔️
 
 ## 🌟 PRIORIDADE ATUAL — ORDEM CANÔNICA
 
-1. **Ranking Dinâmico V2** — novo cálculo assimétrico de ganho/perda ⏳
-2. **Anti-farm A x B** — 3 partidas ranqueadas/24h; 4ª+ amistosa ⏳
-3. **`!recusar`** ⏳
-4. **`!desistir` / forfeit** — penalidade 2x e proteção contra desistência precoce ⏳
-5. **Timeout de turno + hardening de lutas abandonadas** ⏳
+1. **Ranking Dinâmico V2** — cálculo assimétrico de ganho/perda ✔️
+2. **Anti-farm A x B** — 3 partidas ranqueadas/24h; 4ª+ amistosa ✔️
+3. **`!recusar`** ✔️
+4. **`!desistir` / forfeit** — penalidade 2x e proteção precoce ✔️
+5. **Timeout/AFK + disciplina progressiva + hardening** 🧪
 6. **Reset administrativo de Elo individual/geral** ⏳
 7. **Temporadas ranqueadas + soft reset** ⏳
 8. **Passe de batalha da Temporada 1** ⏳
@@ -1443,7 +1538,7 @@ Planejado:
 11. **Combos Elementais V2 / novas reações** ⏳
 12. **Efeitos especiais de Tempo, Espaço, Gravidade e Matéria** ⏳
 13. **Individualidade básica do personagem** ⏳
-14. **Fundação Multi-Streamer / site / bot próprio** ⏳
+14. **Fundação Multi-Streamer / site / bot próprio / saída autônoma para mensagens AFK** ⏳
 
 ## 🎒 PROGRESSÃO / ITENS
 

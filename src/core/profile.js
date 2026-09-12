@@ -117,6 +117,17 @@ export function createBaseProfile(user) {
       recentOpponents: {},
 
       /*
+       * Disciplina de AFK do PvP.
+       *
+       * O primeiro incidente abre uma janela de 30 min.
+       * Reincidência dentro da janela gera bloqueio progressivo.
+       */
+      afkPenaltyLevel: 0,
+      afkBlockedUntil: 0,
+      afkProbationUntil: 0,
+      afkLastIncidentAt: 0,
+
+      /*
       * null = não é Prodígio.
       *
       * 1 até 7 representa sua

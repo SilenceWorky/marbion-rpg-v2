@@ -110,11 +110,19 @@ import {
   MAX_TURN_TIMEOUTS,
   TIMEOUT_PASS_SLOT,
   TIMEOUT_PASS_SKILL,
+  ensureBattleTimeoutState,
   ensureBattleTurnClock,
   startBattleTurnClock,
+  getNextBattleTurnAlarmAt,
+  registerTurnWarning,
   getMissingActionUsers,
   registerTurnTimeouts
 } from "../systems/pvp-timeout.js";
+
+import {
+  getPvpAfkAccess,
+  registerPvpAfkIncident
+} from "../systems/pvp-afk.js";
 
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
@@ -2108,6 +2116,75 @@ function createSleepBlockedExecution(
 }
 
 
+function formatAfkDuration(ms) {
+  const minutes =
+    Math.max(
+      1,
+      Math.round(
+        (Number(ms) || 0) /
+        60000
+      )
+    );
+
+  if (minutes < 60) {
+    return `${minutes} minutos`;
+  }
+
+  const hours =
+    Math.max(
+      1,
+      Math.round(
+        minutes / 60
+      )
+    );
+
+  return hours === 1
+    ? "1 hora"
+    : `${hours} horas`;
+}
+
+
+function appendBattleSystemMessage(
+  battle,
+  type,
+  text,
+  details = {},
+  now = Date.now()
+) {
+  if (!Array.isArray(battle.systemMessages)) {
+    battle.systemMessages = [];
+  }
+
+  const event = {
+    id: crypto.randomUUID(),
+    type,
+    text,
+    at:
+      Math.max(
+        0,
+        Number(now) || Date.now()
+      ),
+    turn:
+      Math.max(
+        1,
+        Number(battle.turn) || 1
+      ),
+    ...details
+  };
+
+  battle.systemMessages.push(
+    event
+  );
+
+  if (battle.systemMessages.length > 50) {
+    battle.systemMessages =
+      battle.systemMessages.slice(-50);
+  }
+
+  return event;
+}
+
+
 function createConfusionSelfHitExecution(
   player,
   action,
@@ -2220,13 +2297,25 @@ export class PvpCoordinator {
       return clock;
     }
 
+    const nextAlarm =
+      getNextBattleTurnAlarmAt(
+        battle
+      );
+
+    if (!nextAlarm.ok) {
+      return nextAlarm;
+    }
+
     await this.state.storage.setAlarm(
-      clock.turnDeadline
+      nextAlarm.alarmAt
     );
 
     return {
       ok: true,
       turn: clock.turn,
+      stage: nextAlarm.stage,
+      alarmAt: nextAlarm.alarmAt,
+      turnWarningAt: clock.turnWarningAt,
       turnDeadline: clock.turnDeadline
     };
   }
@@ -3205,6 +3294,58 @@ export class PvpCoordinator {
     }
 
 
+    const afkAccessNow =
+      Date.now();
+
+    const challengerAfkAccess =
+      getPvpAfkAccess(
+        challengerProfile,
+        afkAccessNow
+      );
+
+    const targetAfkAccess =
+      getPvpAfkAccess(
+        targetProfile,
+        afkAccessNow
+      );
+
+
+    if (
+      challengerAfkAccess.ok &&
+      !challengerAfkAccess.allowed
+    ) {
+      return {
+        ok: false,
+        error: "CHALLENGER_AFK_BLOCKED",
+        challenger,
+        penaltyLevel:
+          challengerAfkAccess.penaltyLevel,
+        blockedUntil:
+          challengerAfkAccess.blockedUntil,
+        remainingMs:
+          challengerAfkAccess.remainingMs
+      };
+    }
+
+
+    if (
+      targetAfkAccess.ok &&
+      !targetAfkAccess.allowed
+    ) {
+      return {
+        ok: false,
+        error: "TARGET_AFK_BLOCKED",
+        target,
+        penaltyLevel:
+          targetAfkAccess.penaltyLevel,
+        blockedUntil:
+          targetAfkAccess.blockedUntil,
+        remainingMs:
+          targetAfkAccess.remainingMs
+      };
+    }
+
+
     let data =
       await this.getData();
 
@@ -3601,6 +3742,74 @@ export class PvpCoordinator {
     }
 
 
+    const acceptAfkNow =
+      Date.now();
+
+    const challengerAfkAccess =
+      getPvpAfkAccess(
+        challengerProfile,
+        acceptAfkNow
+      );
+
+    const targetAfkAccess =
+      getPvpAfkAccess(
+        targetProfile,
+        acceptAfkNow
+      );
+
+
+    if (
+      challengerAfkAccess.ok &&
+      !challengerAfkAccess.allowed
+    ) {
+      data.challenges.splice(
+        challengeIndex,
+        1
+      );
+
+      await this.saveData(
+        data
+      );
+
+      return {
+        ok: false,
+        error: "CHALLENGER_AFK_BLOCKED",
+        challenger:
+          challenge.challenger,
+        remainingMs:
+          challengerAfkAccess.remainingMs,
+        blockedUntil:
+          challengerAfkAccess.blockedUntil
+      };
+    }
+
+
+    if (
+      targetAfkAccess.ok &&
+      !targetAfkAccess.allowed
+    ) {
+      data.challenges.splice(
+        challengeIndex,
+        1
+      );
+
+      await this.saveData(
+        data
+      );
+
+      return {
+        ok: false,
+        error: "TARGET_AFK_BLOCKED",
+        target:
+          challenge.target,
+        remainingMs:
+          targetAfkAccess.remainingMs,
+        blockedUntil:
+          targetAfkAccess.blockedUntil
+      };
+    }
+
+
     if (
       this.findBattleByUser(
         data,
@@ -3890,10 +4099,23 @@ export class PvpCoordinator {
 
       timeoutEvents: [],
 
+      timeoutWarningEvents: [],
+
+      systemMessages: [],
+
       turnClockTurn: 1,
 
       turnStartedAt:
         battleStartedAt,
+
+      turnWarningAt:
+        battleStartedAt +
+        60 * 1000,
+
+      turnWarningProcessed:
+        false,
+
+      turnWarningUsers: [],
 
       turnDeadline:
         battleStartedAt +
@@ -5854,6 +6076,7 @@ export class PvpCoordinator {
       new Set([
         "tudo",
         "pvp",
+        "afk",
         "habilidades",
         "habilidade",
         "meditar"
@@ -5901,6 +6124,7 @@ export class PvpCoordinator {
 
     let cooldownsCleared = 0;
     let meditationCleared = false;
+    let afkStrikesCleared = 0;
     let slot = null;
     let skillId = null;
 
@@ -5969,6 +6193,30 @@ export class PvpCoordinator {
     }
 
 
+    if (
+      scope === "afk" ||
+      scope === "pvp" ||
+      scope === "tudo"
+    ) {
+      const timeoutState =
+        ensureBattleTimeoutState(
+          battle
+        );
+
+      if (timeoutState.ok) {
+        afkStrikesCleared =
+          Math.max(
+            0,
+            Number(
+              battle.timeoutCounts[user]
+            ) || 0
+          );
+
+        battle.timeoutCounts[user] = 0;
+      }
+    }
+
+
     await this.saveData(
       data
     );
@@ -5983,6 +6231,7 @@ export class PvpCoordinator {
       skillId,
       cooldownsCleared,
       meditationCleared,
+      afkStrikesCleared,
       turn:
         battle.turn
     };
@@ -6188,6 +6437,58 @@ export class PvpCoordinator {
       return clock;
     }
 
+    /*
+     * 60 segundos: aviso de que restam 30 segundos.
+     * O aviso é registrado no estado da batalha para
+     * o bot próprio/saída Twitch publicar quando ligada.
+     */
+    if (
+      !clock.turnWarningProcessed &&
+      now >= clock.turnWarningAt &&
+      now < clock.turnDeadline
+    ) {
+      const warningUsers =
+        getMissingActionUsers(
+          battle
+        );
+
+      const warningResult =
+        registerTurnWarning(
+          battle,
+          warningUsers,
+          now
+        );
+
+      for (const warnedUser of warningUsers) {
+        appendBattleSystemMessage(
+          battle,
+          "AFK_WARNING_30S",
+          `⏰ @${warnedUser}, você ainda não escolheu uma ação. Restam 30 segundos.`,
+          {
+            user: warnedUser,
+            remainingSeconds: 30
+          },
+          now
+        );
+      }
+
+      await this.saveData(
+        data
+      );
+
+      await this.state.storage.setAlarm(
+        clock.turnDeadline
+      );
+
+      return {
+        ok: true,
+        warning: true,
+        warningResult,
+        turn: battle.turn,
+        turnDeadline: clock.turnDeadline
+      };
+    }
+
     if (
       now < clock.turnDeadline
     ) {
@@ -6199,6 +6500,7 @@ export class PvpCoordinator {
         ok: true,
         earlyAlarm: true,
         turn: battle.turn,
+        turnWarningAt: clock.turnWarningAt,
         turnDeadline: clock.turnDeadline
       };
     }
@@ -6243,16 +6545,106 @@ export class PvpCoordinator {
         now
       );
 
+    const discipline = {};
+
+    for (const timedOutUser of missingUsers) {
+      const count =
+        Number(
+          timeoutResult.counts?.[
+            timedOutUser
+          ]
+        ) || 0;
+
+      appendBattleSystemMessage(
+        battle,
+        "AFK_TURN_LOST",
+        `💤 @${timedOutUser} não executou uma ação a tempo e perdeu a vez. AFK: ${count}/${MAX_TURN_TIMEOUTS}.`,
+        {
+          user: timedOutUser,
+          count,
+          max: MAX_TURN_TIMEOUTS
+        },
+        now
+      );
+
+      const profile =
+        await getProfile(
+          this.env,
+          timedOutUser
+        );
+
+      if (profile) {
+        const disciplineResult =
+          registerPvpAfkIncident(
+            profile,
+            now
+          );
+
+        discipline[timedOutUser] =
+          disciplineResult;
+
+        if (disciplineResult.ok) {
+          await saveProfile(
+            this.env,
+            timedOutUser,
+            profile
+          );
+        }
+
+        if (
+          disciplineResult.action ===
+          "WARNING"
+        ) {
+          appendBattleSystemMessage(
+            battle,
+            "AFK_DISCIPLINE_WARNING",
+            `⚠️ @${timedOutUser}, se você ficar AFK novamente nos próximos 30 minutos, ficará 15 minutos sem poder participar de PvP.`,
+            {
+              user: timedOutUser,
+              probationUntil:
+                disciplineResult.probationUntil
+            },
+            now
+          );
+        }
+
+        else if (
+          disciplineResult.action ===
+          "BLOCKED"
+        ) {
+          appendBattleSystemMessage(
+            battle,
+            "AFK_PVP_BLOCK",
+            `🚫 @${timedOutUser} recebeu bloqueio de PvP por ${formatAfkDuration(disciplineResult.durationMs)} por reincidência de AFK. Após o bloqueio, haverá 30 minutos de observação.`,
+            {
+              user: timedOutUser,
+              penaltyLevel:
+                disciplineResult.penaltyLevel,
+              blockedUntil:
+                disciplineResult.blockedUntil,
+              probationUntil:
+                disciplineResult.probationUntil
+            },
+            now
+          );
+        }
+      }
+    }
+
     const reachedLimit =
       timeoutResult.reachedLimit || [];
 
-    /*
-     * Os dois atingiram o terceiro timeout
-     * no mesmo turno: empate por abandono mútuo.
-     */
     if (
       reachedLimit.length === 2
     ) {
+      appendBattleSystemMessage(
+        battle,
+        "AFK_DOUBLE_DEFEAT",
+        "💤 Os dois jogadores atingiram 3/3 AFKs no mesmo turno. O PvP foi encerrado em empate por inatividade.",
+        {},
+        now
+      );
+
       const finishedAt =
         Date.now();
 
@@ -6300,6 +6692,7 @@ export class PvpCoordinator {
         draw: true,
         finishReason: "DOUBLE_TIMEOUT",
         timeoutResult,
+        discipline,
         nextQueuedBattle:
           promotion?.started
             ? promotion.battle
@@ -6307,35 +6700,43 @@ export class PvpCoordinator {
       };
     }
 
-    /*
-     * Terceiro timeout de apenas um jogador:
-     * derrota automática tratada como forfeit normal,
-     * sem a proteção de early forfeit.
-     */
     if (
       reachedLimit.length === 1
     ) {
+      const defeatedUser =
+        reachedLimit[0];
+
+      appendBattleSystemMessage(
+        battle,
+        "AFK_DEFEAT",
+        `💤 @${defeatedUser} ficou AFK por 3 turnos e perdeu o PvP por inatividade.`,
+        {
+          user: defeatedUser
+        },
+        now
+      );
+
       await this.saveData(
         data
       );
 
-      return this.forfeitBattle(
-        reachedLimit[0],
-        {
-          forceLateForfeit: true,
-          timeoutForfeit: true,
-          finishReason: "TIMEOUT_FORFEIT"
-        }
-      );
+      const result =
+        await this.forfeitBattle(
+          defeatedUser,
+          {
+            forceLateForfeit: true,
+            timeoutForfeit: true,
+            finishReason: "TIMEOUT_FORFEIT"
+          }
+        );
+
+      return {
+        ...result,
+        timeoutResult,
+        discipline
+      };
     }
 
-    /*
-     * Primeiro/segundo timeout: quem não escolheu
-     * recebe uma ação interna de PASS e perde a ação.
-     * O motor normal resolve o turno, portanto DoTs,
-     * efeitos, KO e abertura do próximo turno continuam
-     * passando pelo fluxo já existente.
-     */
     await this.saveData(
       data
     );
@@ -6361,6 +6762,7 @@ export class PvpCoordinator {
       ok: true,
       timeout: true,
       timeoutResult,
+      discipline,
       resolution
     };
   }

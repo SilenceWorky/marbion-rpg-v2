@@ -3,6 +3,10 @@ import {
   saveProfile
 } from "../core/database.js";
 
+import {
+  resetPvpAfkDiscipline
+} from "./pvp-afk.js";
+
 
 function normalizeUser(value) {
   return String(value ?? "")
@@ -35,6 +39,10 @@ export function normalizeAdminTimeScope(value) {
     meditation: "meditar",
     antifarm: "antifarm",
     anti_farm: "antifarm",
+    afk: "afk",
+    fk: "afk",
+    timeout: "afk",
+    inatividade: "afk",
     daily: "daily",
     checkin: "checkin",
     xpchest: "xpchest",
@@ -190,10 +198,38 @@ export function applyProfileTimeReset(
      */
   }
 
+  else if (normalizedScope === "afk") {
+    const afkReset =
+      resetPvpAfkDiscipline(
+        profile
+      );
+
+    if (!afkReset.ok) {
+      return afkReset;
+    }
+
+    resetFields.push(
+      ...afkReset.resetFields
+    );
+  }
+
   else if (normalizedScope === "pvp") {
     zeroField("lastCombat");
     profile.skillCooldowns = {};
     resetFields.push("skillCooldowns");
+
+    const afkReset =
+      resetPvpAfkDiscipline(
+        profile
+      );
+
+    if (!afkReset.ok) {
+      return afkReset;
+    }
+
+    resetFields.push(
+      ...afkReset.resetFields
+    );
   }
 
   else if (normalizedScope === "tudo") {
@@ -212,6 +248,19 @@ export function applyProfileTimeReset(
 
     profile.skillCooldowns = {};
     resetFields.push("skillCooldowns");
+
+    const afkReset =
+      resetPvpAfkDiscipline(
+        profile
+      );
+
+    if (!afkReset.ok) {
+      return afkReset;
+    }
+
+    resetFields.push(
+      ...afkReset.resetFields
+    );
   }
 
 
