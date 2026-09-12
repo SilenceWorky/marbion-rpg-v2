@@ -133,7 +133,7 @@ test(
     assert.equal(second.action, "BLOCKED");
     assert.equal(second.penaltyLevel, 1);
     assert.equal(second.durationMs, 15 * 60_000);
-    assert.equal(AF K_BASE_BLOCK_MS, 15 * 60_000);
+    assert.equal(AFK_BASE_BLOCK_MS, 15 * 60_000);
   }
 );
 
