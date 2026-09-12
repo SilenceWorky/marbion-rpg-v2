@@ -159,8 +159,13 @@ export async function attackRoute(
       result.error ===
       "ACTION_ALREADY_SELECTED"
     ) {
+      const selectedAction =
+        Number(result.slot) === 5
+          ? "Soco"
+          : `a habilidade ${result.slot}`;
+
       return new Response(
-        `@${user}, você já escolheu a habilidade ${result.slot} neste turno. Aguarde seu adversário.`
+        `@${user}, você já escolheu ${selectedAction} neste turno. Aguarde seu adversário.`
       );
     }
 
@@ -208,6 +213,14 @@ export async function attackRoute(
           `Aguardando @${result.opponent}.`
         );
       }
+
+    if (
+      Number(result.slot) === 5
+    ) {
+      return new Response(
+        `👊 @${result.user} escolheu Soco. Aguardando @${result.opponent}.`
+      );
+    }
 
     return new Response(
       `⚔️ @${result.user} escolheu a habilidade ${result.slot}. Aguardando @${result.opponent}.`
