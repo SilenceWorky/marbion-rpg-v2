@@ -3346,6 +3346,93 @@ export class PvpCoordinator {
   }
 
 
+  async refuseChallenge(
+    user
+  ) {
+    user =
+      normalizeUser(
+        user
+      );
+
+
+    if (!user) {
+      return {
+        ok: false,
+        error: "INVALID_USER"
+      };
+    }
+
+
+    let data =
+      await this.getData();
+
+
+    data =
+      this.cleanExpiredChallenges(
+        data
+      );
+
+
+    /*
+     * Apenas o alvo do desafio pendente
+     * pode recusá-lo. O desafiante não
+     * encontra uma entrada com target=user.
+     */
+    const challengeIndex =
+      data.challenges.findIndex(
+        challenge =>
+          challenge?.target === user
+      );
+
+
+    if (
+      challengeIndex === -1
+    ) {
+      /*
+       * cleanExpiredChallenges pode ter
+       * removido entradas vencidas; salva
+       * o estado normalizado mesmo no erro.
+       */
+      await this.saveData(
+        data
+      );
+
+      return {
+        ok: false,
+        error: "NO_CHALLENGE"
+      };
+    }
+
+
+    const challenge =
+      data.challenges[
+        challengeIndex
+      ];
+
+
+    data.challenges.splice(
+      challengeIndex,
+      1
+    );
+
+
+    await this.saveData(
+      data
+    );
+
+
+    return {
+      ok: true,
+
+      challenger:
+        challenge.challenger,
+
+      target:
+        challenge.target
+    };
+  }
+
+
   async acceptChallenge(
     user
   ) {
@@ -5633,6 +5720,32 @@ export class PvpCoordinator {
 
       return Response.json(
         result
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/refuse"
+    ) {
+      const result =
+        await this.refuseChallenge(
+          url.searchParams.get(
+            "user"
+          )
+        );
+
+
+      return new Response(
+        JSON.stringify(
+          result
+        ),
+        {
+          headers: {
+            "Content-Type":
+              "application/json"
+          }
+        }
       );
     }
 
