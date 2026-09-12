@@ -157,6 +157,29 @@ function resolveSkillFromSlot(
     };
   }
 
+  /*
+   * Slot 5 é virtual e exclusivo do Soco.
+   *
+   * Ele NÃO pertence ao loadout 1-4,
+   * não pode ser trocado e fica sempre
+   * disponível como ação universal.
+   */
+  if (
+    slot === 5
+  ) {
+    return {
+      skillId: null,
+
+      skill:
+        BASIC_PUNCH_SKILL,
+
+      fallback: true,
+
+      punch: true
+    };
+  }
+
+
   const index =
     slot - 1;
 
@@ -3740,10 +3763,16 @@ export class PvpCoordinator {
       rawSlot === "meditação";
 
 
+    const isPunch =
+      rawSlot === "soco";
+
+
     const normalizedSlot =
       isMeditation
         ? 0
-        : Number(slot);
+        : isPunch
+          ? 5
+          : Number(slot);
 
 
     if (!user) {
@@ -3756,6 +3785,7 @@ export class PvpCoordinator {
 
     if (
       !isMeditation &&
+      !isPunch &&
       (
         !Number.isInteger(
           normalizedSlot

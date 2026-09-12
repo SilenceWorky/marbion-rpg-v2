@@ -40,7 +40,7 @@ export async function attackRoute(
 
   if (!slot) {
     return new Response(
-      `@${user}, uso: !ataque 1-4`
+      `@${user}, uso: !ataque 1-4 | !ataque soco`
     );
   }
 
@@ -140,7 +140,7 @@ export async function attackRoute(
       "INVALID_SLOT"
     ) {
       return new Response(
-        `@${user}, escolha uma habilidade de 1 a 4.`
+        `@${user}, escolha uma habilidade de 1 a 4 ou use !ataque soco.`
       );
     }
 
