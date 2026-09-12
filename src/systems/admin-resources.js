@@ -17,6 +17,24 @@ const RESOURCE_CONFIG = Object.freeze({
     maxField: "maxMentalidade",
     label: "Mentalidade",
     icon: "🧠"
+  }),
+
+  maxhp: Object.freeze({
+    field: "maxHp",
+    currentField: "hp",
+    label: "HP Máximo",
+    currentLabel: "HP atual",
+    icon: "❤️",
+    maximum: true
+  }),
+
+  maxmentalidade: Object.freeze({
+    field: "maxMentalidade",
+    currentField: "mentalidade",
+    label: "Mentalidade Máxima",
+    currentLabel: "Mentalidade atual",
+    icon: "🧠",
+    maximum: true
   })
 });
 
@@ -53,6 +71,26 @@ export function normalizeAdminResource(
     normalized === "mental"
   ) {
     return "mentalidade";
+  }
+
+
+  if (
+    normalized === "maxhp" ||
+    normalized === "hpmax" ||
+    normalized === "maxvida" ||
+    normalized === "vidamax"
+  ) {
+    return "maxhp";
+  }
+
+
+  if (
+    normalized === "maxmentalidade" ||
+    normalized === "mentalidademax" ||
+    normalized === "maxmental" ||
+    normalized === "mentalmax"
+  ) {
+    return "maxmentalidade";
   }
 
 
@@ -332,6 +370,117 @@ export function applyAdminResourceChange(
       normalizedResource
     ];
 
+
+  /*
+   * ==========================
+   * RECURSO MÁXIMO
+   * ==========================
+   *
+   * Aumentar o máximo não cura/enche
+   * automaticamente o recurso atual.
+   *
+   * Diminuir o máximo abaixo do valor
+   * atual reduz o valor atual até o novo
+   * limite para manter o estado válido.
+   */
+  if (
+    config.maximum === true
+  ) {
+    const before =
+      Math.max(
+        1,
+        Math.floor(
+          Number(
+            holder[
+              config.field
+            ]
+          ) || 1
+        )
+      );
+
+    const currentBefore =
+      Math.min(
+        before,
+        Math.max(
+          0,
+          Math.floor(
+            Number(
+              holder[
+                config.currentField
+              ]
+            ) || 0
+          )
+        )
+      );
+
+
+    const requested =
+      change.mode === "set"
+        ? Number(change.amount)
+        : before +
+          Number(change.amount);
+
+
+    const after =
+      Math.max(
+        1,
+        Math.floor(
+          requested
+        )
+      );
+
+
+    const currentAfter =
+      Math.min(
+        after,
+        currentBefore
+      );
+
+
+    holder[
+      config.field
+    ] =
+      after;
+
+    holder[
+      config.currentField
+    ] =
+      currentAfter;
+
+
+    return {
+      ok: true,
+      resource:
+        normalizedResource,
+      label:
+        config.label,
+      currentLabel:
+        config.currentLabel,
+      icon:
+        config.icon,
+      field:
+        config.field,
+      currentField:
+        config.currentField,
+      maximum: true,
+      mode:
+        change.mode,
+      requestedAmount:
+        Number(change.amount),
+      before,
+      after,
+      max:
+        after,
+      currentBefore,
+      currentAfter,
+      deltaApplied:
+        after - before,
+      clamped:
+        after !== requested
+    };
+  }
+
+
   const max =
     Math.max(
       0,
@@ -469,7 +618,9 @@ export async function adminModifyProfileResource(
 
   if (
     result.resource ===
-    "mentalidade"
+      "mentalidade" ||
+    result.resource ===
+      "maxmentalidade"
   ) {
     profile.lastMentalidadeRegenAt =
       Date.now();
