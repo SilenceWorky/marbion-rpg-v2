@@ -16,6 +16,11 @@ import {
   parseAdminResourceChange
 } from "../systems/admin-resources.js";
 
+import {
+  adminResetProfileTime,
+  normalizeAdminTimeScope
+} from "../systems/admin-time-reset.js";
+
 
 function normalizeUser(value) {
   return String(value ?? "")
@@ -112,7 +117,7 @@ export async function adminRoute(
 
   if (!rawArgs) {
     return new Response(
-      `@${actor}, uso: !adm level/raça/elemento/status/pontos/skill/pvp/hp/mentalidade ...`
+      `@${actor}, uso: !adm level/raça/elemento/status/pontos/skill/pvp/hp/mentalidade/tempo ...`
     );
   }
 
@@ -484,6 +489,204 @@ export async function adminRoute(
 
     return new Response(
       `🛠️ ADM | @${result.user} | ${result.icon} ${result.label}: ${result.before} → ${result.after}/${result.max} | ${operationText} | ${scopeText}${clampText}.`
+    );
+  }
+
+
+  /*
+   * ==========================
+   * RESET ADMINISTRATIVO DE TEMPO
+   * ==========================
+   *
+   * Sintaxes equivalentes:
+   * !adm tempo reset @user escopo [extra]
+   * !adm reset tempo @user escopo [extra]
+   */
+  const isTempoReset =
+    command === "tempo" &&
+    normalizeCommand(args[1]) === "reset";
+
+  const isResetTempo =
+    command === "reset" &&
+    normalizeCommand(args[1]) === "tempo";
+
+
+  if (
+    isTempoReset ||
+    isResetTempo
+  ) {
+    const target =
+      args[2];
+
+    const rawScope =
+      args[3];
+
+    const scope =
+      normalizeAdminTimeScope(
+        rawScope
+      );
+
+    const extra =
+      args[4] ?? null;
+
+
+    if (
+      !target ||
+      !scope
+    ) {
+      return new Response(
+        `@${actor}, uso: !adm tempo reset @usuário tudo|pvp|habilidades|habilidade 1-4|meditar|antifarm @oponente|daily|checkin|xpchest|reroll|cura`
+      );
+    }
+
+
+    if (
+      scope === "habilidade" &&
+      (
+        !extra ||
+        !Number.isInteger(Number(extra)) ||
+        Number(extra) < 1 ||
+        Number(extra) > 4
+      )
+    ) {
+      return new Response(
+        `@${actor}, uso: !adm tempo reset @usuário habilidade 1-4`
+      );
+    }
+
+
+    if (
+      scope === "antifarm" &&
+      !extra
+    ) {
+      return new Response(
+        `@${actor}, uso: !adm tempo reset @usuário antifarm @oponente`
+      );
+    }
+
+
+    const profileResult =
+      await adminResetProfileTime(
+        env,
+        target,
+        scope,
+        extra
+      );
+
+
+    if (!profileResult.ok) {
+      if (
+        profileResult.error ===
+        "CHARACTER_NOT_FOUND"
+      ) {
+        return new Response(
+          `@${actor}, @${normalizeUser(target)} ainda não possui personagem.`
+        );
+      }
+
+
+      if (
+        profileResult.error ===
+        "OPPONENT_NOT_FOUND"
+      ) {
+        return new Response(
+          `@${actor}, o oponente @${normalizeUser(extra)} não possui perfil.`
+        );
+      }
+
+
+      return new Response(
+        `@${actor}, não foi possível resetar esse tempo de @${normalizeUser(target)}.`
+      );
+    }
+
+
+    const battleScopes =
+      new Set([
+        "tudo",
+        "pvp",
+        "habilidades",
+        "habilidade",
+        "meditar"
+      ]);
+
+    let battleResult =
+      null;
+
+
+    if (
+      battleScopes.has(scope)
+    ) {
+      const coordinator =
+        getCoordinator(
+          env
+        );
+
+      const internalUrl =
+        new URL(
+          "https://pvp.internal/admin-reset-time"
+        );
+
+      internalUrl.searchParams.set(
+        "user",
+        normalizeUser(target)
+      );
+
+      internalUrl.searchParams.set(
+        "scope",
+        scope
+      );
+
+
+      if (extra) {
+        internalUrl.searchParams.set(
+          "extra",
+          String(extra)
+        );
+      }
+
+
+      const response =
+        await coordinator.fetch(
+          new Request(
+            internalUrl.toString()
+          )
+        );
+
+      battleResult =
+        await response.json();
+
+
+      if (!battleResult.ok) {
+        return new Response(
+          `@${actor}, o perfil foi resetado, mas não foi possível resetar o temporizador vivo do PvP.`
+        );
+      }
+    }
+
+
+    if (scope === "antifarm") {
+      return new Response(
+        `🕒 ADM | Anti-farm entre @${profileResult.user} e @${profileResult.opponent} resetado.`
+      );
+    }
+
+
+    if (scope === "habilidade") {
+      return new Response(
+        `🕒 ADM | Cooldown do slot ${Number(extra)} de @${profileResult.user} resetado.`
+      );
+    }
+
+
+    const activeBattleText =
+      battleResult?.inBattle
+        ? " | PvP ativo atualizado"
+        : "";
+
+
+    return new Response(
+      `🕒 ADM | Tempo de @${profileResult.user} resetado: ${scope.toUpperCase()}${activeBattleText}.`
     );
   }
 

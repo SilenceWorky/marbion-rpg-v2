@@ -216,7 +216,7 @@ export function applyProfileTimeReset(
       delete cooldowns[skillId];
     }
 
-    resetFields.push(`skillCooldowns.slot${slot}`);
+    resetFields.push("skillCooldowns.slot" + slot);
   }
 
   else if (normalizedScope === "meditar") {

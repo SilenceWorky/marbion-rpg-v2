@@ -5624,6 +5624,169 @@ export class PvpCoordinator {
   }
 
 
+  async adminResetBattleTime(
+    user,
+    scope,
+    extra = null
+  ) {
+    user =
+      normalizeUser(
+        user
+      );
+
+    scope =
+      String(scope ?? "")
+        .trim()
+        .toLowerCase();
+
+
+    if (!user) {
+      return {
+        ok: false,
+        error: "INVALID_USER"
+      };
+    }
+
+
+    const validScopes =
+      new Set([
+        "tudo",
+        "pvp",
+        "habilidades",
+        "habilidade",
+        "meditar"
+      ]);
+
+
+    if (!validScopes.has(scope)) {
+      return {
+        ok: false,
+        error: "INVALID_SCOPE"
+      };
+    }
+
+
+    const data =
+      await this.getData();
+
+    const battle =
+      this.findBattleByUser(
+        data,
+        user
+      );
+
+
+    if (!battle) {
+      return {
+        ok: true,
+        inBattle: false,
+        user,
+        scope
+      };
+    }
+
+
+    const player =
+      battle.player1.user === user
+        ? battle.player1
+        : battle.player2;
+
+
+    const cooldowns =
+      ensurePlayerSkillCooldowns(
+        player
+      );
+
+    let cooldownsCleared = 0;
+    let meditationCleared = false;
+    let slot = null;
+    let skillId = null;
+
+
+    if (scope === "habilidade") {
+      slot =
+        Number(extra);
+
+
+      if (
+        !Number.isInteger(slot) ||
+        slot < 1 ||
+        slot > 4
+      ) {
+        return {
+          ok: false,
+          error: "INVALID_SLOT"
+        };
+      }
+
+
+      skillId =
+        Array.isArray(player.loadout)
+          ? player.loadout[slot - 1] || null
+          : null;
+
+
+      if (
+        skillId &&
+        Object.prototype.hasOwnProperty.call(
+          cooldowns,
+          skillId
+        )
+      ) {
+        delete cooldowns[skillId];
+        cooldownsCleared = 1;
+      }
+    }
+
+
+    if (
+      scope === "habilidades" ||
+      scope === "pvp" ||
+      scope === "tudo"
+    ) {
+      cooldownsCleared =
+        Object.keys(cooldowns).length;
+
+      player.skillCooldowns = {};
+    }
+
+
+    if (
+      scope === "meditar" ||
+      scope === "pvp" ||
+      scope === "tudo"
+    ) {
+      meditationCleared =
+        Number.isFinite(
+          Number(
+            player.meditationAvailableAtTurn
+          )
+        );
+
+      delete player.meditationAvailableAtTurn;
+    }
+
+
+    await this.saveData(
+      data
+    );
+
+
+    return {
+      ok: true,
+      inBattle: true,
+      user,
+      scope,
+      slot,
+      skillId,
+      cooldownsCleared,
+      meditationCleared,
+      turn:
+        battle.turn
+    };
+  }
+
+
   async adminModifyBattleResource(
     user,
     resource,
@@ -5980,6 +6143,30 @@ export class PvpCoordinator {
         await this.forfeitBattle(
           url.searchParams.get(
             "user"
+          )
+        );
+
+
+      return Response.json(
+        result
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/admin-reset-time"
+    ) {
+      const result =
+        await this.adminResetBattleTime(
+          url.searchParams.get(
+            "user"
+          ),
+          url.searchParams.get(
+            "scope"
+          ),
+          url.searchParams.get(
+            "extra"
           )
         );
 
