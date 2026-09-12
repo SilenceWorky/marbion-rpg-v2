@@ -124,6 +124,15 @@ import {
   registerPvpAfkIncident
 } from "../systems/pvp-afk.js";
 
+import {
+  sendTwitchChatMessage
+} from "../integrations/twitch-chat.js";
+
+import {
+  formatAutomaticPvpResolution,
+  formatAutomaticForfeitResult
+} from "../systems/pvp-auto-message.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -2182,6 +2191,46 @@ function appendBattleSystemMessage(
   }
 
   return event;
+}
+
+
+async function appendAndSendBattleSystemMessage(
+  env,
+  battle,
+  type,
+  text,
+  details = {},
+  now = Date.now()
+) {
+  const event =
+    appendBattleSystemMessage(
+      battle,
+      type,
+      text,
+      details,
+      now
+    );
+
+  const delivery =
+    await sendTwitchChatMessage(
+      env,
+      text
+    );
+
+  event.delivery = {
+    provider: "twitch",
+    attemptedAt: Date.now(),
+    ok: delivery.ok === true,
+    skipped: delivery.skipped === true,
+    error: delivery.ok ? null : delivery.error || null,
+    status: delivery.status || null,
+    messageId: delivery.messageId || null
+  };
+
+  return {
+    event,
+    delivery
+  };
 }
 
 
@@ -6460,7 +6509,8 @@ export class PvpCoordinator {
         );
 
       for (const warnedUser of warningUsers) {
-        appendBattleSystemMessage(
+        await appendAndSendBattleSystemMessage(
+          this.env,
           battle,
           "AFK_WARNING_30S",
           `⏰ @${warnedUser}, você ainda não escolheu uma ação. Restam 30 segundos.`,
@@ -6555,7 +6605,8 @@ export class PvpCoordinator {
           ]
         ) || 0;
 
-      appendBattleSystemMessage(
+      await appendAndSendBattleSystemMessage(
+          this.env,
         battle,
         "AFK_TURN_LOST",
         `💤 @${timedOutUser} não executou uma ação a tempo e perdeu a vez. AFK: ${count}/${MAX_TURN_TIMEOUTS}.`,
@@ -6595,7 +6646,8 @@ export class PvpCoordinator {
           disciplineResult.action ===
           "WARNING"
         ) {
-          appendBattleSystemMessage(
+          await appendAndSendBattleSystemMessage(
+          this.env,
             battle,
             "AFK_DISCIPLINE_WARNING",
             `⚠️ @${timedOutUser}, se você ficar AFK novamente nos próximos 30 minutos, ficará 15 minutos sem poder participar de PvP.`,
@@ -6612,7 +6664,8 @@ export class PvpCoordinator {
           disciplineResult.action ===
           "BLOCKED"
         ) {
-          appendBattleSystemMessage(
+          await appendAndSendBattleSystemMessage(
+          this.env,
             battle,
             "AFK_PVP_BLOCK",
             `🚫 @${timedOutUser} recebeu bloqueio de PvP por ${formatAfkDuration(disciplineResult.durationMs)} por reincidência de AFK. Após o bloqueio, haverá 30 minutos de observação.`,
@@ -6637,7 +6690,8 @@ export class PvpCoordinator {
     if (
       reachedLimit.length === 2
     ) {
-      appendBattleSystemMessage(
+      await appendAndSendBattleSystemMessage(
+          this.env,
         battle,
         "AFK_DOUBLE_DEFEAT",
         "💤 Os dois jogadores atingiram 3/3 AFKs no mesmo turno. O PvP foi encerrado em empate por inatividade.",
@@ -6706,7 +6760,8 @@ export class PvpCoordinator {
       const defeatedUser =
         reachedLimit[0];
 
-      appendBattleSystemMessage(
+      await appendAndSendBattleSystemMessage(
+          this.env,
         battle,
         "AFK_DEFEAT",
         `💤 @${defeatedUser} ficou AFK por 3 turnos e perdeu o PvP por inatividade.`,
@@ -6729,6 +6784,18 @@ export class PvpCoordinator {
             finishReason: "TIMEOUT_FORFEIT"
           }
         );
+
+      const victoryMessage =
+        formatAutomaticForfeitResult(
+          result
+        );
+
+      if (victoryMessage) {
+        await sendTwitchChatMessage(
+          this.env,
+          victoryMessage
+        );
+      }
 
       return {
         ...result,
@@ -6756,6 +6823,18 @@ export class PvpCoordinator {
             internalTimeout: true
           }
         );
+    }
+
+    const resolutionMessage =
+      formatAutomaticPvpResolution(
+        resolution
+      );
+
+    if (resolutionMessage) {
+      await sendTwitchChatMessage(
+        this.env,
+        resolutionMessage
+      );
     }
 
     return {

@@ -21,6 +21,10 @@ import {
   normalizeAdminTimeScope
 } from "../systems/admin-time-reset.js";
 
+import {
+  sendTwitchChatMessage
+} from "../integrations/twitch-chat.js";
+
 
 function normalizeUser(value) {
   return String(value ?? "")
@@ -132,6 +136,64 @@ export async function adminRoute(
     normalizeCommand(
       args[0]
     );
+
+
+  /*
+   * ==========================
+   * TWITCH CHAT / BOT OUTPUT
+   * ==========================
+   *
+   * !adm twitch teste
+   *
+   * A mensagem de teste é enviada diretamente
+   * pela API oficial da Twitch. Tokens/IDs ficam
+   * somente nos Secrets do Cloudflare.
+   */
+  if (
+    command === "twitch" ||
+    command === "chatbot"
+  ) {
+    const operation =
+      normalizeCommand(
+        args[1]
+      );
+
+    if (
+      operation !== "teste" &&
+      operation !== "test"
+    ) {
+      return new Response(
+        `@${actor}, uso: !adm twitch teste`
+      );
+    }
+
+    const result =
+      await sendTwitchChatMessage(
+        env,
+        "🤖 Marbion RPG: saída automática da Twitch conectada."
+      );
+
+    if (!result.ok) {
+      const statusText =
+        result.status
+          ? ` | HTTP ${result.status}`
+          : "";
+
+      const missingText =
+        Array.isArray(result.missing) &&
+        result.missing.length > 0
+          ? ` | faltando: ${result.missing.join(", ")}`
+          : "";
+
+      return new Response(
+        `❌ ADM | Falha na saída Twitch: ${result.error || "ERRO_DESCONHECIDO"}${statusText}${missingText}.`
+      );
+    }
+
+    return new Response(
+      `✅ ADM | Mensagem autônoma de teste enviada para a Twitch.`
+    );
+  }
 
 
   /*
