@@ -147,6 +147,16 @@ export async function attackRoute(
 
     if (
       result.error ===
+      "TURN_EXPIRED"
+    ) {
+      return new Response(
+        `⏱️ @${user}, o tempo do Turno ${result.turn} terminou. O timeout está sendo processado.`
+      );
+    }
+
+
+    if (
+      result.error ===
       "NOT_IN_BATTLE"
     ) {
       return new Response(

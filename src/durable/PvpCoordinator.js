@@ -105,6 +105,17 @@ import {
   dequeueNextPvp
 } from "../systems/pvp-queue.js";
 
+import {
+  TURN_TIMEOUT_MS,
+  MAX_TURN_TIMEOUTS,
+  TIMEOUT_PASS_SLOT,
+  TIMEOUT_PASS_SKILL,
+  ensureBattleTurnClock,
+  startBattleTurnClock,
+  getMissingActionUsers,
+  registerTurnTimeouts
+} from "../systems/pvp-timeout.js";
+
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
@@ -135,6 +146,21 @@ function resolveSkillFromSlot(
   skillsData
 ) {
 
+
+  /*
+   * Slot interno usado somente pelo Alarm
+   * quando o jogador perde a ação por timeout.
+   */
+  if (
+    slot === TIMEOUT_PASS_SLOT
+  ) {
+    return {
+      skillId: null,
+      skill: TIMEOUT_PASS_SKILL,
+      fallback: false,
+      timeoutPass: true
+    };
+  }
 
   /*
   * Slot 0 não existe para o jogador.
@@ -2120,6 +2146,19 @@ function createConfusionSelfHitExecution(
   };
 }
 
+function createTimeoutSkipExecution(
+  player
+) {
+  return {
+    kind: "timeout_skip",
+    attacker: player.user,
+    skill: TIMEOUT_PASS_SKILL.nome,
+    timedOut: true,
+    damage: 0
+  };
+}
+
+
 export class PvpCoordinator {
   constructor(
     state,
@@ -2166,6 +2205,39 @@ export class PvpCoordinator {
       "pvp",
       data
     );
+  }
+
+
+  async scheduleBattleTurnAlarm(
+    battle
+  ) {
+    const clock =
+      ensureBattleTurnClock(
+        battle
+      );
+
+    if (!clock.ok) {
+      return clock;
+    }
+
+    await this.state.storage.setAlarm(
+      clock.turnDeadline
+    );
+
+    return {
+      ok: true,
+      turn: clock.turn,
+      turnDeadline: clock.turnDeadline
+    };
+  }
+
+
+  async clearBattleTurnAlarm() {
+    await this.state.storage.deleteAlarm();
+
+    return {
+      ok: true
+    };
   }
 
 
@@ -2709,6 +2781,8 @@ export class PvpCoordinator {
     await this.saveData(
       data
     );
+
+    await this.clearBattleTurnAlarm();
 
 
     const adminQueuePromotion =
@@ -3807,7 +3881,23 @@ export class PvpCoordinator {
     },
 
       createdAt:
-        Date.now()
+        battleStartedAt,
+
+      timeoutCounts: {
+        [challenge.challenger]: 0,
+        [challenge.target]: 0
+      },
+
+      timeoutEvents: [],
+
+      turnClockTurn: 1,
+
+      turnStartedAt:
+        battleStartedAt,
+
+      turnDeadline:
+        battleStartedAt +
+        TURN_TIMEOUT_MS
     };
 
 
@@ -3826,6 +3916,10 @@ export class PvpCoordinator {
       data
     );
 
+    await this.scheduleBattleTurnAlarm(
+      battle
+    );
+
 
     return {
       ok: true,
@@ -3835,7 +3929,8 @@ export class PvpCoordinator {
 
     async chooseAction(
     user,
-    slot
+    slot,
+    options = {}
     ) {
     user =
         normalizeUser(
@@ -3861,12 +3956,19 @@ export class PvpCoordinator {
       rawSlot === "soco";
 
 
+    const isInternalTimeout =
+      options?.internalTimeout === true &&
+      rawSlot === "__timeout__";
+
+
     const normalizedSlot =
-      isMeditation
-        ? 0
-        : isPunch
-          ? 5
-          : Number(slot);
+      isInternalTimeout
+        ? TIMEOUT_PASS_SLOT
+        : isMeditation
+          ? 0
+          : isPunch
+            ? 5
+            : Number(slot);
 
 
     if (!user) {
@@ -3880,6 +3982,7 @@ export class PvpCoordinator {
     if (
       !isMeditation &&
       !isPunch &&
+      !isInternalTimeout &&
       (
         !Number.isInteger(
           normalizedSlot
@@ -3918,6 +4021,34 @@ export class PvpCoordinator {
         ok: false,
         error: "NOT_IN_BATTLE"
         };
+    }
+
+
+    const turnClock =
+      ensureBattleTurnClock(
+        battle
+      );
+
+
+    if (
+      !isInternalTimeout &&
+      turnClock.ok &&
+      Date.now() >= turnClock.turnDeadline
+    ) {
+      await this.saveData(
+        data
+      );
+
+      await this.scheduleBattleTurnAlarm(
+        battle
+      );
+
+      return {
+        ok: false,
+        error: "TURN_EXPIRED",
+        turn: battle.turn,
+        turnDeadline: turnClock.turnDeadline
+      };
     }
 
 
@@ -4172,7 +4303,10 @@ export class PvpCoordinator {
         normalizedSlot,
 
         selectedAt:
-        Date.now()
+        Date.now(),
+
+        timeoutPass:
+          isInternalTimeout
     };
 
 
@@ -4435,30 +4569,50 @@ export class PvpCoordinator {
      * ou executar a habilidade,
      * verificamos se existe Controle.
      */
+    const firstIsTimeoutPass =
+      first.action.timeoutPass === true;
+
+
     const firstControl =
-      consumeControlBlock(
-        first.player
-      );
+      firstIsTimeoutPass
+        ? { blocked: false }
+        : consumeControlBlock(
+            first.player
+          );
 
 
     const firstSleep =
-      consumeSleepBlock(
-        first.player
-      );
+      firstIsTimeoutPass
+        ? { blocked: false }
+        : consumeSleepBlock(
+            first.player
+          );
 
 
     const firstSilence =
-      checkSilenceRestriction(
-        first.player,
-        first.action.skill,
-        battle.turn
-      );
+      firstIsTimeoutPass
+        ? { blocked: false }
+        : checkSilenceRestriction(
+            first.player,
+            first.action.skill,
+            battle.turn
+          );
 
 
     let firstExecution;
 
 
     if (
+      firstIsTimeoutPass
+    ) {
+      firstExecution =
+        createTimeoutSkipExecution(
+          first.player
+        );
+    }
+
+
+    else if (
       firstControl.blocked
     ) {
       /*
@@ -4642,27 +4796,38 @@ export class PvpCoordinator {
      * jogador aplique Controle
      * durante o mesmo turno.
      */
+    const secondIsTimeoutPass =
+      second.action.timeoutPass === true;
+
+
     const secondControl =
-      consumeControlBlock(
-        second.player
-      );
+      secondIsTimeoutPass
+        ? { blocked: false }
+        : consumeControlBlock(
+            second.player
+          );
 
 
     const secondSleep =
-      consumeSleepBlock(
-        second.player
-      );
+      secondIsTimeoutPass
+        ? { blocked: false }
+        : consumeSleepBlock(
+            second.player
+          );
 
 
     const secondSilence =
-      checkSilenceRestriction(
-        second.player,
-        second.action.skill,
-        battle.turn
-      );
+      secondIsTimeoutPass
+        ? { blocked: false }
+        : checkSilenceRestriction(
+            second.player,
+            second.action.skill,
+            battle.turn
+          );
 
 
     const reactionMatch =
+      !secondIsTimeoutPass &&
       firstExecution?.kind ===
         "reaction_stance"
         ? matchReaction(
@@ -4707,6 +4872,16 @@ export class PvpCoordinator {
 
 
     if (
+      secondIsTimeoutPass
+    ) {
+      secondExecution =
+        createTimeoutSkipExecution(
+          second.player
+        );
+    }
+
+
+    else if (
       secondControl.blocked
     ) {
       secondExecution =
@@ -5295,12 +5470,27 @@ export class PvpCoordinator {
       else {
         battle.state =
           "WAITING_ACTIONS";
+
+        startBattleTurnClock(
+          battle
+        );
       }
     }
 
     await this.saveData(
     data
     );
+
+    if (
+      battleOver
+    ) {
+      await this.clearBattleTurnAlarm();
+    }
+    else {
+      await this.scheduleBattleTurnAlarm(
+        battle
+      );
+    }
 
     /*
      * ==============================
@@ -5447,7 +5637,8 @@ export class PvpCoordinator {
     }
 
   async forfeitBattle(
-    user
+    user,
+    options = {}
   ) {
     user =
       normalizeUser(
@@ -5497,8 +5688,13 @@ export class PvpCoordinator {
         ) || 1
       );
 
+    const forceLateForfeit =
+      options?.forceLateForfeit === true;
+
     const earlyForfeit =
-      turn < 3;
+      forceLateForfeit
+        ? false
+        : turn < 3;
 
 
     const rankedResult =
@@ -5553,10 +5749,14 @@ export class PvpCoordinator {
     battle.forfeit =
       true;
 
+    battle.timeoutForfeit =
+      options?.timeoutForfeit === true;
+
     battle.forfeitedBy =
       loser;
 
     battle.finishReason =
+      options?.finishReason ||
       "FORFEIT";
 
     battle.winner =
@@ -5581,6 +5781,8 @@ export class PvpCoordinator {
     await this.saveData(
       data
     );
+
+    await this.clearBattleTurnAlarm();
 
 
     const queuePromotion =
@@ -5953,6 +6155,216 @@ export class PvpCoordinator {
           : []
     };
   }
+
+  async alarm() {
+    const data =
+      await this.getData();
+
+    const battle =
+      getGlobalActivePvpBattle(
+        data
+      );
+
+    if (!battle) {
+      await this.clearBattleTurnAlarm();
+
+      return {
+        ok: true,
+        activeBattle: false
+      };
+    }
+
+    const now =
+      Date.now();
+
+    const clock =
+      ensureBattleTurnClock(
+        battle,
+        now
+      );
+
+    if (!clock.ok) {
+      await this.clearBattleTurnAlarm();
+      return clock;
+    }
+
+    if (
+      now < clock.turnDeadline
+    ) {
+      await this.scheduleBattleTurnAlarm(
+        battle
+      );
+
+      return {
+        ok: true,
+        earlyAlarm: true,
+        turn: battle.turn,
+        turnDeadline: clock.turnDeadline
+      };
+    }
+
+    if (
+      battle.state !== "WAITING_ACTIONS"
+    ) {
+      await this.state.storage.setAlarm(
+        now + 1000
+      );
+
+      return {
+        ok: true,
+        deferred: true,
+        state: battle.state
+      };
+    }
+
+    const missingUsers =
+      getMissingActionUsers(
+        battle
+      );
+
+    if (
+      missingUsers.length === 0
+    ) {
+      await this.state.storage.setAlarm(
+        now + 1000
+      );
+
+      return {
+        ok: true,
+        deferred: true,
+        reason: "NO_MISSING_ACTION"
+      };
+    }
+
+    const timeoutResult =
+      registerTurnTimeouts(
+        battle,
+        missingUsers,
+        now
+      );
+
+    const reachedLimit =
+      timeoutResult.reachedLimit || [];
+
+    /*
+     * Os dois atingiram o terceiro timeout
+     * no mesmo turno: empate por abandono mútuo.
+     */
+    if (
+      reachedLimit.length === 2
+    ) {
+      const finishedAt =
+        Date.now();
+
+      const persistence =
+        await this.persistBattleMentalidade(
+          battle,
+          finishedAt
+        );
+
+      if (!persistence.ok) {
+        await this.state.storage.setAlarm(
+          Date.now() + 5000
+        );
+
+        return {
+          ok: false,
+          error: "MENTALIDADE_PERSIST_FAILED"
+        };
+      }
+
+      battle.status = "FINISHED";
+      battle.state = "FINISHED";
+      battle.draw = true;
+      battle.timeoutDraw = true;
+      battle.finishReason = "DOUBLE_TIMEOUT";
+      battle.winner = null;
+      battle.loser = null;
+      battle.rankedResult = null;
+      battle.finishedAt = finishedAt;
+      battle.player1.action = null;
+      battle.player2.action = null;
+
+      await this.saveData(
+        data
+      );
+
+      await this.clearBattleTurnAlarm();
+
+      const promotion =
+        await this.startNextQueuedBattle();
+
+      return {
+        ok: true,
+        battleOver: true,
+        draw: true,
+        finishReason: "DOUBLE_TIMEOUT",
+        timeoutResult,
+        nextQueuedBattle:
+          promotion?.started
+            ? promotion.battle
+            : null
+      };
+    }
+
+    /*
+     * Terceiro timeout de apenas um jogador:
+     * derrota automática tratada como forfeit normal,
+     * sem a proteção de early forfeit.
+     */
+    if (
+      reachedLimit.length === 1
+    ) {
+      await this.saveData(
+        data
+      );
+
+      return this.forfeitBattle(
+        reachedLimit[0],
+        {
+          forceLateForfeit: true,
+          timeoutForfeit: true,
+          finishReason: "TIMEOUT_FORFEIT"
+        }
+      );
+    }
+
+    /*
+     * Primeiro/segundo timeout: quem não escolheu
+     * recebe uma ação interna de PASS e perde a ação.
+     * O motor normal resolve o turno, portanto DoTs,
+     * efeitos, KO e abertura do próximo turno continuam
+     * passando pelo fluxo já existente.
+     */
+    await this.saveData(
+      data
+    );
+
+    let resolution =
+      null;
+
+    for (
+      const timedOutUser
+      of missingUsers
+    ) {
+      resolution =
+        await this.chooseAction(
+          timedOutUser,
+          "__timeout__",
+          {
+            internalTimeout: true
+          }
+        );
+    }
+
+    return {
+      ok: true,
+      timeout: true,
+      timeoutResult,
+      resolution
+    };
+  }
+
 
   async fetch(
     request
