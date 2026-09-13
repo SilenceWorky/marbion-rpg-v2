@@ -18,6 +18,30 @@ function normalizeUser(value) {
 }
 
 
+function normalizeStoredRating(
+  value,
+  fallback = PVP_STARTING_RATING
+) {
+  const rating =
+    Number(value);
+
+  if (
+    !Number.isFinite(
+      rating
+    )
+  ) {
+    return fallback;
+  }
+
+  return Math.max(
+    0,
+    Math.round(
+      rating
+    )
+  );
+}
+
+
 export function resetProfileEloState(profile) {
   if (
     !profile ||
@@ -42,15 +66,17 @@ export function resetProfileEloState(profile) {
 
   const before = {
     rating:
-      Number(profile.pvp.rating) ||
-      PVP_STARTING_RATING,
+      normalizeStoredRating(
+        profile.pvp.rating
+      ),
     displayRank:
       getDisplayRank(profile),
     prodigyPosition:
       profile.pvp.prodigyPosition ?? null,
     peakRating:
-      Number(profile.pvp.peakRating) ||
-      PVP_STARTING_RATING
+      normalizeStoredRating(
+        profile.pvp.peakRating
+      )
   };
 
 
@@ -81,8 +107,9 @@ export function resetProfileEloState(profile) {
       prodigyPosition:
         null,
       peakRating:
-        Number(profile.pvp.peakRating) ||
-        PVP_STARTING_RATING
+        normalizeStoredRating(
+          profile.pvp.peakRating
+        )
     }
   };
 }
