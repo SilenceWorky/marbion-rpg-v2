@@ -73,18 +73,6 @@ function makeStorage(initial = {}) {
         return name;
       },
       get(id) {
-        if (id === "marbion-elo-generation") {
-          return {
-            async fetch() {
-              return Response.json({
-                eloGenerationStore: true,
-                ok: true,
-                generation: 1
-              });
-            }
-          };
-        }
-
         if (id === "marbion-profile:alice") {
           return {
             async fetch(request) {
@@ -119,7 +107,11 @@ function makeStorage(initial = {}) {
     },
 
     MARBION_USERS_V2: {
-      async get() {
+      async get(key) {
+        if (key === "__pvp_elo_generation__") {
+          return "1";
+        }
+
         return null;
       },
       async put() {}
@@ -155,11 +147,8 @@ function makeStorage(initial = {}) {
 
 
 {
-  const generationStorage = makeStorage({
-    elo_generation: 7
-  });
-
   const coordinatorStorage = makeStorage({
+    elo_generation: 7,
     pvp: {
       challenges: [],
       battles: [],
@@ -167,34 +156,27 @@ function makeStorage(initial = {}) {
     }
   });
 
-  const generationState = {
-    storage: generationStorage
-  };
-
-  const generationCoordinator =
-    new PvpCoordinator(
-      generationState,
-      {
-        MARBION_USERS_V2: {}
-      }
-    );
+  let kvGeneration = "7";
+  let kvWrites = 0;
 
   const env = {
-    PVP_COORDINATOR: {
-      idFromName(name) {
-        return name;
-      },
-      get(id) {
+    MARBION_USERS_V2: {
+      async get(key) {
         assert.equal(
-          id,
-          "marbion-elo-generation"
+          key,
+          "__pvp_elo_generation__"
         );
 
-        return {
-          fetch(request) {
-            return generationCoordinator.fetch(request);
-          }
-        };
+        return kvGeneration;
+      },
+      async put(key, value) {
+        assert.equal(
+          key,
+          "__pvp_elo_generation__"
+        );
+
+        kvWrites += 1;
+        kvGeneration = value;
       }
     }
   };
@@ -214,20 +196,22 @@ function makeStorage(initial = {}) {
   assert.equal(result.before, 7);
   assert.equal(result.after, 8);
   assert.equal(
-    generationStorage._data.get("elo_generation"),
+    coordinatorStorage._data.get("elo_generation"),
     8
   );
+  assert.equal(kvGeneration, "8");
+  assert.equal(kvWrites, 1);
   assert.equal(
     coordinatorStorage._data.has("elo_reset_in_progress"),
     false
   );
 
-  console.log("✅ reset geral avança a geração global e libera a trava ao terminar");
+  console.log("✅ reset geral avança a geração no coordenador e espelha no KV");
 }
 
 
 {
-  let generationCalls = 0;
+  let kvWrites = 0;
 
   const coordinator =
     new PvpCoordinator(
@@ -249,13 +233,9 @@ function makeStorage(initial = {}) {
         })
       },
       {
-        PVP_COORDINATOR: {
-          idFromName(name) {
-            return name;
-          },
-          get() {
-            generationCalls += 1;
-            throw new Error("should not reach generation store");
+        MARBION_USERS_V2: {
+          async put() {
+            kvWrites += 1;
           }
         }
       }
@@ -266,7 +246,7 @@ function makeStorage(initial = {}) {
 
   assert.equal(result.ok, false);
   assert.equal(result.error, "ACTIVE_BATTLE");
-  assert.equal(generationCalls, 0);
+  assert.equal(kvWrites, 0);
 
   console.log("✅ reset geral é recusado enquanto existe batalha PvP ativa");
 }

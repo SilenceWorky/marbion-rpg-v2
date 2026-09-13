@@ -155,6 +155,9 @@ import {
 const CHALLENGE_TIMEOUT =
   2 * 60 * 1000;
 
+const PVP_ELO_GENERATION_KV_KEY =
+  "__pvp_elo_generation__";
+
 
 function normalizeUser(value) {
   return String(value ?? "")
@@ -2323,9 +2326,38 @@ export class PvpCoordinator {
         "elo_generation"
       );
 
-    return normalizeEloGeneration(
-      stored
+    if (
+      stored !== undefined &&
+      stored !== null
+    ) {
+      return normalizeEloGeneration(
+        stored
+      );
+    }
+
+    let mirrored = null;
+
+    try {
+      mirrored =
+        await this.env?.MARBION_USERS_V2?.get?.(
+          PVP_ELO_GENERATION_KV_KEY
+        );
+    }
+    catch {
+      mirrored = null;
+    }
+
+    const generation =
+      normalizeEloGeneration(
+        mirrored
+      );
+
+    await this.state.storage.put(
+      "elo_generation",
+      generation
     );
+
+    return generation;
   }
 
 
@@ -2340,10 +2372,43 @@ export class PvpCoordinator {
       return next;
     }
 
+    const kv =
+      this.env?.MARBION_USERS_V2;
+
+    if (
+      !kv ||
+      typeof kv.put !== "function"
+    ) {
+      return {
+        ok: false,
+        error:
+          "ELO_GENERATION_KV_UNAVAILABLE"
+      };
+    }
+
     await this.state.storage.put(
       "elo_generation",
       next.after
     );
+
+    try {
+      await kv.put(
+        PVP_ELO_GENERATION_KV_KEY,
+        String(next.after)
+      );
+    }
+    catch {
+      await this.state.storage.put(
+        "elo_generation",
+        before
+      );
+
+      return {
+        ok: false,
+        error:
+          "ELO_GENERATION_KV_WRITE_FAILED"
+      };
+    }
 
     return {
       ok: true,
@@ -2421,43 +2486,8 @@ export class PvpCoordinator {
     );
 
     try {
-      const namespace =
-        this.env?.PVP_COORDINATOR;
-
-      if (
-        !namespace ||
-        typeof namespace.idFromName !== "function" ||
-        typeof namespace.get !== "function"
-      ) {
-        return {
-          ok: false,
-          error:
-            "ELO_GENERATION_STORE_UNAVAILABLE"
-        };
-      }
-
-      const generationId =
-        namespace.idFromName(
-          "marbion-elo-generation"
-        );
-
-      const generationStub =
-        namespace.get(
-          generationId
-        );
-
-      const response =
-        await generationStub.fetch(
-          new Request(
-            "https://pvp.internal/elo-generation/advance",
-            {
-              method: "POST"
-            }
-          )
-        );
-
       const result =
-        await response.json();
+        await this.advanceStoredEloGeneration();
 
       if (!result?.ok) {
         return {
@@ -2468,13 +2498,7 @@ export class PvpCoordinator {
         };
       }
 
-      return {
-        ok: true,
-        before:
-          result.before,
-        after:
-          result.after
-      };
+      return result;
     }
     finally {
       await this.state.storage.delete(
@@ -3824,16 +3848,21 @@ export class PvpCoordinator {
     }
 
 
+    const eloGeneration =
+      await this.getStoredEloGeneration();
+
     const challengerProfile =
       await getProfile(
         this.env,
-        challenger
+        challenger,
+        { eloGeneration }
       );
 
     const targetProfile =
       await getProfile(
         this.env,
-        target
+        target,
+        { eloGeneration }
       );
 
 
@@ -4286,16 +4315,21 @@ export class PvpCoordinator {
       ];
 
 
+    const eloGeneration =
+      await this.getStoredEloGeneration();
+
     const challengerProfile =
       await getProfile(
         this.env,
-        challenge.challenger
+        challenge.challenger,
+        { eloGeneration }
       );
 
     const targetProfile =
       await getProfile(
         this.env,
-        challenge.target
+        challenge.target,
+        { eloGeneration }
       );
 
 
@@ -7408,40 +7442,6 @@ export class PvpCoordinator {
       new URL(
         request.url
       );
-
-
-    if (
-      url.pathname ===
-      "/elo-generation/get"
-    ) {
-      const generation =
-        await this.getStoredEloGeneration();
-
-      return Response.json({
-        eloGenerationStore: true,
-        ok: true,
-        generation
-      });
-    }
-
-
-    if (
-      url.pathname ===
-      "/elo-generation/advance"
-    ) {
-      const result =
-        await this.advanceStoredEloGeneration();
-
-      return Response.json({
-        eloGenerationStore: true,
-        ...result
-      }, {
-        status:
-          result.ok
-            ? 200
-            : 400
-      });
-    }
 
 
     if (

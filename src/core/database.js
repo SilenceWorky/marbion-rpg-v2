@@ -20,75 +20,35 @@ function normalizeUser(
 }
 
 
-function getEloGenerationStub(
-  env
-) {
-  const namespace =
-    env?.PVP_COORDINATOR;
-
-  if (
-    !namespace ||
-    typeof namespace.idFromName !== "function" ||
-    typeof namespace.get !== "function"
-  ) {
-    return null;
-  }
-
-  const id =
-    namespace.idFromName(
-      "marbion-elo-generation"
-    );
-
-  return namespace.get(id);
-}
+const PVP_ELO_GENERATION_KV_KEY =
+  "__pvp_elo_generation__";
 
 
 async function readCurrentEloGeneration(
   env
 ) {
-  const stub =
-    getEloGenerationStub(env);
+  const kv =
+    env?.MARBION_USERS_V2;
 
-  if (!stub) {
+  if (
+    !kv ||
+    typeof kv.get !== "function"
+  ) {
     return {
       supported: false,
       generation: null
     };
   }
 
-  let response;
+  let stored = null;
 
   try {
-    response =
-      await stub.fetch(
-        new Request(
-          "https://pvp.internal/elo-generation/get"
-        )
+    stored =
+      await kv.get(
+        PVP_ELO_GENERATION_KV_KEY
       );
   }
   catch {
-    return {
-      supported: false,
-      generation: null
-    };
-  }
-
-  let result = null;
-
-  try {
-    result = await response.json();
-  }
-  catch {
-    return {
-      supported: false,
-      generation: null
-    };
-  }
-
-  if (
-    result?.eloGenerationStore !== true ||
-    result?.ok !== true
-  ) {
     return {
       supported: false,
       generation: null
@@ -99,7 +59,7 @@ async function readCurrentEloGeneration(
     supported: true,
     generation:
       normalizeEloGeneration(
-        result.generation
+        stored
       )
   };
 }
@@ -108,10 +68,20 @@ async function readCurrentEloGeneration(
 async function syncLoadedProfileEloGeneration(
   env,
   user,
-  profile
+  profile,
+  forcedGeneration = null
 ) {
   const generation =
-    await readCurrentEloGeneration(env);
+    forcedGeneration === null ||
+    forcedGeneration === undefined
+      ? await readCurrentEloGeneration(env)
+      : {
+          supported: true,
+          generation:
+            normalizeEloGeneration(
+              forcedGeneration
+            )
+        };
 
   if (!generation.supported) {
     return profile;
@@ -425,7 +395,8 @@ async function deleteFromProfileStore(
 
 export async function getProfile(
   env,
-  user
+  user,
+  options = {}
 ) {
   const normalizedUser =
     normalizeUser(
@@ -462,7 +433,8 @@ export async function getProfile(
     return syncLoadedProfileEloGeneration(
       env,
       normalizedUser,
-      profile
+      profile,
+      options?.eloGeneration
     );
   }
 
@@ -496,7 +468,8 @@ export async function getProfile(
   return syncLoadedProfileEloGeneration(
     env,
     normalizedUser,
-    normalizedProfile
+    normalizedProfile,
+    options?.eloGeneration
   );
 }
 
