@@ -119,10 +119,15 @@ console.log("=== RESET ADMINISTRATIVO DE ELO ===");
 
   assert.match(
     route,
+    /resetGeneralElo/
+  );
+
+  assert.doesNotMatch(
+    route,
     /reset geral de Elo ainda não está disponível com segurança/
   );
 
-  console.log("✅ !adm elo reset está roteado e reset geral segue bloqueado");
+  console.log("✅ !adm elo reset está roteado para reset individual e geral");
 }
 
 console.log("\n🏆 TODOS OS TESTES DO RESET INDIVIDUAL DE ELO PASSARAM.");

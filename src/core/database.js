@@ -2,6 +2,11 @@ import {
   ensureProfileDefaults
 } from "./profile.js";
 
+import {
+  normalizeEloGeneration,
+  syncProfileEloGeneration
+} from "../systems/pvp-elo-generation.js";
+
 
 function normalizeUser(
   user
@@ -12,6 +17,127 @@ function normalizeUser(
     .trim()
     .replace(/^@/, "")
     .toLowerCase();
+}
+
+
+function getEloGenerationStub(
+  env
+) {
+  const namespace =
+    env?.PVP_COORDINATOR;
+
+  if (
+    !namespace ||
+    typeof namespace.idFromName !== "function" ||
+    typeof namespace.get !== "function"
+  ) {
+    return null;
+  }
+
+  const id =
+    namespace.idFromName(
+      "marbion-elo-generation"
+    );
+
+  return namespace.get(id);
+}
+
+
+async function readCurrentEloGeneration(
+  env
+) {
+  const stub =
+    getEloGenerationStub(env);
+
+  if (!stub) {
+    return {
+      supported: false,
+      generation: null
+    };
+  }
+
+  let response;
+
+  try {
+    response =
+      await stub.fetch(
+        new Request(
+          "https://pvp.internal/elo-generation/get"
+        )
+      );
+  }
+  catch {
+    return {
+      supported: false,
+      generation: null
+    };
+  }
+
+  let result = null;
+
+  try {
+    result = await response.json();
+  }
+  catch {
+    return {
+      supported: false,
+      generation: null
+    };
+  }
+
+  if (
+    result?.eloGenerationStore !== true ||
+    result?.ok !== true
+  ) {
+    return {
+      supported: false,
+      generation: null
+    };
+  }
+
+  return {
+    supported: true,
+    generation:
+      normalizeEloGeneration(
+        result.generation
+      )
+  };
+}
+
+
+async function syncLoadedProfileEloGeneration(
+  env,
+  user,
+  profile
+) {
+  const generation =
+    await readCurrentEloGeneration(env);
+
+  if (!generation.supported) {
+    return profile;
+  }
+
+  const sync =
+    syncProfileEloGeneration(
+      profile,
+      generation.generation
+    );
+
+  if (!sync.ok) {
+    throw new Error(
+      `PROFILE_ELO_GENERATION_SYNC_FAILED:${sync.error || "UNKNOWN"}`
+    );
+  }
+
+  if (sync.changed) {
+    await saveProfile(
+      env,
+      user,
+      profile
+    );
+  }
+
+  return profile;
 }
 
 
@@ -327,9 +453,16 @@ export async function getProfile(
     }
 
 
-    return ensureProfileDefaults(
-      strongResult.profile,
-      normalizedUser
+    const profile =
+      ensureProfileDefaults(
+        strongResult.profile,
+        normalizedUser
+      );
+
+    return syncLoadedProfileEloGeneration(
+      env,
+      normalizedUser,
+      profile
     );
   }
 
@@ -354,9 +487,16 @@ export async function getProfile(
     JSON.parse(raw);
 
 
-  return ensureProfileDefaults(
-    profile,
-    normalizedUser
+  const normalizedProfile =
+    ensureProfileDefaults(
+      profile,
+      normalizedUser
+    );
+
+  return syncLoadedProfileEloGeneration(
+    env,
+    normalizedUser,
+    normalizedProfile
   );
 }
 

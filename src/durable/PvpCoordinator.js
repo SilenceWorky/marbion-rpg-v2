@@ -133,6 +133,11 @@ import {
 } from "../systems/pvp-result-idempotency.js";
 
 import {
+  normalizeEloGeneration,
+  nextEloGeneration
+} from "../systems/pvp-elo-generation.js";
+
+import {
   partitionExpiredChallenges,
   getNextChallengeExpiry,
   formatChallengeTimeoutMessage
@@ -2312,6 +2317,173 @@ export class PvpCoordinator {
   }
 
 
+  async getStoredEloGeneration() {
+    const stored =
+      await this.state.storage.get(
+        "elo_generation"
+      );
+
+    return normalizeEloGeneration(
+      stored
+    );
+  }
+
+
+  async advanceStoredEloGeneration() {
+    const before =
+      await this.getStoredEloGeneration();
+
+    const next =
+      nextEloGeneration(before);
+
+    if (!next.ok) {
+      return next;
+    }
+
+    await this.state.storage.put(
+      "elo_generation",
+      next.after
+    );
+
+    return {
+      ok: true,
+      before:
+        next.before,
+      after:
+        next.after
+    };
+  }
+
+
+  async isEloResetInProgress() {
+    return (
+      await this.state.storage.get(
+        "elo_reset_in_progress"
+      )
+    ) === true;
+  }
+
+
+  async adminResetGeneralElo() {
+    if (
+      await this.isEloResetInProgress()
+    ) {
+      return {
+        ok: false,
+        error:
+          "ELO_RESET_IN_PROGRESS"
+      };
+    }
+
+    const data =
+      await this.getData();
+
+    const activeBattle =
+      getGlobalActivePvpBattle(
+        data
+      );
+
+    if (activeBattle) {
+      return {
+        ok: false,
+        error:
+          "ACTIVE_BATTLE",
+        battleId:
+          activeBattle.id || null
+      };
+    }
+
+    if (
+      Array.isArray(data.challenges) &&
+      data.challenges.length > 0
+    ) {
+      return {
+        ok: false,
+        error:
+          "PENDING_CHALLENGE"
+      };
+    }
+
+    if (
+      Array.isArray(data.queue) &&
+      data.queue.length > 0
+    ) {
+      return {
+        ok: false,
+        error:
+          "PVP_QUEUE_NOT_EMPTY"
+      };
+    }
+
+    await this.state.storage.put(
+      "elo_reset_in_progress",
+      true
+    );
+
+    try {
+      const namespace =
+        this.env?.PVP_COORDINATOR;
+
+      if (
+        !namespace ||
+        typeof namespace.idFromName !== "function" ||
+        typeof namespace.get !== "function"
+      ) {
+        return {
+          ok: false,
+          error:
+            "ELO_GENERATION_STORE_UNAVAILABLE"
+        };
+      }
+
+      const generationId =
+        namespace.idFromName(
+          "marbion-elo-generation"
+        );
+
+      const generationStub =
+        namespace.get(
+          generationId
+        );
+
+      const response =
+        await generationStub.fetch(
+          new Request(
+            "https://pvp.internal/elo-generation/advance",
+            {
+              method: "POST"
+            }
+          )
+        );
+
+      const result =
+        await response.json();
+
+      if (!result?.ok) {
+        return {
+          ok: false,
+          error:
+            result?.error ||
+            "ELO_GENERATION_ADVANCE_FAILED"
+        };
+      }
+
+      return {
+        ok: true,
+        before:
+          result.before,
+        after:
+          result.after
+      };
+    }
+    finally {
+      await this.state.storage.delete(
+        "elo_reset_in_progress"
+      );
+    }
+  }
+
+
   async getData() {
     const data =
       await this.state.storage.get(
@@ -3610,6 +3782,16 @@ export class PvpCoordinator {
     challenger,
     target
   ) {
+    if (
+      await this.isEloResetInProgress()
+    ) {
+      return {
+        ok: false,
+        error:
+          "ELO_RESET_IN_PROGRESS"
+      };
+    }
+
     challenger =
       normalizeUser(
         challenger
@@ -4043,6 +4225,16 @@ export class PvpCoordinator {
   async acceptChallenge(
     user
   ) {
+    if (
+      await this.isEloResetInProgress()
+    ) {
+      return {
+        ok: false,
+        error:
+          "ELO_RESET_IN_PROGRESS"
+      };
+    }
+
     user =
       normalizeUser(
         user
@@ -7216,6 +7408,59 @@ export class PvpCoordinator {
       new URL(
         request.url
       );
+
+
+    if (
+      url.pathname ===
+      "/elo-generation/get"
+    ) {
+      const generation =
+        await this.getStoredEloGeneration();
+
+      return Response.json({
+        eloGenerationStore: true,
+        ok: true,
+        generation
+      });
+    }
+
+
+    if (
+      url.pathname ===
+      "/elo-generation/advance"
+    ) {
+      const result =
+        await this.advanceStoredEloGeneration();
+
+      return Response.json({
+        eloGenerationStore: true,
+        ...result
+      }, {
+        status:
+          result.ok
+            ? 200
+            : 400
+      });
+    }
+
+
+    if (
+      url.pathname ===
+      "/admin-elo-reset-general"
+    ) {
+      const result =
+        await this.adminResetGeneralElo();
+
+      return Response.json(
+        result,
+        {
+          status:
+            result.ok
+              ? 200
+              : 409
+        }
+      );
+    }
 
 
     if (

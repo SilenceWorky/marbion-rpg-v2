@@ -105,6 +105,12 @@ export function createBaseProfile(user) {
       rating: 1000,
       peakRating: 1000,
 
+      /*
+       * Geração global do Elo.
+       * Perfis antigos sem o campo equivalem à geração 0.
+       */
+      eloGeneration: 0,
+
       rank: "Prata III",
 
       /*

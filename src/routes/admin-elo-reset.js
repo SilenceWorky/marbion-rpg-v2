@@ -24,6 +24,77 @@ function normalizeCommand(value) {
 }
 
 
+function getGlobalPvpCoordinator(
+  env
+) {
+  const namespace =
+    env?.PVP_COORDINATOR;
+
+  if (
+    !namespace ||
+    typeof namespace.idFromName !== "function" ||
+    typeof namespace.get !== "function"
+  ) {
+    return null;
+  }
+
+  const id =
+    namespace.idFromName(
+      "marbion-global-pvp"
+    );
+
+  return namespace.get(id);
+}
+
+
+async function resetGeneralElo(
+  env
+) {
+  const coordinator =
+    getGlobalPvpCoordinator(env);
+
+  if (!coordinator) {
+    return {
+      ok: false,
+      error:
+        "PVP_COORDINATOR_UNAVAILABLE"
+    };
+  }
+
+  let response;
+
+  try {
+    response =
+      await coordinator.fetch(
+        new Request(
+          "https://pvp.internal/admin-elo-reset-general",
+          {
+            method: "POST"
+          }
+        )
+      );
+  }
+  catch {
+    return {
+      ok: false,
+      error:
+        "PVP_COORDINATOR_UNAVAILABLE"
+    };
+  }
+
+  try {
+    return await response.json();
+  }
+  catch {
+    return {
+      ok: false,
+      error:
+        "INVALID_COORDINATOR_RESPONSE"
+    };
+  }
+}
+
+
 export async function adminEloResetRoute(
   request,
   env
@@ -95,8 +166,37 @@ export async function adminEloResetRoute(
   if (
     normalizeCommand(target) === "geral"
   ) {
+    const result =
+      await resetGeneralElo(env);
+
+    if (!result.ok) {
+      if (
+        result.error === "ACTIVE_BATTLE" ||
+        result.error === "PENDING_CHALLENGE" ||
+        result.error === "PVP_QUEUE_NOT_EMPTY"
+      ) {
+        return new Response(
+          `@${actor}, não é possível resetar o Elo geral enquanto houver atividade PvP em andamento.`
+        );
+      }
+
+      if (
+        result.error ===
+        "ELO_RESET_IN_PROGRESS"
+      ) {
+        return new Response(
+          `@${actor}, já existe um reset geral de Elo em andamento.`
+        );
+      }
+
+      return new Response(
+        `@${actor}, não foi possível executar o reset geral de Elo.`
+      );
+    }
+
     return new Response(
-      `@${actor}, o reset geral de Elo ainda não está disponível com segurança.`
+      `🏆 ADM | Reset geral de Elo ativado: geração ${result.before} → ${result.after}. ` +
+      `Cada perfil será sincronizado para 1000 de Elo ao ser acessado; histórico competitivo preservado.`
     );
   }
 
