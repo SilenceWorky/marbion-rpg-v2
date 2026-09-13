@@ -6,6 +6,10 @@ import {
   adminMaxResourceRoute
 } from "./admin-max-resource.js";
 
+import {
+  adminEloResetRoute
+} from "./admin-elo-reset.js";
+
 
 function normalizeCommand(value) {
   return String(value ?? "")
@@ -53,6 +57,16 @@ export async function adminDispatcherRoute(
     )
   ) {
     return adminMaxResourceRoute(
+      request,
+      env
+    );
+  }
+
+
+  if (
+    command === "elo"
+  ) {
+    return adminEloResetRoute(
       request,
       env
     );
