@@ -1546,7 +1546,7 @@ Planejado:
 2. **Anti-farm A x B** — 3 partidas ranqueadas/24h; 4ª+ amistosa ✔️
 3. **`!recusar`** ✔️
 4. **`!desistir` / forfeit** — penalidade 2x e proteção precoce ✔️
-5. **Timeout/AFK + disciplina progressiva** ✔️ | **hardening de resultado/Alarm** 🧪
+5. **Timeout/AFK + disciplina progressiva + hardening exact-once** ✔️
 6. **Reset administrativo de Elo individual/geral** ⏳
 7. **Temporadas ranqueadas + soft reset** ⏳
 8. **Passe de batalha da Temporada 1** ⏳
@@ -1662,10 +1662,7 @@ Cancelamento sem AFK, Elo ou estatísticas ✔️
 
 Próximo desenvolvimento:
 ```txt
-Hardening do resultado PvP
-→ idempotência/exact-once
-→ proteção contra aplicação dupla de Elo/penalidade
-→ endurecimento de Alarm e persistência
+Reset administrativo de Elo individual/geral
 ```
 
 Depois:
