@@ -1547,7 +1547,7 @@ Planejado:
 3. **`!recusar`** ✔️
 4. **`!desistir` / forfeit** — penalidade 2x e proteção precoce ✔️
 5. **Timeout/AFK + disciplina progressiva + hardening exact-once** ✔️
-6. **Reset administrativo de Elo individual/geral** ⏳
+6. **Reset administrativo de Elo individual** ✔️ | **reset geral** ⏳
 7. **Temporadas ranqueadas + soft reset** ⏳
 8. **Passe de batalha da Temporada 1** ⏳
 9. **Habilidades de Suporte com efeitos reais** ⏳
@@ -1658,11 +1658,15 @@ Disciplina progressiva de AFK ✔️
 Saída autônoma para o chat via API oficial da Twitch ✔️
 Timeout automático de desafio PvP após 2 minutos ✔️
 Cancelamento sem AFK, Elo ou estatísticas ✔️
+Reset administrativo individual de Elo ✔️
+- rating volta para 1000
+- Prodígio removido
+- histórico competitivo, anti-farm e AFK preservados
 ```
 
 Próximo desenvolvimento:
 ```txt
-Reset administrativo de Elo individual/geral
+Reset administrativo geral de Elo
 ```
 
 Depois:
