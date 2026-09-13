@@ -7,6 +7,22 @@ import {
 } from "../systems/pvp-ranking.js";
 
 
+function normalizeUser(
+  value
+) {
+  return String(
+    value ?? ""
+  )
+    .trim()
+    .split(/\s+/)[0]
+    .replace(
+      /^@/,
+      ""
+    )
+    .toLowerCase();
+}
+
+
 export async function rankRoute(
   request,
   env
@@ -17,25 +33,23 @@ export async function rankRoute(
     );
 
 
-  const rawUser =
-    url.searchParams.get(
-      "user"
+  const requester =
+    normalizeUser(
+      url.searchParams.get(
+        "user"
+      )
     );
 
-
-  const user =
-    String(
-      rawUser ?? ""
-    )
-      .trim()
-      .replace(
-        /^@/,
-        ""
+  const target =
+    normalizeUser(
+      url.searchParams.get(
+        "target"
       )
-      .toLowerCase();
+    ) ||
+    requester;
 
 
-  if (!user) {
+  if (!target) {
     return new Response(
       "❌ Usuário não informado."
     );
@@ -45,7 +59,7 @@ export async function rankRoute(
   const profile =
     await getProfile(
       env,
-      user
+      target
     );
 
 
@@ -53,7 +67,7 @@ export async function rankRoute(
     !profile?.race
   ) {
     return new Response(
-      `@${user}, você ainda não possui um personagem.`
+      `@${target}, você ainda não possui um personagem.`
     );
   }
 
@@ -69,7 +83,7 @@ export async function rankRoute(
 
 
   return new Response(
-    `⚔️ @${user} | Elo: ${rank} | ` +
+    `⚔️ @${target} | Elo: ${rank} | ` +
     `XP de Combate: ${pvp.rating} | ` +
     `Vitórias: ${pvp.wins} | ` +
     `Derrotas: ${pvp.losses} | ` +
