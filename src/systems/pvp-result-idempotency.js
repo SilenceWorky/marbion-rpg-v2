@@ -298,7 +298,7 @@ export function validatePvpResultRecord(
     return false;
   }
 
-  return (
+  return Boolean(
     String(record.battleId ?? "") ===
       String(battleId ?? "").trim() &&
     normalizeUser(record.winnerUser) ===

@@ -125,6 +125,14 @@ import {
 } from "../systems/pvp-afk.js";
 
 import {
+  createPvpResultRecord,
+  getPvpResultRecord,
+  restorePvpRankingState,
+  storePvpResultRecord,
+  validatePvpResultRecord
+} from "../systems/pvp-result-idempotency.js";
+
+import {
   partitionExpiredChallenges,
   getNextChallengeExpiry,
   formatChallengeTimeoutMessage
@@ -3356,6 +3364,11 @@ export class PvpCoordinator {
     loserUser,
     options = {}
     ) {
+    const battleId =
+      String(
+        options?.battleId ?? ""
+      ).trim();
+
     const [
         winnerProfile,
         loserProfile
@@ -3385,6 +3398,124 @@ export class PvpCoordinator {
     }
 
 
+    /*
+     * ==============================
+     * IDEMPOTÊNCIA DE RESULTADO PvP
+     * ==============================
+     *
+     * Cada batalha possui UUID próprio. Quando um
+     * resultado já foi persistido em um ou nos dois
+     * perfis, a repetição da finalização NÃO recalcula
+     * Elo, streak, estatísticas ou anti-farm.
+     *
+     * Se somente um perfil foi salvo antes de uma
+     * falha parcial, o registro salvo contém o estado
+     * determinístico que falta ao outro perfil.
+     */
+    if (battleId) {
+      const winnerRecord =
+        getPvpResultRecord(
+          winnerProfile,
+          battleId
+        );
+
+      const loserRecord =
+        getPvpResultRecord(
+          loserProfile,
+          battleId
+        );
+
+      const storedRecord =
+        winnerRecord ||
+        loserRecord;
+
+
+      if (storedRecord) {
+        if (
+          !validatePvpResultRecord(
+            storedRecord,
+            battleId,
+            winnerUser,
+            loserUser
+          )
+        ) {
+          return {
+            ok: false,
+            error:
+              "RANKED_RESULT_LEDGER_CONFLICT"
+          };
+        }
+
+
+        const repairs = [];
+
+
+        if (!winnerRecord) {
+          restorePvpRankingState(
+            winnerProfile,
+            storedRecord.winnerState
+          );
+
+          winnerProfile.lastCombat =
+            storedRecord.lastCombat;
+
+          storePvpResultRecord(
+            winnerProfile,
+            storedRecord
+          );
+
+          repairs.push(
+            saveProfile(
+              this.env,
+              winnerUser,
+              winnerProfile
+            )
+          );
+        }
+
+
+        if (!loserRecord) {
+          restorePvpRankingState(
+            loserProfile,
+            storedRecord.loserState
+          );
+
+          loserProfile.lastCombat =
+            storedRecord.lastCombat;
+
+          storePvpResultRecord(
+            loserProfile,
+            storedRecord
+          );
+
+          repairs.push(
+            saveProfile(
+              this.env,
+              loserUser,
+              loserProfile
+            )
+          );
+        }
+
+
+        if (repairs.length > 0) {
+          await Promise.all(
+            repairs
+          );
+        }
+
+
+        return {
+          ok: true,
+          idempotent: true,
+          repairedPartialWrite:
+            repairs.length > 0,
+          ...storedRecord.result
+        };
+      }
+    }
+
+
     const now =
         Date.now();
 
@@ -3409,6 +3540,50 @@ export class PvpCoordinator {
         now;
 
 
+    if (battleId) {
+      const record =
+        createPvpResultRecord({
+          battleId,
+          winnerUser,
+          loserUser,
+          result,
+          winnerProfile,
+          loserProfile,
+          lastCombat: now
+        });
+
+
+      if (!record) {
+        return {
+          ok: false,
+          error:
+            "RANKED_RESULT_LEDGER_CREATE_FAILED"
+        };
+      }
+
+
+      storePvpResultRecord(
+        winnerProfile,
+        record
+      );
+
+      storePvpResultRecord(
+        loserProfile,
+        record
+      );
+    }
+
+
+    /*
+     * Os dois saves podem terminar de forma parcial
+     * por falha externa. O ledger acima é gravado no
+     * mesmo objeto do resultado e permite reparar o
+     * lado faltante numa repetição, sem reaplicar Elo.
+     *
+     * Não capturamos a exceção aqui: se o save falhar,
+     * a finalização precisa abortar antes de marcar a
+     * batalha como concluída no Durable Object.
+     */
     await Promise.all([
         saveProfile(
         this.env,
@@ -3426,6 +3601,7 @@ export class PvpCoordinator {
 
     return {
         ok: true,
+        idempotent: false,
         ...result
     };
     }
@@ -5593,7 +5769,11 @@ export class PvpCoordinator {
     rankedResult =
         await this.applyRankedBattleResult(
         winner,
-        loser
+        loser,
+        {
+          battleId:
+            battle.id
+        }
         );
 
 
@@ -5830,7 +6010,11 @@ export class PvpCoordinator {
           rankedResult =
             await this.applyRankedBattleResult(
               winner,
-              loser
+              loser,
+              {
+                battleId:
+                  battle.id
+              }
             );
 
 
@@ -5868,7 +6052,11 @@ export class PvpCoordinator {
           rankedResult =
             await this.applyRankedBattleResult(
               winner,
-              loser
+              loser,
+              {
+                battleId:
+                  battle.id
+              }
             );
 
 
@@ -6133,6 +6321,8 @@ export class PvpCoordinator {
         winner,
         loser,
         {
+          battleId:
+            battle.id,
           forfeit: true,
           earlyForfeit
         }
