@@ -3,6 +3,7 @@ import {
   createScheduledPvpSeasonMonth,
   normalizePvpSeasonYearSchedule,
   setPvpSeasonScheduledMonth,
+  getPvpSeasonScheduledMonth,
   clearPvpSeasonScheduledMonth
 } from "./pvp-season-schedule.js";
 
@@ -224,16 +225,6 @@ export async function schedulePvpSeasonYearMonth(
     };
   }
 
-  const entryResult =
-    createScheduledPvpSeasonMonth(
-      definition,
-      now
-    );
-
-  if (!entryResult.ok) {
-    return entryResult;
-  }
-
   const existing =
     await readPvpSeasonYearSchedule(
       storage,
@@ -242,6 +233,46 @@ export async function schedulePvpSeasonYearMonth(
 
   if (!existing.ok) {
     return existing;
+  }
+
+  /*
+   * Agendar novamente o mesmo mês é uma operação
+   * estritamente idempotente. O primeiro scheduledAt
+   * representa quando aquele mês foi oficialmente
+   * autorizado e não deve ser reescrito por retries,
+   * pelo futuro painel ou por reconciliações repetidas.
+   *
+   * Uma eventual edição de nome após o agendamento é
+   * uma política separada e será tratada explicitamente;
+   * não a escondemos dentro de um novo "agendar".
+   */
+  const alreadyScheduled =
+    existing.schedule
+      ? getPvpSeasonScheduledMonth(
+          existing.schedule,
+          normalizedMonth
+        )
+      : null;
+
+  if (alreadyScheduled) {
+    return {
+      ok: true,
+      changed: false,
+      entry:
+        alreadyScheduled,
+      schedule:
+        existing.schedule
+    };
+  }
+
+  const entryResult =
+    createScheduledPvpSeasonMonth(
+      definition,
+      now
+    );
+
+  if (!entryResult.ok) {
+    return entryResult;
   }
 
   let schedule =
