@@ -3,6 +3,12 @@
   "main": "src/index.js",
   "compatibility_date": "2026-08-25",
 
+  "triggers": {
+    "crons": [
+      "0 12 * * *"
+    ]
+  },
+
   "kv_namespaces": [
     {
       "binding": "MARBION_USERS_V2",
