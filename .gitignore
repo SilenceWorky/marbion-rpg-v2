@@ -3,3 +3,8 @@ node_modules/
 .env
 .env.*
 .dev.vars
+
+# Artefatos locais temporários de geração de skills
+skills-v1-1500.json
+skills-v1-1500-final.json
+skills-v1-1500-debuff.json
