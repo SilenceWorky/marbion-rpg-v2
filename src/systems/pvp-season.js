@@ -1,3 +1,11 @@
+import {
+  PVP_SEASON_TIMEZONE,
+  getSeasonMonthName,
+  normalizeSeasonMonth,
+  normalizeSeasonYear
+} from "./pvp-season-calendar.js";
+
+
 export const PVP_SEASON_VERSION = 1;
 
 export const PVP_SEASON_DEFAULT_DURATION_MS =
@@ -25,6 +33,106 @@ function normalizeTimestamp(value) {
 }
 
 
+function normalizeOptionalText(value) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  const text =
+    String(value)
+      .trim();
+
+  return text || null;
+}
+
+
+function normalizeMonthlyMetadata(value = {}) {
+  const supplied =
+    [
+      value.year,
+      value.month,
+      value.monthName,
+      value.baseTheme,
+      value.timezone
+    ].some(
+      field =>
+        field !== null &&
+        field !== undefined
+    );
+
+  if (!supplied) {
+    return {
+      ok: true,
+      metadata: null
+    };
+  }
+
+  const year =
+    normalizeSeasonYear(
+      value.year
+    );
+
+  const month =
+    normalizeSeasonMonth(
+      value.month
+    );
+
+  const baseTheme =
+    normalizeOptionalText(
+      value.baseTheme
+    );
+
+  const timezone =
+    normalizeOptionalText(
+      value.timezone
+    );
+
+  const expectedMonthName =
+    getSeasonMonthName(
+      month
+    );
+
+  const suppliedMonthName =
+    normalizeOptionalText(
+      value.monthName
+    );
+
+  if (
+    !year ||
+    !month ||
+    !expectedMonthName ||
+    !baseTheme ||
+    timezone !== PVP_SEASON_TIMEZONE ||
+    (
+      suppliedMonthName &&
+      suppliedMonthName !==
+        expectedMonthName
+    )
+  ) {
+    return {
+      ok: false,
+      metadata: null
+    };
+  }
+
+  return {
+    ok: true,
+    metadata: {
+      year,
+      month,
+      monthName:
+        expectedMonthName,
+      baseTheme,
+      timezone:
+        PVP_SEASON_TIMEZONE
+    }
+  };
+}
+
+
 export function normalizeSeasonId(value) {
   const id =
     String(value ?? "")
@@ -48,7 +156,12 @@ export function createPvpSeason({
   name,
   startsAt = Date.now(),
   endsAt = null,
-  durationMs = PVP_SEASON_DEFAULT_DURATION_MS
+  durationMs = PVP_SEASON_DEFAULT_DURATION_MS,
+  year = null,
+  month = null,
+  monthName = null,
+  baseTheme = null,
+  timezone = null
 } = {}) {
   const normalizedId =
     normalizeSeasonId(id);
@@ -61,6 +174,15 @@ export function createPvpSeason({
 
   const normalizedDuration =
     Number(durationMs);
+
+  const monthly =
+    normalizeMonthlyMetadata({
+      year,
+      month,
+      monthName,
+      baseTheme,
+      timezone
+    });
 
   if (!normalizedId) {
     return {
@@ -80,6 +202,14 @@ export function createPvpSeason({
     return {
       ok: false,
       error: "INVALID_SEASON_START"
+    };
+  }
+
+  if (!monthly.ok) {
+    return {
+      ok: false,
+      error:
+        "INVALID_SEASON_MONTHLY_METADATA"
     };
   }
 
@@ -137,7 +267,9 @@ export function createPvpSeason({
         normalizedEndsAt,
 
       endedAt:
-        null
+        null,
+
+      ...(monthly.metadata || {})
     }
   };
 }
@@ -163,12 +295,16 @@ export function normalizePvpSeason(value) {
   const endsAt =
     normalizeTimestamp(value.endsAt);
 
+  const monthly =
+    normalizeMonthlyMetadata(value);
+
   if (
     !id ||
     !name ||
     startsAt === null ||
     endsAt === null ||
-    endsAt <= startsAt
+    endsAt <= startsAt ||
+    !monthly.ok
   ) {
     return null;
   }
@@ -191,7 +327,8 @@ export function normalizePvpSeason(value) {
     status,
     startsAt,
     endsAt,
-    endedAt
+    endedAt,
+    ...(monthly.metadata || {})
   };
 }
 
