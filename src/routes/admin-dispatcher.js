@@ -10,6 +10,10 @@ import {
   adminEloResetRoute
 } from "./admin-elo-reset.js";
 
+import {
+  adminSeasonRoute
+} from "./admin-season.js";
+
 
 function normalizeCommand(value) {
   return String(value ?? "")
@@ -67,6 +71,16 @@ export async function adminDispatcherRoute(
     command === "elo"
   ) {
     return adminEloResetRoute(
+      request,
+      env
+    );
+  }
+
+
+  if (
+    command === "temporada"
+  ) {
+    return adminSeasonRoute(
       request,
       env
     );
