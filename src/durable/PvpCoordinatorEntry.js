@@ -18,6 +18,17 @@ import {
 } from "../systems/pvp-season-next-schedule.js";
 
 import {
+  definePvpSeasonYearMonth,
+  readPvpSeasonYearPlan
+} from "../systems/pvp-season-plan-store.js";
+
+import {
+  schedulePvpSeasonYearMonth,
+  cancelScheduledPvpSeasonYearMonth,
+  readPvpSeasonYearSchedule
+} from "../systems/pvp-season-schedule-store.js";
+
+import {
   getNextChallengeExpiry
 } from "../systems/pvp-challenge-timeout.js";
 
@@ -56,16 +67,28 @@ function getSeasonErrorStatus(
 
   if (
     result?.error ===
-      "NO_CURRENT_SEASON"
+      "NO_CURRENT_SEASON" ||
+    result?.error ===
+      "SEASON_YEAR_PLAN_NOT_FOUND" ||
+    result?.error ===
+      "SEASON_MONTH_DEFINITION_NOT_FOUND"
   ) {
     return 404;
   }
 
+  const error =
+    String(result?.error || "");
+
   if (
-    String(result?.error || "")
-      .startsWith("SEASON_STORAGE_") ||
+    error.startsWith("SEASON_STORAGE_") ||
+    error.startsWith("SEASON_PLAN_STORAGE_") ||
+    error.startsWith("SEASON_SCHEDULE_STORAGE_") ||
     result?.error ===
-      "INVALID_STORED_SEASON"
+      "INVALID_STORED_SEASON" ||
+    result?.error ===
+      "INVALID_STORED_SEASON_PLAN" ||
+    result?.error ===
+      "INVALID_STORED_SEASON_SCHEDULE"
   ) {
     return 500;
   }
@@ -278,6 +301,168 @@ export class PvpCoordinator extends BasePvpCoordinator {
 
       return Response.json(
         result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    /*
+     * Planejamento anual.
+     *
+     * Definir o nome de um mês não agenda nem ativa
+     * temporada alguma. Esta camada existe para o
+     * futuro painel/site e para os comandos de ADM.
+     */
+    if (
+      url.pathname ===
+      "/season/plan"
+    ) {
+      const result =
+        await readPvpSeasonYearPlan(
+          this.state.storage,
+          url.searchParams.get("year")
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/season/plan/define"
+    ) {
+      const result =
+        await definePvpSeasonYearMonth(
+          this.state.storage,
+          {
+            year:
+              url.searchParams.get("year"),
+            month:
+              url.searchParams.get("month"),
+            name:
+              url.searchParams.get("name")
+          }
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    /*
+     * Agendamento anual.
+     *
+     * O nome precisa ter sido previamente definido.
+     * Ao agendar/cancelar, o alarm compartilhado é
+     * recalculado imediatamente.
+     */
+    if (
+      url.pathname ===
+      "/season/schedule"
+    ) {
+      const result =
+        await readPvpSeasonYearSchedule(
+          this.state.storage,
+          url.searchParams.get("year")
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/season/schedule/add"
+    ) {
+      const result =
+        await schedulePvpSeasonYearMonth(
+          this.state.storage,
+          {
+            year:
+              url.searchParams.get("year"),
+            month:
+              url.searchParams.get("month")
+          },
+          Date.now()
+        );
+
+      let alarm = null;
+
+      if (result.ok) {
+        alarm =
+          await this.scheduleCoordinatorAlarm();
+      }
+
+      return Response.json(
+        {
+          ...result,
+          alarm
+        },
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/season/schedule/cancel"
+    ) {
+      const result =
+        await cancelScheduledPvpSeasonYearMonth(
+          this.state.storage,
+          {
+            year:
+              url.searchParams.get("year"),
+            month:
+              url.searchParams.get("month")
+          }
+        );
+
+      let alarm = null;
+
+      if (result.ok) {
+        alarm =
+          await this.scheduleCoordinatorAlarm();
+      }
+
+      return Response.json(
+        {
+          ...result,
+          alarm
+        },
         {
           status:
             getSeasonErrorStatus(
