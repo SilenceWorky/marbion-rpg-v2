@@ -6,6 +6,14 @@ import {
   syncPvpSeasonCatalog
 } from "../systems/pvp-season-catalog-sync.js";
 
+import {
+  getGlobalActivePvpBattle
+} from "../systems/pvp-queue.js";
+
+import {
+  getNextBattleTurnAlarmAt
+} from "../systems/pvp-timeout.js";
+
 
 function readSyncTimestamp(
   searchParams
@@ -55,6 +63,49 @@ function getCatalogSyncStatus(
 }
 
 
+function getBattleAlarmCandidate(
+  data,
+  preferredBattle,
+  now
+) {
+  const battle =
+    preferredBattle?.status === "ACTIVE"
+      ? preferredBattle
+      : getGlobalActivePvpBattle(
+          data
+        );
+
+  if (!battle) {
+    return null;
+  }
+
+  const next =
+    getNextBattleTurnAlarmAt(
+      battle,
+      now
+    );
+
+  if (
+    !next?.ok ||
+    !Number.isFinite(
+      Number(next.alarmAt)
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    ok: true,
+    scheduled: true,
+    kind: "battle",
+    stage:
+      next.stage,
+    alarmAt:
+      Number(next.alarmAt)
+  };
+}
+
+
 /*
  * Camada final do Durable Object global para o catálogo
  * oficial de temporadas.
@@ -65,6 +116,81 @@ function getCatalogSyncStatus(
  * mantendo o restante do PvP intacto.
  */
 export class PvpCoordinator extends SeasonPvpCoordinator {
+  /*
+   * O coordenador PvP legado possui uma condição antiga em que
+   * `null` de desafio pode ser convertido para 0 e aparecer como
+   * um candidato fantasma de alarm. A camada de temporada já
+   * descarta esse falso desafio, porém isso poderia esconder um
+   * alarm real de batalha que estava em segundo lugar.
+   *
+   * Recalculamos somente o candidato real de batalha depois do
+   * coordenador completo e o restauramos quando ele ocorrer antes
+   * do resultado escolhido. Não alteramos o motor PvP legado nem
+   * a ordem normal entre desafios e batalhas reais.
+   */
+  async scheduleCoordinatorAlarm(
+    data = null,
+    preferredBattle = null
+  ) {
+    const currentData =
+      data ||
+      await this.getData();
+
+    const result =
+      await super.scheduleCoordinatorAlarm(
+        currentData,
+        preferredBattle
+      );
+
+    const battleAlarm =
+      getBattleAlarmCandidate(
+        currentData,
+        preferredBattle,
+        Date.now()
+      );
+
+    if (!battleAlarm) {
+      return result;
+    }
+
+    if (
+      result?.kind === "battle"
+    ) {
+      return result;
+    }
+
+    const resultAlarmAt =
+      Number(result?.alarmAt);
+
+    const hasResultAlarm =
+      result?.scheduled === true &&
+      Number.isFinite(
+        resultAlarmAt
+      );
+
+    if (
+      hasResultAlarm &&
+      resultAlarmAt <
+        battleAlarm.alarmAt
+    ) {
+      return result;
+    }
+
+    if (
+      typeof this.state.storage.setAlarm !==
+      "function"
+    ) {
+      return result;
+    }
+
+    await this.state.storage.setAlarm(
+      battleAlarm.alarmAt
+    );
+
+    return battleAlarm;
+  }
+
+
   /*
    * O motor PvP legado limpa o alarm quando uma batalha acaba,
    * é desistida ou deixa de precisar do timeout de turno.
