@@ -1,0 +1,376 @@
+import {
+  createPvpSeasonYearSchedule,
+  createScheduledPvpSeasonMonth,
+  normalizePvpSeasonYearSchedule,
+  setPvpSeasonScheduledMonth,
+  clearPvpSeasonScheduledMonth
+} from "./pvp-season-schedule.js";
+
+import {
+  getPvpSeasonPlanMonth
+} from "./pvp-season-plan.js";
+
+import {
+  readPvpSeasonYearPlan
+} from "./pvp-season-plan-store.js";
+
+import {
+  normalizeSeasonMonth,
+  normalizeSeasonYear
+} from "./pvp-season-calendar.js";
+
+
+export const PVP_SEASON_SCHEDULE_STORAGE_PREFIX =
+  "pvp_season_schedule:";
+
+
+function hasMethod(
+  value,
+  method
+) {
+  return Boolean(
+    value &&
+    typeof value[method] === "function"
+  );
+}
+
+
+export function getPvpSeasonScheduleStorageKey(
+  year
+) {
+  const normalizedYear =
+    normalizeSeasonYear(year);
+
+  if (!normalizedYear) {
+    return null;
+  }
+
+  return (
+    `${PVP_SEASON_SCHEDULE_STORAGE_PREFIX}` +
+    `${normalizedYear}`
+  );
+}
+
+
+export async function readPvpSeasonYearSchedule(
+  storage,
+  year
+) {
+  if (!hasMethod(storage, "get")) {
+    return {
+      ok: false,
+      error: "SEASON_SCHEDULE_STORAGE_UNAVAILABLE"
+    };
+  }
+
+  const key =
+    getPvpSeasonScheduleStorageKey(
+      year
+    );
+
+  if (!key) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_YEAR"
+    };
+  }
+
+  let stored;
+
+  try {
+    stored =
+      await storage.get(key);
+  }
+  catch {
+    return {
+      ok: false,
+      error: "SEASON_SCHEDULE_STORAGE_READ_FAILED"
+    };
+  }
+
+  if (
+    stored === null ||
+    stored === undefined
+  ) {
+    return {
+      ok: true,
+      schedule: null
+    };
+  }
+
+  const schedule =
+    normalizePvpSeasonYearSchedule(
+      stored
+    );
+
+  if (!schedule) {
+    return {
+      ok: false,
+      error: "INVALID_STORED_SEASON_SCHEDULE"
+    };
+  }
+
+  return {
+    ok: true,
+    schedule
+  };
+}
+
+
+export async function savePvpSeasonYearSchedule(
+  storage,
+  schedule
+) {
+  if (!hasMethod(storage, "put")) {
+    return {
+      ok: false,
+      error: "SEASON_SCHEDULE_STORAGE_UNAVAILABLE"
+    };
+  }
+
+  const normalized =
+    normalizePvpSeasonYearSchedule(
+      schedule
+    );
+
+  if (!normalized) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_SCHEDULE"
+    };
+  }
+
+  const key =
+    getPvpSeasonScheduleStorageKey(
+      normalized.year
+    );
+
+  try {
+    await storage.put(
+      key,
+      normalized
+    );
+  }
+  catch {
+    return {
+      ok: false,
+      error: "SEASON_SCHEDULE_STORAGE_WRITE_FAILED"
+    };
+  }
+
+  return {
+    ok: true,
+    schedule:
+      normalized
+  };
+}
+
+
+export async function schedulePvpSeasonYearMonth(
+  storage,
+  {
+    year,
+    month
+  } = {},
+  now = Date.now()
+) {
+  const normalizedYear =
+    normalizeSeasonYear(year);
+
+  const normalizedMonth =
+    normalizeSeasonMonth(month);
+
+  if (!normalizedYear) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_YEAR"
+    };
+  }
+
+  if (!normalizedMonth) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_MONTH"
+    };
+  }
+
+  const planResult =
+    await readPvpSeasonYearPlan(
+      storage,
+      normalizedYear
+    );
+
+  if (!planResult.ok) {
+    return planResult;
+  }
+
+  if (!planResult.plan) {
+    return {
+      ok: false,
+      error: "SEASON_YEAR_PLAN_NOT_FOUND"
+    };
+  }
+
+  const definition =
+    getPvpSeasonPlanMonth(
+      planResult.plan,
+      normalizedMonth
+    );
+
+  if (!definition) {
+    return {
+      ok: false,
+      error: "SEASON_MONTH_DEFINITION_NOT_FOUND"
+    };
+  }
+
+  const entryResult =
+    createScheduledPvpSeasonMonth(
+      definition,
+      now
+    );
+
+  if (!entryResult.ok) {
+    return entryResult;
+  }
+
+  const existing =
+    await readPvpSeasonYearSchedule(
+      storage,
+      normalizedYear
+    );
+
+  if (!existing.ok) {
+    return existing;
+  }
+
+  let schedule =
+    existing.schedule;
+
+  if (!schedule) {
+    const created =
+      createPvpSeasonYearSchedule(
+        normalizedYear
+      );
+
+    if (!created.ok) {
+      return created;
+    }
+
+    schedule =
+      created.schedule;
+  }
+
+  const next =
+    setPvpSeasonScheduledMonth(
+      schedule,
+      entryResult.entry
+    );
+
+  if (!next.ok) {
+    return next;
+  }
+
+  const saved =
+    await savePvpSeasonYearSchedule(
+      storage,
+      next.schedule
+    );
+
+  if (!saved.ok) {
+    return saved;
+  }
+
+  return {
+    ok: true,
+    changed:
+      next.changed,
+    entry:
+      next.entry,
+    schedule:
+      saved.schedule
+  };
+}
+
+
+export async function cancelScheduledPvpSeasonYearMonth(
+  storage,
+  {
+    year,
+    month
+  } = {}
+) {
+  const normalizedYear =
+    normalizeSeasonYear(year);
+
+  const normalizedMonth =
+    normalizeSeasonMonth(month);
+
+  if (!normalizedYear) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_YEAR"
+    };
+  }
+
+  if (!normalizedMonth) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_MONTH"
+    };
+  }
+
+  const existing =
+    await readPvpSeasonYearSchedule(
+      storage,
+      normalizedYear
+    );
+
+  if (!existing.ok) {
+    return existing;
+  }
+
+  if (!existing.schedule) {
+    return {
+      ok: true,
+      changed: false,
+      schedule: null
+    };
+  }
+
+  const cleared =
+    clearPvpSeasonScheduledMonth(
+      existing.schedule,
+      normalizedMonth
+    );
+
+  if (!cleared.ok) {
+    return cleared;
+  }
+
+  if (!cleared.changed) {
+    return {
+      ok: true,
+      changed: false,
+      schedule:
+        cleared.schedule
+    };
+  }
+
+  const saved =
+    await savePvpSeasonYearSchedule(
+      storage,
+      cleared.schedule
+    );
+
+  if (!saved.ok) {
+    return saved;
+  }
+
+  return {
+    ok: true,
+    changed: true,
+    schedule:
+      saved.schedule
+  };
+}
