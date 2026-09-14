@@ -17,6 +17,10 @@ import {
   findNextScheduledPvpSeason
 } from "../systems/pvp-season-next-schedule.js";
 
+import {
+  getNextChallengeExpiry
+} from "../systems/pvp-challenge-timeout.js";
+
 
 function readOptionalNumber(
   searchParams,
@@ -70,6 +74,49 @@ function getSeasonErrorStatus(
 }
 
 
+function getValidatedBaseAlarmAt(
+  baseResult,
+  data,
+  now
+) {
+  const rawAlarmAt =
+    baseResult?.alarmAt;
+
+  if (
+    rawAlarmAt === null ||
+    rawAlarmAt === undefined ||
+    !Number.isFinite(
+      Number(rawAlarmAt)
+    )
+  ) {
+    return null;
+  }
+
+  if (
+    baseResult?.kind ===
+      "challenge"
+  ) {
+    const nextChallengeAt =
+      getNextChallengeExpiry(
+        data?.challenges,
+        now
+      );
+
+    if (
+      nextChallengeAt === null ||
+      nextChallengeAt === undefined ||
+      !Number.isFinite(
+        Number(nextChallengeAt)
+      )
+    ) {
+      return null;
+    }
+  }
+
+  return Number(rawAlarmAt);
+}
+
+
 /*
  * Entrada do Durable Object global.
  *
@@ -91,14 +138,25 @@ export class PvpCoordinator extends BasePvpCoordinator {
     data = null,
     preferredBattle = null
   ) {
+    const currentData =
+      data ||
+      await this.getData();
+
     const baseResult =
       await super.scheduleCoordinatorAlarm(
-        data,
+        currentData,
         preferredBattle
       );
 
     const now =
       Date.now();
+
+    const baseAlarmAt =
+      getValidatedBaseAlarmAt(
+        baseResult,
+        currentData,
+        now
+      );
 
     const nextSeason =
       await findNextScheduledPvpSeason(
@@ -106,13 +164,31 @@ export class PvpCoordinator extends BasePvpCoordinator {
         now
       );
 
-    if (
-      !nextSeason.ok ||
-      !nextSeason.entry ||
-      !Number.isFinite(
+    const hasSeasonAlarm =
+      nextSeason.ok &&
+      nextSeason.entry &&
+      nextSeason.alarmAt !== null &&
+      nextSeason.alarmAt !== undefined &&
+      Number.isFinite(
         Number(nextSeason.alarmAt)
-      )
-    ) {
+      );
+
+    if (!hasSeasonAlarm) {
+      if (
+        baseAlarmAt === null &&
+        baseResult?.kind ===
+          "challenge" &&
+        typeof this.state.storage.deleteAlarm ===
+          "function"
+      ) {
+        await this.state.storage.deleteAlarm();
+
+        return {
+          ok: true,
+          scheduled: false
+        };
+      }
+
       return baseResult;
     }
 
@@ -121,36 +197,9 @@ export class PvpCoordinator extends BasePvpCoordinator {
         nextSeason.alarmAt
       );
 
-    let currentAlarmAt =
-      Number(
-        baseResult?.alarmAt
-      );
-
     if (
-      typeof this.state.storage.getAlarm ===
-      "function"
-    ) {
-      try {
-        const storedAlarm =
-          await this.state.storage.getAlarm();
-
-        if (
-          Number.isFinite(
-            Number(storedAlarm)
-          )
-        ) {
-          currentAlarmAt =
-            Number(storedAlarm);
-        }
-      }
-      catch {
-        // Mantemos o resultado do scheduler base.
-      }
-    }
-
-    if (
-      Number.isFinite(currentAlarmAt) &&
-      currentAlarmAt <= seasonAlarmAt
+      baseAlarmAt !== null &&
+      baseAlarmAt <= seasonAlarmAt
     ) {
       return baseResult;
     }
