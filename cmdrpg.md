@@ -6,7 +6,7 @@
 >
 > Legenda: **✔️ implementado e validado** | **🧪 implementado/em validação** | **⏳ pendente** | **🗃️ legado V1 ainda não migrado**
 >
-> Última atualização canônica: **12/09/2026**.
+> Última atualização canônica: **13/09/2026**.
 
 ---
 
@@ -1133,24 +1133,81 @@ Regras:
 ---
 
 ## Reset administrativo de Elo
-Status V2: ⏳
+Status V2: ✔️ **implementado, testado e validado em produção**
 
-Comandos planejados:
+Comandos:
 ```txt
 !adm elo reset @usuario
 !adm elo reset geral
 ```
 
-Reset individual:
-- rating volta para 1000
-- rank é recalculado
-- posição de Prodígio é removida/recalculada
-- histórico pode ser preservado separadamente
+### Reset individual
 
-Reset geral:
-- todos os jogadores voltam para 1000
-- ranking/Prodígios são recalculados
-- deve exigir confirmação administrativa forte para evitar execução acidental
+```txt
+!adm elo reset @usuario
+```
+
+Regras:
+- rating volta para `1000`
+- rank é recalculado a partir do novo rating
+- posição de Prodígio é removida
+- vitórias e derrotas são preservadas
+- quantidade de PvPs é preservada
+- sequência atual e melhor sequência são preservadas
+- `peakRating` é preservado
+- histórico anti-farm é preservado
+- disciplina e penalidades de AFK são preservadas
+- ledger de resultados/exact-once é preservado
+
+O reset individual altera somente o estado competitivo atual de Elo/rank/Prodígio.
+
+### Reset geral
+
+```txt
+!adm elo reset geral
+```
+
+O reset geral utiliza um sistema de **gerações de Elo**.
+
+Ao executar:
+```txt
+geração atual → próxima geração
+```
+
+Exemplo validado em produção:
+```txt
+geração 0 → 1
+```
+
+Cada perfil possui sua própria geração de Elo. Quando um perfil antigo é acessado pela primeira vez após um reset geral, ele é sincronizado automaticamente para a geração atual.
+
+Na sincronização:
+- rating volta para `1000`
+- rank é recalculado
+- posição de Prodígio é removida
+- histórico competitivo é preservado
+- `peakRating` é preservado
+- anti-farm é preservado
+- disciplina de AFK é preservada
+- ledger de resultados é preservado
+
+A sincronização é preguiçosa:
+- o reset geral não precisa percorrer todos os jogadores de uma vez
+- cada perfil é atualizado quando for acessado
+- um perfil atrasado pode avançar diretamente para a geração atual
+- acessar novamente o perfil na mesma geração não aplica outro reset
+
+Proteções:
+- o reset geral é recusado enquanto existir batalha PvP ativa
+- é recusado enquanto houver desafio PvP pendente
+- é recusado enquanto houver jogadores na fila PvP
+- existe trava temporária durante a troca de geração
+
+A geração global fica no coordenador PvP e é espelhada no KV para evitar uma consulta extra de Durable Object em cada leitura de perfil.
+
+Validação em produção:
+- `SilenceWorky`: Elo `842 → 1000`, mantendo `10 vitórias / 14 derrotas / 29 PvPs / sequência 2 / melhor sequência 2`
+- `acervojuju`: sincronizado para `1000`, mantendo `13 vitórias / 16 derrotas / 29 PvPs / sequência 0 / melhor sequência 7`
 
 ---
 
@@ -1535,6 +1592,7 @@ Planejado:
 - `!desistir` ✔️
 - Soco universal via `!ataque soco` ✔️
 - reset administrativo de tempos ✔️
+- reset administrativo de Elo individual e geral ✔️
 - timeout de 90s via Durable Object Alarm ✔️
 - disciplina progressiva de AFK ✔️
 - saída autônoma Twitch para eventos PvP ✔️
@@ -1547,7 +1605,7 @@ Planejado:
 3. **`!recusar`** ✔️
 4. **`!desistir` / forfeit** — penalidade 2x e proteção precoce ✔️
 5. **Timeout/AFK + disciplina progressiva + hardening exact-once** ✔️
-6. **Reset administrativo de Elo individual** ✔️ | **reset geral** ⏳
+6. **Reset administrativo de Elo individual e geral** ✔️
 7. **Temporadas ranqueadas + soft reset** ⏳
 8. **Passe de batalha da Temporada 1** ⏳
 9. **Habilidades de Suporte com efeitos reais** ⏳
@@ -1649,7 +1707,7 @@ Planejado:
 
 ---
 
-# 📌 PONTO EXATO DE CONTINUIDADE — 12/09/2026
+# 📌 PONTO EXATO DE CONTINUIDADE — 13/09/2026
 
 Últimos sistemas concluídos e validados em produção:
 ```txt
@@ -1659,19 +1717,22 @@ Saída autônoma para o chat via API oficial da Twitch ✔️
 Timeout automático de desafio PvP após 2 minutos ✔️
 Cancelamento sem AFK, Elo ou estatísticas ✔️
 Reset administrativo individual de Elo ✔️
-- rating volta para 1000
-- Prodígio removido
-- histórico competitivo, anti-farm e AFK preservados
+Reset administrativo geral de Elo por geração ✔️
+- geração 0 → 1 validada em produção
+- perfis sincronizam para 1000 ao serem acessados
+- histórico competitivo, anti-farm, AFK e ledger preservados
+- geração forte no coordenador PvP e espelho no KV
+- leitura comum de perfil não cria um Durable Object extra para consultar geração
 ```
 
 Próximo desenvolvimento:
 ```txt
-Reset administrativo geral de Elo
+Temporadas ranqueadas + soft reset de Elo
 ```
 
 Depois:
 ```txt
-reset administrativo de Elo
-→ temporadas ranqueadas / soft reset
-→ passe de batalha
+passe de batalha
+→ habilidades de Suporte com efeitos reais
+→ aprendizado automático de habilidades por nível
 ```
