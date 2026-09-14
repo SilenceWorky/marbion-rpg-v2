@@ -33,6 +33,14 @@ function normalizeNow(value) {
 }
 
 
+/*
+ * Procura apenas ativações FUTURAS.
+ *
+ * Uma entrada cujo startsAt já chegou é tratada
+ * pelo motor de ativação no alarm atual. Se essa
+ * ativação falhar, não reagendamos para now + 1,
+ * evitando um loop apertado de alarms.
+ */
 export async function findNextScheduledPvpSeason(
   storage,
   now = Date.now()
@@ -107,7 +115,7 @@ export async function findNextScheduledPvpSeason(
     ) {
       if (
         !entry ||
-        entry.endsAt <= timestamp
+        entry.startsAt <= timestamp
       ) {
         continue;
       }
@@ -135,9 +143,6 @@ export async function findNextScheduledPvpSeason(
     entry:
       nextEntry,
     alarmAt:
-      Math.max(
-        timestamp + 1,
-        nextEntry.startsAt
-      )
+      nextEntry.startsAt
   };
 }
