@@ -5,6 +5,7 @@ import {
 import {
   getPvpSeasonState,
   startPvpSeason,
+  startMonthlyPvpSeason,
   endCurrentPvpSeason
 } from "../systems/pvp-season-service.js";
 
@@ -99,6 +100,50 @@ export class PvpCoordinator extends BasePvpCoordinator {
     }
 
 
+    /*
+     * Rota mensal canônica.
+     *
+     * O calendário calcula automaticamente
+     * ID, início e fim do mês civil em
+     * America/Fortaleza. Tema-base e nome
+     * anual permanecem campos distintos.
+     */
+    if (
+      url.pathname ===
+      "/season/start-monthly"
+    ) {
+      const result =
+        await startMonthlyPvpSeason(
+          this.state.storage,
+          {
+            year:
+              url.searchParams.get("year"),
+            month:
+              url.searchParams.get("month"),
+            baseTheme:
+              url.searchParams.get("baseTheme"),
+            name:
+              url.searchParams.get("name")
+          }
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    /*
+     * Compatibilidade temporária com o fluxo
+     * antigo de duração arbitrária. Não é mais
+     * a rota recomendada para novas temporadas.
+     */
     if (
       url.pathname ===
       "/season/start"
