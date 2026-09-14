@@ -84,6 +84,10 @@ function getSeasonErrorStatus(
     error.startsWith("SEASON_PLAN_STORAGE_") ||
     error.startsWith("SEASON_SCHEDULE_STORAGE_") ||
     result?.error ===
+      "SEASON_SCHEDULE_LIST_UNAVAILABLE" ||
+    result?.error ===
+      "SEASON_SCHEDULE_LIST_FAILED" ||
+    result?.error ===
       "INVALID_STORED_SEASON" ||
     result?.error ===
       "INVALID_STORED_SEASON_PLAN" ||
@@ -376,6 +380,28 @@ export class PvpCoordinator extends BasePvpCoordinator {
      * Ao agendar/cancelar, o alarm compartilhado é
      * recalculado imediatamente.
      */
+    if (
+      url.pathname ===
+      "/season/schedule/next"
+    ) {
+      const result =
+        await findNextScheduledPvpSeason(
+          this.state.storage,
+          Date.now()
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
     if (
       url.pathname ===
       "/season/schedule"
