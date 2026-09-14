@@ -214,39 +214,57 @@ console.log("=== SINCRONIZAÇÃO AUTOMÁTICA DO CATÁLOGO ===");
     String(now)
   );
 
-  const response =
-    await coordinator.fetch(
-      new Request(
-        url.toString(),
-        { method: "POST" }
-      )
+  /*
+   * scheduleCoordinatorAlarm() usa Date.now() para decidir
+   * se a temporada ainda está no futuro. Como este teste
+   * simula 20/08/2026, o relógio global precisa representar
+   * o mesmo instante; caso contrário, executar o teste depois
+   * de 01/09 faria a temporada parecer já vencida.
+   */
+  const originalDateNow =
+    Date.now;
+
+  Date.now = () => now;
+
+  try {
+    const response =
+      await coordinator.fetch(
+        new Request(
+          url.toString(),
+          { method: "POST" }
+        )
+      );
+
+    const result =
+      await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(result.ok, true);
+    assert.equal(
+      result.alarm.kind,
+      "season"
+    );
+    assert.equal(
+      result.alarm.alarmAt,
+      start
+    );
+    assert.equal(
+      await storage.getAlarm(),
+      start
     );
 
-  const result =
-    await response.json();
+    const current =
+      await readCurrentPvpSeason(
+        storage
+      );
 
-  assert.equal(response.status, 200);
-  assert.equal(result.ok, true);
-  assert.equal(
-    result.alarm.kind,
-    "season"
-  );
-  assert.equal(
-    result.alarm.alarmAt,
-    start
-  );
-  assert.equal(
-    await storage.getAlarm(),
-    start
-  );
-
-  const current =
-    await readCurrentPvpSeason(
-      storage
-    );
-
-  assert.equal(current.ok, true);
-  assert.equal(current.season, null);
+    assert.equal(current.ok, true);
+    assert.equal(current.season, null);
+  }
+  finally {
+    Date.now =
+      originalDateNow;
+  }
 
   console.log("✅ A rota automática reconcilia o alarm da próxima temporada sem ativá-la antes da hora.");
 }
