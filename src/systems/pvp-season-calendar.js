@@ -19,6 +19,18 @@ const MONTH_NAMES = [
   "Dezembro"
 ];
 
+/*
+ * Temas-base permanentes por mês.
+ *
+ * Só registramos aqui temas já definidos canonicamente.
+ * Meses ainda não fechados ficam sem tema e não podem
+ * ser ativados em produção até receberem um tema-base.
+ */
+const BASE_THEMES = {
+  8: "Arquivo do Infinito",
+  9: "Jardim do Criador"
+};
+
 
 function normalizeText(value) {
   const text =
@@ -72,6 +84,18 @@ export function getSeasonMonthName(month) {
   return MONTH_NAMES[
     normalized - 1
   ];
+}
+
+
+export function getSeasonBaseTheme(month) {
+  const normalized =
+    normalizeSeasonMonth(month);
+
+  if (!normalized) {
+    return null;
+  }
+
+  return BASE_THEMES[normalized] ?? null;
 }
 
 
@@ -180,6 +204,44 @@ export function getMonthlySeasonBounds(
 }
 
 
+export function getSeasonCalendarPartsAt(
+  timestamp = Date.now()
+) {
+  const normalized =
+    Number(timestamp);
+
+  if (
+    !Number.isFinite(normalized) ||
+    normalized < 0
+  ) {
+    return null;
+  }
+
+  const fortalezaTime =
+    new Date(
+      Math.round(normalized) -
+      3 * 60 * 60 * 1000
+    );
+
+  return {
+    year:
+      fortalezaTime.getUTCFullYear(),
+    month:
+      fortalezaTime.getUTCMonth() + 1,
+    day:
+      fortalezaTime.getUTCDate(),
+    hour:
+      fortalezaTime.getUTCHours(),
+    minute:
+      fortalezaTime.getUTCMinutes(),
+    second:
+      fortalezaTime.getUTCSeconds(),
+    timezone:
+      PVP_SEASON_TIMEZONE
+  };
+}
+
+
 export function createMonthlySeasonDefinition({
   year,
   month,
@@ -197,7 +259,10 @@ export function createMonthlySeasonDefinition({
   }
 
   const normalizedBaseTheme =
-    normalizeText(baseTheme);
+    normalizeText(
+      baseTheme ??
+      getSeasonBaseTheme(bounds.month)
+    );
 
   const normalizedName =
     normalizeText(name);
