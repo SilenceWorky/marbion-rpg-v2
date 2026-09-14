@@ -155,6 +155,39 @@ function formatPlayerRanking(
 }
 
 
+async function callCoordinatorJson(
+  coordinator,
+  path
+) {
+  let response;
+
+  try {
+    response =
+      await coordinator.fetch(
+        new Request(
+          `https://pvp.internal${path}`
+        )
+      );
+  }
+  catch {
+    return {
+      ok: false,
+      transportError: true
+    };
+  }
+
+  try {
+    return await response.json();
+  }
+  catch {
+    return {
+      ok: false,
+      invalidResponse: true
+    };
+  }
+}
+
+
 export async function seasonRoute(
   request,
   env
@@ -180,30 +213,20 @@ export async function seasonRoute(
     );
   }
 
-  let response;
+  const result =
+    await callCoordinatorJson(
+      coordinator,
+      "/season/current"
+    );
 
-  try {
-    response =
-      await coordinator.fetch(
-        new Request(
-          "https://pvp.internal/season/current"
-        )
-      );
-  }
-  catch {
+  if (result.transportError) {
     return new Response(
       "❌ Não foi possível consultar a temporada atual.",
       { status: 503 }
     );
   }
 
-  let result;
-
-  try {
-    result =
-      await response.json();
-  }
-  catch {
+  if (result.invalidResponse) {
     return new Response(
       "❌ Resposta inválida do sistema de temporadas.",
       { status: 502 }
@@ -221,18 +244,6 @@ export async function seasonRoute(
     );
   }
 
-  if (
-    !result.season ||
-    result.lifecycle === "NONE"
-  ) {
-    return new Response(
-      `${mention}não há temporada ranqueada cadastrada no momento.`
-    );
-  }
-
-  const season =
-    result.season;
-
   const playerRanking =
     await getPlayerRankingContext(
       env,
@@ -243,6 +254,46 @@ export async function seasonRoute(
     formatPlayerRanking(
       playerRanking
     );
+
+  /*
+   * Com o novo modelo, uma temporada futura fica
+   * no calendário de agendamento e não em
+   * pvp_current_season. Quando não há temporada
+   * atual, consultamos a próxima agendada para que
+   * !temporada continue exibindo Status: AGENDADA.
+   */
+  if (
+    !result.season ||
+    result.lifecycle === "NONE"
+  ) {
+    const next =
+      await callCoordinatorJson(
+        coordinator,
+        "/season/schedule/next"
+      );
+
+    if (
+      next.ok &&
+      next.entry
+    ) {
+      const scheduled =
+        next.entry;
+
+      return new Response(
+        `🏆 ${scheduled.name} [${scheduled.id}] | Status: AGENDADA | ` +
+        `Início: ${formatDateTime(scheduled.startsAt)} | ` +
+        `Fim: ${formatDateTime(scheduled.endsAt)}` +
+        `${playerSuffix}.`
+      );
+    }
+
+    return new Response(
+      `${mention}não há temporada ranqueada cadastrada no momento.`
+    );
+  }
+
+  const season =
+    result.season;
 
   if (
     result.lifecycle === "ACTIVE"
