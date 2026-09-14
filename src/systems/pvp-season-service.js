@@ -7,6 +7,10 @@ import {
 } from "./pvp-season.js";
 
 import {
+  createMonthlySeasonDefinition
+} from "./pvp-season-calendar.js";
+
+import {
   readCurrentPvpSeason,
   saveCurrentPvpSeason
 } from "./pvp-season-store.js";
@@ -123,6 +127,35 @@ export async function startPvpSeason(
         now
       )
   };
+}
+
+
+export async function startMonthlyPvpSeason(
+  storage,
+  options = {},
+  now = Date.now()
+) {
+  const monthly =
+    createMonthlySeasonDefinition({
+      year:
+        options.year,
+      month:
+        options.month,
+      baseTheme:
+        options.baseTheme,
+      name:
+        options.name
+    });
+
+  if (!monthly.ok) {
+    return monthly;
+  }
+
+  return startPvpSeason(
+    storage,
+    monthly.definition,
+    now
+  );
 }
 
 
