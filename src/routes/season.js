@@ -1,3 +1,12 @@
+import {
+  getProfile
+} from "../core/database.js";
+
+import {
+  getDisplayRank
+} from "../systems/pvp-ranking.js";
+
+
 function getGlobalPvpCoordinator(
   env
 ) {
@@ -86,6 +95,66 @@ function formatDateTime(
 }
 
 
+async function getPlayerRankingContext(
+  env,
+  user
+) {
+  if (!user) {
+    return null;
+  }
+
+  let profile;
+
+  try {
+    profile =
+      await getProfile(
+        env,
+        user
+      );
+  }
+  catch {
+    return null;
+  }
+
+  if (!profile?.race) {
+    return null;
+  }
+
+  const rating =
+    Math.max(
+      0,
+      Math.round(
+        Number(
+          profile?.pvp?.rating
+        ) || 0
+      )
+    );
+
+  return {
+    user,
+    rating,
+    rank:
+      getDisplayRank(
+        profile
+      )
+  };
+}
+
+
+function formatPlayerRanking(
+  context
+) {
+  if (!context) {
+    return "";
+  }
+
+  return (
+    ` | @${context.user}: ${context.rank} | ` +
+    `Rating: ${context.rating}`
+  );
+}
+
+
 export async function seasonRoute(
   request,
   env
@@ -164,13 +233,25 @@ export async function seasonRoute(
   const season =
     result.season;
 
+  const playerRanking =
+    await getPlayerRankingContext(
+      env,
+      user
+    );
+
+  const playerSuffix =
+    formatPlayerRanking(
+      playerRanking
+    );
+
   if (
     result.lifecycle === "ACTIVE"
   ) {
     return new Response(
       `🏆 ${season.name} [${season.id}] | Status: ATIVA | ` +
       `Tempo restante: ${formatRemainingTime(result.remainingMs)} | ` +
-      `Encerra: ${formatDateTime(season.endsAt)}.`
+      `Encerra: ${formatDateTime(season.endsAt)}` +
+      `${playerSuffix}.`
     );
   }
 
@@ -180,7 +261,8 @@ export async function seasonRoute(
     return new Response(
       `🏆 ${season.name} [${season.id}] | Status: AGENDADA | ` +
       `Início: ${formatDateTime(season.startsAt)} | ` +
-      `Fim: ${formatDateTime(season.endsAt)}.`
+      `Fim: ${formatDateTime(season.endsAt)}` +
+      `${playerSuffix}.`
     );
   }
 
@@ -189,12 +271,14 @@ export async function seasonRoute(
   ) {
     return new Response(
       `🏆 ${season.name} [${season.id}] | Status: EXPIRADA | ` +
-      `Aguardando encerramento administrativo.`
+      `Aguardando encerramento administrativo` +
+      `${playerSuffix}.`
     );
   }
 
   return new Response(
     `🏆 ${season.name} [${season.id}] | Status: ENCERRADA | ` +
-    `Encerrada em: ${formatDateTime(season.endedAt)}.`
+    `Encerrada em: ${formatDateTime(season.endedAt)}` +
+    `${playerSuffix}.`
   );
 }
