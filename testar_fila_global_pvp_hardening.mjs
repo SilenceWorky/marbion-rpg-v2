@@ -123,7 +123,14 @@ console.log("=== HARDENING FILA GLOBAL DE PVP ===");
   assert.equal(data.queue.length, 1);
   assert.equal(data.queue[0].challenger, "gamma");
 
-  console.log("✅ FIFO, posição e bloqueio de duplicidade permanecem consistentes.");
+  const next2 =
+    dequeueNextPvp(data);
+
+  assert.equal(next2.challenger, "gamma");
+  assert.equal(next2.target, "delta");
+  assert.equal(dequeueNextPvp(data), null);
+
+  console.log("✅ FIFO, posição, esgotamento e bloqueio de duplicidade permanecem consistentes.");
 }
 
 
