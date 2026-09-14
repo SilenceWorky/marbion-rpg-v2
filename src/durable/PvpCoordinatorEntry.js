@@ -9,6 +9,14 @@ import {
   endCurrentPvpSeason
 } from "../systems/pvp-season-service.js";
 
+import {
+  activateDueScheduledPvpSeason
+} from "../systems/pvp-season-activation.js";
+
+import {
+  findNextScheduledPvpSeason
+} from "../systems/pvp-season-next-schedule.js";
+
 
 function readOptionalNumber(
   searchParams,
@@ -72,6 +80,137 @@ function getSeasonErrorStatus(
  * já validado de combate, fila, AFK e ranking.
  */
 export class PvpCoordinator extends BasePvpCoordinator {
+  /*
+   * O coordenador já possui um único alarm
+   * compartilhado por desafio pendente e timeout
+   * de batalha. A temporada entra como mais um
+   * candidato, sem substituir um evento PvP que
+   * precise acontecer antes dela.
+   */
+  async scheduleCoordinatorAlarm(
+    data = null,
+    preferredBattle = null
+  ) {
+    const baseResult =
+      await super.scheduleCoordinatorAlarm(
+        data,
+        preferredBattle
+      );
+
+    const now =
+      Date.now();
+
+    const nextSeason =
+      await findNextScheduledPvpSeason(
+        this.state.storage,
+        now
+      );
+
+    if (
+      !nextSeason.ok ||
+      !nextSeason.entry ||
+      !Number.isFinite(
+        Number(nextSeason.alarmAt)
+      )
+    ) {
+      return baseResult;
+    }
+
+    const seasonAlarmAt =
+      Number(
+        nextSeason.alarmAt
+      );
+
+    let currentAlarmAt =
+      Number(
+        baseResult?.alarmAt
+      );
+
+    if (
+      typeof this.state.storage.getAlarm ===
+      "function"
+    ) {
+      try {
+        const storedAlarm =
+          await this.state.storage.getAlarm();
+
+        if (
+          Number.isFinite(
+            Number(storedAlarm)
+          )
+        ) {
+          currentAlarmAt =
+            Number(storedAlarm);
+        }
+      }
+      catch {
+        // Mantemos o resultado do scheduler base.
+      }
+    }
+
+    if (
+      Number.isFinite(currentAlarmAt) &&
+      currentAlarmAt <= seasonAlarmAt
+    ) {
+      return baseResult;
+    }
+
+    if (
+      typeof this.state.storage.setAlarm !==
+      "function"
+    ) {
+      return baseResult;
+    }
+
+    await this.state.storage.setAlarm(
+      seasonAlarmAt
+    );
+
+    return {
+      ok: true,
+      scheduled: true,
+      kind: "season",
+      stage: "SEASON_START",
+      alarmAt:
+        seasonAlarmAt,
+      seasonId:
+        nextSeason.entry.id
+    };
+  }
+
+
+  async alarm() {
+    const alarmNow =
+      Date.now();
+
+    const seasonActivation =
+      await activateDueScheduledPvpSeason(
+        this.state.storage,
+        alarmNow
+      );
+
+    if (!seasonActivation.ok) {
+      console.error(
+        "[PVP_SEASON_ACTIVATION]",
+        seasonActivation.error
+      );
+    }
+
+    const baseResult =
+      await super.alarm();
+
+    /*
+     * super.alarm() pode criar, substituir ou
+     * remover o alarm ao tratar PvP. Recalculamos
+     * ao final para garantir que a próxima
+     * temporada futura continue registrada.
+     */
+    await this.scheduleCoordinatorAlarm();
+
+    return baseResult;
+  }
+
+
   async fetch(
     request
   ) {
