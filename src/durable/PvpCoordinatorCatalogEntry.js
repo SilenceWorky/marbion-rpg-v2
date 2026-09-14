@@ -65,6 +65,30 @@ function getCatalogSyncStatus(
  * mantendo o restante do PvP intacto.
  */
 export class PvpCoordinator extends SeasonPvpCoordinator {
+  /*
+   * O motor PvP legado limpa o alarm quando uma batalha acaba,
+   * é desistida ou deixa de precisar do timeout de turno.
+   *
+   * Como agora o mesmo Durable Object também usa esse único
+   * alarm para a próxima temporada, uma limpeza PvP não pode
+   * apagar silenciosamente um início mensal já agendado.
+   *
+   * Primeiro preservamos exatamente a limpeza original; em
+   * seguida, recalculamos o alarm compartilhado. Assim desafios
+   * ou batalhas que ainda existirem continuam tendo prioridade,
+   * e a temporada volta a ocupar o alarm quando for o próximo
+   * evento real.
+   */
+  async clearBattleTurnAlarm() {
+    const result =
+      await super.clearBattleTurnAlarm();
+
+    await this.scheduleCoordinatorAlarm();
+
+    return result;
+  }
+
+
   async fetch(
     request
   ) {
