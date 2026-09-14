@@ -16,6 +16,7 @@ import { acceptRoute } from "./routes/accept.js";
 import { attackRoute } from "./routes/attack.js";
 import { rankRoute } from "./routes/rank.js";
 import { estadoRoute } from "./routes/estado.js";
+import { seasonRoute } from "./routes/season.js";
 
 
 export async function handleRequest(request, env, ctx) {
@@ -143,6 +144,13 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/rank") {
     return rankRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/temporada") {
+    return seasonRoute(
       request,
       env
     );
