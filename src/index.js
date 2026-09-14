@@ -5,7 +5,7 @@ import {
 
 export {
   PvpCoordinator
-} from "./durable/PvpCoordinator.js";
+} from "./durable/PvpCoordinatorEntry.js";
 
 
 export default {
