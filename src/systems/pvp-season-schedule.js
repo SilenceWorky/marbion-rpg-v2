@@ -16,6 +16,9 @@ export const PVP_SEASON_SCHEDULE_VERSION = 1;
 export const PVP_SEASON_SCHEDULE_STATUS_SCHEDULED =
   "SCHEDULED";
 
+export const PVP_SEASON_SCHEDULE_SOURCE_CATALOG =
+  "CATALOG";
+
 
 function normalizeTimestamp(value) {
   const timestamp =
@@ -29,6 +32,14 @@ function normalizeTimestamp(value) {
   }
 
   return Math.round(timestamp);
+}
+
+
+function normalizeScheduleSource(value) {
+  return value ===
+    PVP_SEASON_SCHEDULE_SOURCE_CATALOG
+      ? PVP_SEASON_SCHEDULE_SOURCE_CATALOG
+      : null;
 }
 
 
@@ -73,7 +84,10 @@ export function createPvpSeasonYearSchedule(
 
 export function createScheduledPvpSeasonMonth(
   definition,
-  scheduledAt = Date.now()
+  scheduledAt = Date.now(),
+  {
+    source = null
+  } = {}
 ) {
   const normalizedDefinition =
     normalizePvpSeasonPlanMonth(
@@ -109,9 +123,28 @@ export function createScheduledPvpSeasonMonth(
     return bounds;
   }
 
+  const normalizedSource =
+    normalizeScheduleSource(
+      source
+    );
+
+  /*
+   * Agendamento manual/administrativo continua precisando existir
+   * antes da virada do mês.
+   *
+   * A única exceção é uma entrada do catálogo oficial: o catálogo
+   * já representa autorização prévia, então uma falha/atraso do sync
+   * pode persistir o snapshot durante o próprio mês. Os limites civis
+   * permanecem intactos e o mês nunca pode ser recuperado depois de
+   * seu endsAt.
+   */
   if (
-    timestamp >=
-    bounds.startsAt
+    timestamp >= bounds.startsAt &&
+    (
+      normalizedSource !==
+        PVP_SEASON_SCHEDULE_SOURCE_CATALOG ||
+      timestamp >= bounds.endsAt
+    )
   ) {
     return {
       ok: false,
@@ -144,7 +177,15 @@ export function createScheduledPvpSeasonMonth(
       endsAt:
         bounds.endsAt,
       scheduledAt:
-        timestamp
+        timestamp,
+      ...(
+        normalizedSource
+          ? {
+              source:
+                normalizedSource
+            }
+          : {}
+      )
     }
   };
 }
@@ -181,6 +222,11 @@ export function normalizePvpSeasonScheduleMonth(
       value.scheduledAt
     );
 
+  const source =
+    normalizeScheduleSource(
+      value.source
+    );
+
   if (
     !year ||
     !month ||
@@ -198,7 +244,14 @@ export function normalizePvpSeasonScheduleMonth(
 
   if (
     !bounds.ok ||
-    scheduledAt >= bounds.startsAt
+    (
+      scheduledAt >= bounds.startsAt &&
+      (
+        source !==
+          PVP_SEASON_SCHEDULE_SOURCE_CATALOG ||
+        scheduledAt >= bounds.endsAt
+      )
+    )
   ) {
     return null;
   }
@@ -227,7 +280,12 @@ export function normalizePvpSeasonScheduleMonth(
       bounds.startsAt,
     endsAt:
       bounds.endsAt,
-    scheduledAt
+    scheduledAt,
+    ...(
+      source
+        ? { source }
+        : {}
+    )
   };
 }
 
@@ -365,7 +423,8 @@ export function setPvpSeasonScheduledMonth(
       !previous ||
       previous.name !== normalizedEntry.name ||
       previous.startsAt !== normalizedEntry.startsAt ||
-      previous.endsAt !== normalizedEntry.endsAt,
+      previous.endsAt !== normalizedEntry.endsAt ||
+      previous.source !== normalizedEntry.source,
     entry:
       normalizedEntry,
     schedule: {
