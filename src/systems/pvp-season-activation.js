@@ -12,6 +12,10 @@ import {
 } from "./pvp-season-schedule-store.js";
 
 import {
+  cleanupExpiredScheduledPvpSeasons
+} from "./pvp-season-schedule-cleanup.js";
+
+import {
   readCurrentPvpSeason
 } from "./pvp-season-store.js";
 
@@ -32,6 +36,22 @@ export async function activateDueScheduledPvpSeason(
       ok: false,
       error: "INVALID_SEASON_ACTIVATION_TIME"
     };
+  }
+
+  /*
+   * Antes de procurar o mês atual, removemos snapshots cuja
+   * janela civil já terminou. Isso impede que uma temporada que
+   * nunca conseguiu ativar permaneça órfã como SCHEDULED após
+   * sua virada mensal (inclusive entre anos).
+   */
+  const expiredCleanup =
+    await cleanupExpiredScheduledPvpSeasons(
+      storage,
+      now
+    );
+
+  if (!expiredCleanup.ok) {
+    return expiredCleanup;
   }
 
   const scheduleResult =
