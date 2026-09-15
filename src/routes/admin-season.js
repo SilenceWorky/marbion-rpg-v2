@@ -2,6 +2,11 @@ import {
   isAdminUser
 } from "../config/admins.js";
 
+import {
+  getMonthlySeasonBounds,
+  getSeasonBaseTheme
+} from "../systems/pvp-season-calendar.js";
+
 
 function normalizeUser(value) {
   return String(value ?? "")
@@ -17,6 +22,16 @@ function normalizeCommand(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
     .toLowerCase();
+}
+
+
+function getUsage(actor) {
+  return (
+    `@${actor}, uso: ` +
+    `!adm temporada definir <ano> <mês> <nome> | ` +
+    `!adm temporada cancelar <ano> <mês> | ` +
+    `!adm temporada encerrar`
+  );
 }
 
 
@@ -147,68 +162,199 @@ export async function adminSeasonRoute(
     command !== "temporada"
   ) {
     return new Response(
-      `@${actor}, uso: !adm temporada iniciar <ID> <nome> | !adm temporada encerrar`
+      getUsage(actor)
     );
   }
 
 
   if (
-    operation === "iniciar"
+    operation === "iniciar" ||
+    operation === "agendar"
   ) {
-    const id =
-      String(args[2] ?? "").trim();
+    return new Response(
+      `@${actor}, o comando legado de início/agendamento manual foi desativado. ` +
+      `Use !adm temporada definir <ano> <mês> <nome>.`
+    );
+  }
+
+
+  if (
+    operation === "definir"
+  ) {
+    const year =
+      args[2];
+
+    const month =
+      args[3];
 
     const name =
-      args.slice(3).join(" ").trim();
+      args.slice(4)
+        .join(" ")
+        .trim();
+
+    const bounds =
+      getMonthlySeasonBounds(
+        year,
+        month
+      );
 
     if (
-      !id ||
+      !bounds.ok ||
       !name
     ) {
       return new Response(
-        `@${actor}, uso: !adm temporada iniciar <ID> <nome>`
+        `@${actor}, uso: !adm temporada definir <ano> <mês> <nome>`
       );
     }
 
-    const startUrl =
-      new URL(
-        "https://pvp.internal/season/start"
+    if (
+      Date.now() >=
+      bounds.startsAt
+    ) {
+      return new Response(
+        `@${actor}, só é possível definir e autorizar uma temporada antes do início do mês correspondente.`
+      );
+    }
+
+    const baseTheme =
+      getSeasonBaseTheme(
+        bounds.month
       );
 
-    startUrl.searchParams.set(
-      "id",
-      id
+    if (!baseTheme) {
+      return new Response(
+        `@${actor}, ${bounds.monthName}/${bounds.year} ainda não possui tema-base canônico configurado e não pode ser autorizado.`
+      );
+    }
+
+    const defineUrl =
+      new URL(
+        "https://pvp.internal/season/plan/define"
+      );
+
+    defineUrl.searchParams.set(
+      "year",
+      String(bounds.year)
     );
 
-    startUrl.searchParams.set(
+    defineUrl.searchParams.set(
+      "month",
+      String(bounds.month)
+    );
+
+    defineUrl.searchParams.set(
       "name",
       name
+    );
+
+    const defined =
+      await callCoordinator(
+        env,
+        `${defineUrl.pathname}${defineUrl.search}`
+      );
+
+    if (!defined.ok) {
+      return new Response(
+        `@${actor}, não foi possível definir a temporada.`
+      );
+    }
+
+    const scheduleUrl =
+      new URL(
+        "https://pvp.internal/season/schedule/add"
+      );
+
+    scheduleUrl.searchParams.set(
+      "year",
+      String(bounds.year)
+    );
+
+    scheduleUrl.searchParams.set(
+      "month",
+      String(bounds.month)
+    );
+
+    const scheduled =
+      await callCoordinator(
+        env,
+        `${scheduleUrl.pathname}${scheduleUrl.search}`
+      );
+
+    if (!scheduled.ok) {
+      if (
+        scheduled.error ===
+          "SEASON_SCHEDULE_WINDOW_CLOSED"
+      ) {
+        return new Response(
+          `@${actor}, o mês começou antes de o agendamento ser concluído. A temporada não foi autorizada.`
+        );
+      }
+
+      return new Response(
+        `@${actor}, o nome foi salvo, mas não foi possível autorizar/agendar a temporada. Repita o comando.`
+      );
+    }
+
+    return new Response(
+      `🏆 ADM | ${bounds.monthName}/${bounds.year} preparada: ` +
+      `${defined.definition.name} [${defined.definition.id}]. ` +
+      `Início automático no dia 1 às 00:00 (${bounds.timezone}).`
+    );
+  }
+
+
+  if (
+    operation === "cancelar"
+  ) {
+    const bounds =
+      getMonthlySeasonBounds(
+        args[2],
+        args[3]
+      );
+
+    if (!bounds.ok) {
+      return new Response(
+        `@${actor}, uso: !adm temporada cancelar <ano> <mês>`
+      );
+    }
+
+    const cancelUrl =
+      new URL(
+        "https://pvp.internal/season/schedule/cancel"
+      );
+
+    cancelUrl.searchParams.set(
+      "year",
+      String(bounds.year)
+    );
+
+    cancelUrl.searchParams.set(
+      "month",
+      String(bounds.month)
     );
 
     const result =
       await callCoordinator(
         env,
-        `${startUrl.pathname}${startUrl.search}`
+        `${cancelUrl.pathname}${cancelUrl.search}`
       );
 
     if (!result.ok) {
-      if (
-        result.error ===
-        "SEASON_ALREADY_EXISTS"
-      ) {
-        return new Response(
-          `@${actor}, já existe uma temporada atual. Encerre-a antes de iniciar outra.`
-        );
-      }
-
       return new Response(
-        `@${actor}, não foi possível iniciar a temporada.`
+        `@${actor}, não foi possível cancelar o agendamento da temporada.`
+      );
+    }
+
+    if (!result.changed) {
+      return new Response(
+        `@${actor}, não existe agendamento para ${bounds.monthName}/${bounds.year}. ` +
+        `Se a temporada já estiver ACTIVE, use !adm temporada encerrar.`
       );
     }
 
     return new Response(
-      `🏆 ADM | Temporada iniciada: ${result.season.name} [${result.season.id}]. ` +
-      `Duração padrão: 30 dias.`
+      `🏆 ADM | Agendamento de ${bounds.monthName}/${bounds.year} cancelado. ` +
+      `O nome planejado foi preservado.`
     );
   }
 
@@ -251,6 +397,6 @@ export async function adminSeasonRoute(
 
 
   return new Response(
-    `@${actor}, uso: !adm temporada iniciar <ID> <nome> | !adm temporada encerrar`
+    getUsage(actor)
   );
 }
