@@ -1,7 +1,7 @@
 # Marbion RPG V2 — Ranking, anti-farm, reset de Elo e temporadas
 
 Data canônica original: 2026-09-11
-Atualização canônica: 2026-09-14
+Atualização canônica: 2026-09-15
 
 Este documento registra as decisões de design tomadas após a validação em produção da Fila Global de PvP e foi atualizado para refletir a arquitetura mensal de temporadas consolidada na Etapa 24.
 
@@ -12,7 +12,7 @@ Este documento registra as decisões de design tomadas após a validação em pr
 - Matriz elemental / combos V1 / Counter / Refletir: núcleo fechado.
 - Fila Global de PvP: validada localmente e em produção na Twitch.
 - `!recusar`, `!desistir`, timeout/AFK, anti-farm, Ranking Dinâmico V2 e resets administrativos de Elo: implementados e validados.
-- Etapa 24 — Temporadas: infraestrutura mensal, planejamento, agendamento, catálogo, ativação, encerramento, retries e comandos ADM implementados no GitHub/local; ainda não liberada como temporada real em produção.
+- Etapa 24 — Temporadas: infraestrutura mensal, planejamento, agendamento, catálogo, ativação, encerramento, retries e comandos ADM implementados, testados localmente e **implantados em produção em 15/09/2026**. O deploy passou em smoke tests de produção sem criar nenhuma temporada real.
 - Etapa 25 — Passe de batalha: pendente.
 - Etapa 26 — soft reset, snapshot final e recompensas de fim de temporada: pendente.
 
@@ -291,7 +291,8 @@ As proteções já validadas garantem que:
 - um timeout PvP anterior à temporada mantém prioridade;
 - limpar um alarm de batalha não apaga silenciosamente um início/fim mensal;
 - múltiplas temporadas futuras preservam a mais próxima;
-- retry transitório de batalha de 1 segundo não é substituído por um evento mensal mais distante.
+- retry transitório de batalha de 1 segundo não é substituído por um evento mensal mais distante;
+- candidatos ausentes não podem virar `0` por `Number(null)` e roubar prioridade do retry PvP.
 
 ## 13. Renomeação de temporada futura
 
@@ -401,24 +402,46 @@ Importante: finalizar uma temporada nunca cria automaticamente um mês indefinid
 
 ## 17. Estado de implantação
 
-A arquitetura mensal mais nova está no GitHub/local e ainda não deve ser confundida com uma temporada real ativa em produção.
+A infraestrutura mensal da Etapa 24 foi implantada no Worker de produção em **15/09/2026**, sem cadastrar ou ativar nenhuma temporada real.
 
-Regras de segurança para a liberação:
-- não criar setembro de 2026 em produção agora;
+Smoke tests realizados após o deploy:
+
+```txt
+/temporada?user=silenceworky
+→ respondeu que não há temporada cadastrada
+
+/season/start
+→ HTTP 404 / rota pública não encontrada
+
+/rank?user=silenceworky
+→ perfil competitivo preservado
+
+/estado?user=silenceworky
+→ estado do perfil preservado
+```
+
+Isso confirma que:
+- o Worker novo está respondendo normalmente;
+- o deploy não inventou uma temporada;
+- a rota interna/legada de início arbitrário não ficou exposta publicamente;
+- o estado competitivo e o perfil existente foram preservados.
+
+Ainda **não** foi realizado em produção um ciclo real `SCHEDULED → ACTIVE → ENDED`, porque isso exigiria criar uma temporada real. Esse teste fica deliberadamente adiado até existir autorização explícita para um mês oficial.
+
+Regras operacionais permanecem:
+- não criar temporada real apenas para testar;
 - não preencher nomes oficiais no catálogo sem aprovação;
-- não iniciar uma temporada manualmente só para testar;
-- completar primeiro os blocos que ainda forem necessários para a primeira versão jogável;
-- quando chegar o lançamento, autorizar explicitamente os meses desejados.
+- não iniciar temporada manualmente;
+- autorizar explicitamente cada mês real antes de ele poder entrar em produção.
 
 ## 18. Próxima ordem de implementação
 
-1. Manter a documentação sincronizada com a arquitetura mensal.
-2. Fechar a Etapa 24 e validar somente regressões realmente afetadas pelas últimas mudanças.
-3. Implementar Etapa 25 — XP de temporada e Passe de Batalha.
-4. Implementar Etapa 26 — snapshot, recompensas de fim, soft reset e histórico sazonal.
-5. Preparar a primeira temporada oficial apenas quando a versão jogável estiver pronta.
-6. Fazer deploy controlado sem criar temporada não autorizada.
-7. Validar em produção primeiro em modo sem temporada ativa; depois liberar o mês oficial quando decidido.
+1. Etapa 24 — infraestrutura mensal: **implantada em produção e smoke-testada**.
+2. Implementar Etapa 25 — XP de temporada e Passe de Batalha.
+3. Implementar Etapa 26 — snapshot, recompensas de fim, soft reset e histórico sazonal.
+4. Preparar a primeira temporada oficial apenas quando a versão jogável estiver pronta.
+5. Autorizar explicitamente o mês oficial escolhido.
+6. Na primeira temporada real, validar em produção o ciclo `SCHEDULED → ACTIVE → ENDED` sem alterar os limites canônicos.
 
 ## 19. Observação de balanceamento
 
