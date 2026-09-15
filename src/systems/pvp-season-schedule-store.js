@@ -173,7 +173,10 @@ export async function schedulePvpSeasonYearMonth(
     year,
     month
   } = {},
-  now = Date.now()
+  now = Date.now(),
+  {
+    source = null
+  } = {}
 ) {
   const normalizedYear =
     normalizeSeasonYear(year);
@@ -268,7 +271,8 @@ export async function schedulePvpSeasonYearMonth(
   const entryResult =
     createScheduledPvpSeasonMonth(
       definition,
-      now
+      now,
+      { source }
     );
 
   if (!entryResult.ok) {
