@@ -13,7 +13,12 @@ function createStorage() {
   const data =
     new Map();
 
+  let alarmAt =
+    null;
+
   return {
+    data,
+
     async get(key) {
       return data.get(key);
     },
@@ -27,6 +32,42 @@ function createStorage() {
 
     async delete(key) {
       data.delete(key);
+    },
+
+    async list({ prefix } = {}) {
+      const result =
+        new Map();
+
+      for (
+        const [key, value]
+        of data.entries()
+      ) {
+        if (
+          !prefix ||
+          String(key).startsWith(prefix)
+        ) {
+          result.set(
+            key,
+            structuredClone(value)
+          );
+        }
+      }
+
+      return result;
+    },
+
+    async getAlarm() {
+      return alarmAt;
+    },
+
+    async setAlarm(value) {
+      alarmAt =
+        Number(value);
+    },
+
+    async deleteAlarm() {
+      alarmAt =
+        null;
     }
   };
 }
@@ -78,12 +119,51 @@ async function textRequest(
 }
 
 
-console.log("=== ROTAS PÚBLICAS E ADM DE TEMPORADA ===");
+function admUrl(
+  actor,
+  args
+) {
+  const url =
+    new URL(
+      "https://worker.test/adm"
+    );
+
+  url.searchParams.set(
+    "actor",
+    actor
+  );
+
+  url.searchParams.set(
+    "key",
+    "test-admin-key"
+  );
+
+  url.searchParams.set(
+    "args",
+    args
+  );
+
+  return url.toString();
+}
 
 
-{
+console.log("=== ROTAS PÚBLICAS E ADM DE TEMPORADA MENSAL ===");
+
+
+const originalDateNow =
+  Date.now;
+
+try {
+  const now =
+    Date.parse(
+      "2026-08-20T12:00:00.000-03:00"
+    );
+
+  Date.now = () => now;
+
   const env =
     createEnv();
+
 
   const empty =
     await textRequest(
@@ -97,12 +177,15 @@ console.log("=== ROTAS PÚBLICAS E ADM DE TEMPORADA ===");
     /não há temporada ranqueada/i
   );
 
-  console.log("✅ !temporada informa corretamente quando não existe temporada atual.");
+  console.log("✅ !temporada informa corretamente quando não existe temporada atual ou agendada.");
 
 
   const unauthorized =
     await textRequest(
-      "https://worker.test/adm?actor=naoadmin&key=test-admin-key&args=temporada%20iniciar%20S1%20Temporada%201",
+      admUrl(
+        "naoadmin",
+        "temporada definir 2026 9 Jardim do Criador"
+      ),
       env
     );
 
@@ -111,81 +194,132 @@ console.log("=== ROTAS PÚBLICAS E ADM DE TEMPORADA ===");
     403
   );
 
-  console.log("✅ Comandos administrativos de temporada respeitam permissão de ADM.");
+  console.log("✅ Comandos administrativos de temporada continuam exigindo permissão de ADM.");
 
 
-  const start =
+  const legacyStart =
     await textRequest(
-      "https://worker.test/adm?actor=silenceworky&key=test-admin-key&args=temporada%20iniciar%20S1%20Temporada%201",
+      admUrl(
+        "silenceworky",
+        "temporada iniciar S1 Temporada 1"
+      ),
       env
     );
 
-  assert.equal(start.response.status, 200);
-  assert.match(
-    start.text,
-    /Temporada iniciada: Temporada 1 \[S1\]/
+  assert.equal(
+    legacyStart.response.status,
+    200
   );
 
-  console.log("✅ !adm temporada iniciar cria a temporada global pelo dispatcher real.");
+  assert.match(
+    legacyStart.text,
+    /comando legado.*desativado/i
+  );
 
-
-  const current =
+  const stillEmpty =
     await textRequest(
       "https://worker.test/temporada?user=teste",
       env
     );
 
-  assert.equal(current.response.status, 200);
-  assert.match(current.text, /Temporada 1 \[S1\]/);
-  assert.match(current.text, /Status: ATIVA/);
-  assert.match(current.text, /Tempo restante:/);
+  assert.match(
+    stillEmpty.text,
+    /não há temporada ranqueada/i
+  );
 
-  console.log("✅ !temporada consulta e formata a temporada ativa pelo router real.");
+  console.log("✅ !adm temporada iniciar permanece bloqueado e não cria temporada arbitrária.");
 
 
-  const duplicate =
+  const defined =
     await textRequest(
-      "https://worker.test/adm?actor=silenceworky&key=test-admin-key&args=temporada%20iniciar%20S2%20Temporada%202",
+      admUrl(
+        "silenceworky",
+        "temporada definir 2026 9 Jardim Desperto"
+      ),
       env
     );
 
-  assert.match(
-    duplicate.text,
-    /já existe uma temporada atual/i
+  assert.equal(
+    defined.response.status,
+    200
   );
 
-  console.log("✅ ADM não consegue sobrescrever silenciosamente uma temporada existente.");
-
-
-  const end =
-    await textRequest(
-      "https://worker.test/adm?actor=silenceworky&key=test-admin-key&args=temporada%20encerrar",
-      env
-    );
-
-  assert.equal(end.response.status, 200);
   assert.match(
-    end.text,
-    /Temporada encerrada: Temporada 1 \[S1\]/
-  );
-  assert.match(
-    end.text,
-    /Soft reset e recompensas ainda não foram executados/
+    defined.text,
+    /Setembro\/2026 preparada/i
   );
 
-  console.log("✅ !adm temporada encerrar persiste o encerramento sem executar soft reset prematuramente.");
+  assert.match(
+    defined.text,
+    /Início automático no dia 1/i
+  );
+
+  console.log("✅ !adm temporada definir prepara e autoriza o mês futuro sem iniciar imediatamente.");
 
 
-  const ended =
+  const scheduled =
     await textRequest(
       "https://worker.test/temporada?user=teste",
       env
     );
 
-  assert.match(ended.text, /Status: ENCERRADA/);
+  assert.equal(
+    scheduled.response.status,
+    200
+  );
 
-  console.log("✅ !temporada passa a exibir a temporada encerrada corretamente.");
+  assert.match(
+    scheduled.text,
+    /Jardim Desperto \[2026-09\]/
+  );
+
+  assert.match(
+    scheduled.text,
+    /Status: AGENDADA/
+  );
+
+  console.log("✅ !temporada exibe a próxima temporada mensal autorizada como AGENDADA.");
+
+
+  const cancelled =
+    await textRequest(
+      admUrl(
+        "silenceworky",
+        "temporada cancelar 2026 9"
+      ),
+      env
+    );
+
+  assert.equal(
+    cancelled.response.status,
+    200
+  );
+
+  assert.match(
+    cancelled.text,
+    /Agendamento de Setembro\/2026 cancelado/i
+  );
+
+  console.log("✅ !adm temporada cancelar remove a autorização temporal sem depender do fluxo legado.");
+
+
+  const afterCancel =
+    await textRequest(
+      "https://worker.test/temporada?user=teste",
+      env
+    );
+
+  assert.match(
+    afterCancel.text,
+    /não há temporada ranqueada/i
+  );
+
+  console.log("✅ Após cancelar, !temporada não inventa nem mantém uma temporada fantasma.");
+}
+finally {
+  Date.now =
+    originalDateNow;
 }
 
 
-console.log("\n🏆 TODOS OS TESTES DAS ROTAS DE TEMPORADA PASSARAM.");
+console.log("\n🏆 TODOS OS TESTES DAS ROTAS MENSAIS DE TEMPORADA PASSARAM.");
