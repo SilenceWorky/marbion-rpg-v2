@@ -18,7 +18,8 @@ import {
 } from "./pvp-season-plan-store.js";
 
 import {
-  getPvpSeasonScheduledMonth
+  getPvpSeasonScheduledMonth,
+  PVP_SEASON_SCHEDULE_SOURCE_CATALOG
 } from "./pvp-season-schedule.js";
 
 import {
@@ -144,8 +145,11 @@ export function listPvpSeasonCatalogEntries(
  * - catálogo apenas PREENCHE lacunas;
  * - definição já salva tem prioridade (futuro painel/site);
  * - agendamento já existente é preservado integralmente;
- * - mês que já começou não é criado no meio do caminho;
- * - nenhum pvp_current_season é criado aqui.
+ * - o catálogo oficial já vale como autorização prévia;
+ * - se o sync atrasar, o mês corrente pode ser persistido enquanto
+ *   ainda estiver dentro de seus limites civis canônicos;
+ * - mês já encerrado nunca é recuperado retroativamente;
+ * - nenhum pvp_current_season é criado diretamente aqui.
  */
 export async function syncPvpSeasonCatalog(
   storage,
@@ -180,6 +184,10 @@ export async function syncPvpSeasonCatalog(
     scheduled: [],
     preservedDefinitions: [],
     preservedSchedules: [],
+    bootstrappedStartedMonths: [],
+    skippedExpiredMonths: [],
+    // Compatibilidade com consumidores antigos do retorno.
+    // Agora contém apenas meses realmente encerrados.
     skippedStartedMonths: []
   };
 
@@ -188,21 +196,29 @@ export async function syncPvpSeasonCatalog(
     of listed.entries
   ) {
     /*
-     * Não criamos temporadas parciais.
-     * Se o mês já começou (ou exatamente chegou ao início),
-     * o catálogo não tenta cadastrá-lo tardiamente.
+     * O catálogo já representa autorização oficial. Por isso o mês
+     * corrente pode ser reconciliado tardiamente, mas um mês cujo
+     * endsAt já passou nunca é recriado retroativamente.
      */
     if (
-      entry.startsAt <= timestamp
+      entry.endsAt <= timestamp
     ) {
-      result.skippedStartedMonths.push({
+      const skipped = {
         year:
           entry.year,
         month:
           entry.month,
         name:
           entry.name
-      });
+      };
+
+      result.skippedExpiredMonths.push(
+        skipped
+      );
+
+      result.skippedStartedMonths.push(
+        skipped
+      );
 
       continue;
     }
@@ -312,7 +328,11 @@ export async function syncPvpSeasonCatalog(
           month:
             entry.month
         },
-        timestamp
+        timestamp,
+        {
+          source:
+            PVP_SEASON_SCHEDULE_SOURCE_CATALOG
+        }
       );
 
     if (!scheduled.ok) {
@@ -333,6 +353,26 @@ export async function syncPvpSeasonCatalog(
       scheduledAt:
         scheduled.entry.scheduledAt
     });
+
+    if (
+      entry.startsAt <= timestamp &&
+      timestamp < entry.endsAt
+    ) {
+      result.bootstrappedStartedMonths.push({
+        year:
+          entry.year,
+        month:
+          entry.month,
+        name:
+          scheduled.entry.name,
+        startsAt:
+          scheduled.entry.startsAt,
+        endsAt:
+          scheduled.entry.endsAt,
+        scheduledAt:
+          scheduled.entry.scheduledAt
+      });
+    }
   }
 
   return result;
