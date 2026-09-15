@@ -6,7 +6,7 @@
 >
 > Legenda: **✔️ implementado e validado** | **🧪 implementado/em validação** | **⏳ pendente** | **🗃️ legado V1 ainda não migrado**
 >
-> Última atualização canônica: **13/09/2026**.
+> Última atualização canônica: **15/09/2026**.
 
 ---
 
@@ -1214,40 +1214,90 @@ Validação em produção:
 # 🗓️ TEMPORADAS E PASSE
 
 ## Temporadas ranqueadas
-Status V2: ⏳ **especificação definida**
+Status V2: 🧪 **infraestrutura mensal implementada e validada localmente; ainda não considerada implantada em produção**
 
-Duração inicial planejada: **30 dias**.
+Modelo canônico:
+- temporadas seguem **meses civis**, não uma duração fixa de 30 dias
+- timezone canônica: `America/Fortaleza` (UTC−03:00)
+- `startsAt` = dia 1 às 00:00 do mês correspondente
+- `endsAt` = dia 1 às 00:00 do mês seguinte
+- atraso técnico dentro do próprio mês NÃO prorroga o encerramento
+- mês já encerrado nunca é ativado retroativamente
+- mês sem definição/autorização não gera temporada automaticamente
 
-Cada temporada deverá possuir:
-- ID e nome
-- data de início
-- data de encerramento
-- XP de temporada separado do XP normal
-- níveis do passe
-- trilha de recompensas
-- itens / consumíveis / cosméticos
-- título exclusivo no final da trilha
-- snapshot final do ranking
-- histórico dos campeões / Prodígios da temporada
+Tema-base e nome anual são conceitos separados:
+- o tema-base pertence ao mês e pode ser reutilizado em anos diferentes
+- o nome da temporada varia por ano
+- Agosto possui tema-base canônico `Arquivo do Infinito`
+- Setembro possui tema-base canônico `Jardim do Criador`
+- outros meses só podem receber tema-base quando forem definidos oficialmente
 
-Comandos planejados:
+Planejamento/autorização:
+- uma temporada pode ser definida com antecedência de meses ou anos
+- o catálogo oficial pode preencher automaticamente meses autorizados
+- uma definição já persistida por painel/site/ADM tem prioridade sobre o catálogo
+- uma entrada presente no catálogo oficial conta como autorização prévia
+- se o cron falhar antes da meia-noite, o mês corrente ainda pode ser reconciliado enquanto `now < endsAt`
+- `scheduledAt` registra o horário real da primeira persistência/reconciliação
+- schedules vencidos são removidos para não permanecerem órfãos no storage
+
+Ativação/encerramento:
+- ativação ocorre automaticamente apenas para mês previamente autorizado
+- falha técnica de ativação gera retry horário dentro do próprio mês
+- retry nunca atravessa `endsAt`
+- temporada mensal ativa agenda seu próprio encerramento
+- na virada mensal, a anterior encerra antes da ativação do novo mês autorizado
+- se não existir nova temporada autorizada, nenhuma é inventada
+
+Alarm compartilhado:
+- temporada, desafio PvP, timeout de batalha, retry transitório e retry de ativação compartilham o Durable Object Alarm
+- prioridade é sempre do evento mais próximo
+- retry transitório de batalha de 1 segundo não pode ser substituído por candidato de temporada ausente
+
+Comandos atuais:
 ```txt
 !temporada
-!passe
-!adm temporada iniciar
+!adm temporada definir <ano> <mês> <nome>
+!adm temporada cancelar <ano> <mês>
 !adm temporada encerrar
 ```
 
-`!temporada`:
-- temporada atual
-- tempo restante
-- posição/rating do jogador
+Comandos legados desativados:
+```txt
+!adm temporada iniciar ...
+!adm temporada agendar ...
+```
 
-`!passe`:
-- XP de temporada
-- nível do passe
-- próxima recompensa
-- progresso
+`!temporada`:
+- exibe temporada ATIVA quando existir
+- exibe a próxima temporada AGENDADA quando não houver ativa
+- mostra início/fim ou tempo restante
+- inclui rank/rating do jogador quando disponível
+
+`!adm temporada definir`:
+- cria ou atualiza o planejamento do mês
+- autoriza/agendar internamente o mês futuro
+- não inicia imediatamente
+- só funciona antes do início do mês
+- exige tema-base canônico já configurado
+
+`!adm temporada cancelar`:
+- remove a autorização/agendamento temporal
+- preserva o nome planejado
+- se a temporada já estiver ativa, deve-se usar `encerrar`
+
+`!adm temporada encerrar`:
+- ferramenta administrativa de emergência
+- encerra a temporada atual
+- ainda não executa recompensas nem soft reset nesta etapa
+
+Ainda pendente antes de considerar o ciclo completo de temporadas finalizado:
+- deploy/validação real desta infraestrutura mensal em produção
+- snapshot final do ranking
+- histórico de campeões/Prodígios da temporada
+- recompensas/títulos de encerramento
+- soft reset de Elo sazonal
+- XP de temporada e Passe de Batalha
 
 ---
 
@@ -1287,14 +1337,16 @@ Exemplos:
 2700 → 2275
 ```
 
-Fluxo de encerramento:
+Fluxo de encerramento futuro:
 1. congelar/salvar ranking final
 2. conceder recompensas/títulos
 3. registrar campeões e Prodígios
 4. aplicar soft reset
 5. limpar/recalcular posições de Prodígio
 6. zerar XP/nível do passe encerrado
-7. iniciar a próxima temporada
+7. aguardar/ativar a próxima temporada somente se ela estiver previamente autorizada
+
+Nunca iniciar automaticamente um mês sem definição/autorização oficial.
 
 ---
 
@@ -1606,14 +1658,15 @@ Planejado:
 4. **`!desistir` / forfeit** — penalidade 2x e proteção precoce ✔️
 5. **Timeout/AFK + disciplina progressiva + hardening exact-once** ✔️
 6. **Reset administrativo de Elo individual e geral** ✔️
-7. **Temporadas ranqueadas + soft reset** ⏳
+7. **Temporadas ranqueadas — infraestrutura mensal** 🧪
 8. **Passe de batalha da Temporada 1** ⏳
-9. **Habilidades de Suporte com efeitos reais** ⏳
-10. **Aprendizado automático de habilidades por nível** ⏳
-11. **Combos Elementais V2 / novas reações** ⏳
-12. **Efeitos especiais de Tempo, Espaço, Gravidade e Matéria** ⏳
-13. **Individualidade básica do personagem** ⏳
-14. **Fundação Multi-Streamer / site / bot próprio** ⏳
+9. **Soft reset sazonal + snapshot/recompensas de encerramento** ⏳
+10. **Habilidades de Suporte com efeitos reais** ⏳
+11. **Aprendizado automático de habilidades por nível** ⏳
+12. **Combos Elementais V2 / novas reações** ⏳
+13. **Efeitos especiais de Tempo, Espaço, Gravidade e Matéria** ⏳
+14. **Individualidade básica do personagem** ⏳
+15. **Fundação Multi-Streamer / site / bot próprio** ⏳
 
 ## 🎒 PROGRESSÃO / ITENS
 
@@ -1707,7 +1760,7 @@ Planejado:
 
 ---
 
-# 📌 PONTO EXATO DE CONTINUIDADE — 13/09/2026
+# 📌 PONTO EXATO DE CONTINUIDADE — 15/09/2026
 
 Últimos sistemas concluídos e validados em produção:
 ```txt
@@ -1725,14 +1778,35 @@ Reset administrativo geral de Elo por geração ✔️
 - leitura comum de perfil não cria um Durable Object extra para consultar geração
 ```
 
-Próximo desenvolvimento:
+Desenvolvimento atual ainda NÃO considerado implantado em produção:
 ```txt
-Temporadas ranqueadas + soft reset de Elo
+Temporadas mensais por calendário civil 🧪
+- planejamento anual
+- autorização/agendamento mensal
+- catálogo oficial
+- ativação automática
+- bootstrap atrasado do mês corrente autorizado
+- retry horário de ativação
+- encerramento automático mensal
+- limpeza de schedules vencidos
+- prioridade segura do alarm compartilhado com PvP
+- comandos !adm temporada definir/cancelar/encerrar
+- !temporada exibindo ativa ou próxima agendada
+```
+
+Próximo passo técnico:
+```txt
+revisão final de prontidão da Etapa 24
+→ somente depois decidir deploy real da infraestrutura de temporadas
 ```
 
 Depois:
 ```txt
-passe de batalha
+Passe de batalha da Temporada 1
+→ snapshot/recompensas de encerramento
+→ soft reset sazonal de Elo
 → habilidades de Suporte com efeitos reais
 → aprendizado automático de habilidades por nível
 ```
+
+Regra operacional: nenhuma temporada real deve ser criada/ativada em produção sem autorização explícita.
