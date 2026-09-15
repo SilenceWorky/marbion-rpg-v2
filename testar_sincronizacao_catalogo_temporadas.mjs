@@ -13,6 +13,10 @@ import {
   readPvpSeasonYearSchedule
 } from "./src/systems/pvp-season-schedule-store.js";
 
+import {
+  PVP_SEASON_SCHEDULE_SOURCE_CATALOG
+} from "./src/systems/pvp-season-schedule.js";
+
 
 function createStorage() {
   const data =
@@ -69,8 +73,11 @@ const storage =
 
 const catalog = {
   2026: {
+    7: {
+      name: "Mês Já Encerrado"
+    },
     8: {
-      name: "Mês Já Iniciado"
+      name: "Mês Corrente Autorizado"
     },
     9: {
       name: "Nome do Arquivo"
@@ -123,13 +130,30 @@ assert.equal(first.ok, true);
 assert.equal(first.changed, true);
 
 assert.deepEqual(
+  first.skippedExpiredMonths.map(
+    item => `${item.year}-${item.month}`
+  ),
+  ["2026-7"]
+);
+
+assert.deepEqual(
   first.skippedStartedMonths.map(
+    item => `${item.year}-${item.month}`
+  ),
+  ["2026-7"]
+);
+
+console.log("✅ Mês já encerrado continua bloqueado e não é recuperado retroativamente.");
+
+
+assert.deepEqual(
+  first.bootstrappedStartedMonths.map(
     item => `${item.year}-${item.month}`
   ),
   ["2026-8"]
 );
 
-console.log("✅ Mês que já começou é ignorado e não vira temporada parcial por causa do catálogo.");
+console.log("✅ Mês corrente presente no catálogo oficial pode ser reconciliado depois da meia-noite.");
 
 
 const plan2026 =
@@ -140,6 +164,14 @@ const plan2026 =
 
 assert.equal(plan2026.ok, true);
 assert.equal(
+  plan2026.plan.months["07"],
+  undefined
+);
+assert.equal(
+  plan2026.plan.months["08"].name,
+  "Mês Corrente Autorizado"
+);
+assert.equal(
   plan2026.plan.months["09"].name,
   "Nome Editado no Painel"
 );
@@ -148,7 +180,7 @@ assert.equal(
   "Nome de Outubro"
 );
 
-console.log("✅ O catálogo preenche meses vazios, mas não sobrescreve um nome já salvo pelo futuro painel/site.");
+console.log("✅ O catálogo preenche meses válidos, mas não sobrescreve um nome já salvo pelo futuro painel/site.");
 
 
 const schedule2026 =
@@ -167,6 +199,30 @@ assert.equal(schedule2026.ok, true);
 assert.equal(schedule2027.ok, true);
 
 assert.equal(
+  schedule2026.schedule.months["07"],
+  undefined
+);
+assert.equal(
+  schedule2026.schedule.months["08"].name,
+  "Mês Corrente Autorizado"
+);
+assert.equal(
+  schedule2026.schedule.months["08"].source,
+  PVP_SEASON_SCHEDULE_SOURCE_CATALOG
+);
+assert.equal(
+  schedule2026.schedule.months["08"].scheduledAt,
+  firstSyncAt
+);
+assert.equal(
+  schedule2026.schedule.months["08"].startsAt,
+  Date.parse("2026-08-01T00:00:00.000-03:00")
+);
+assert.equal(
+  schedule2026.schedule.months["08"].endsAt,
+  Date.parse("2026-09-01T00:00:00.000-03:00")
+);
+assert.equal(
   schedule2026.schedule.months["09"].name,
   "Nome Editado no Painel"
 );
@@ -179,7 +235,8 @@ assert.equal(
   "Nome de Janeiro"
 );
 
-console.log("✅ Meses futuros presentes no catálogo são planejados e agendados automaticamente.");
+console.log("✅ Bootstrap tardio preserva startsAt/endsAt canônicos e registra o horário real do sync em scheduledAt.");
+console.log("✅ Meses futuros presentes no catálogo continuam planejados e agendados automaticamente.");
 
 
 assert.equal(
@@ -187,11 +244,11 @@ assert.equal(
   false
 );
 
-console.log("✅ Sincronizar o catálogo não ativa uma temporada antes da data correta.");
+console.log("✅ Sincronizar o catálogo prepara o mês atrasado sem criar diretamente pvp_current_season.");
 
 
 const originalScheduledAt =
-  schedule2026.schedule.months["09"].scheduledAt;
+  schedule2026.schedule.months["08"].scheduledAt;
 
 const secondSyncAt =
   Date.parse(
@@ -210,6 +267,10 @@ const second =
 
 assert.equal(second.ok, true);
 assert.equal(second.changed, false);
+assert.equal(
+  second.bootstrappedStartedMonths.length,
+  0
+);
 
 const scheduleAfterSecondSync =
   await readPvpSeasonYearSchedule(
@@ -218,11 +279,11 @@ const scheduleAfterSecondSync =
   );
 
 assert.equal(
-  scheduleAfterSecondSync.schedule.months["09"].scheduledAt,
+  scheduleAfterSecondSync.schedule.months["08"].scheduledAt,
   originalScheduledAt
 );
 
-console.log("✅ Reexecutar a sincronização é idempotente e preserva o scheduledAt original.");
+console.log("✅ Reexecutar a sincronização é idempotente e preserva o scheduledAt real da primeira reconciliação.");
 
 
 console.log("\n🏆 TODOS OS TESTES DA SINCRONIZAÇÃO DO CATÁLOGO PASSARAM.");
