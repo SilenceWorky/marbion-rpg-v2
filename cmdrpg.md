@@ -1214,7 +1214,7 @@ Validação em produção:
 # 🗓️ TEMPORADAS E PASSE
 
 ## Temporadas ranqueadas
-Status V2: 🧪 **infraestrutura mensal implementada e validada localmente; ainda não considerada implantada em produção**
+Status V2: ✔️ **infraestrutura mensal implantada em produção em 15/09/2026; smoke tests de leitura e isolamento passaram**
 
 Modelo canônico:
 - temporadas seguem **meses civis**, não uma duração fixa de 30 dias
@@ -1292,7 +1292,7 @@ Comandos legados desativados:
 - ainda não executa recompensas nem soft reset nesta etapa
 
 Ainda pendente antes de considerar o ciclo completo de temporadas finalizado:
-- deploy/validação real desta infraestrutura mensal em produção
+- validação do ciclo real `SCHEDULED → ACTIVE → ENDED` quando a primeira temporada oficial for autorizada
 - snapshot final do ranking
 - histórico de campeões/Prodígios da temporada
 - recompensas/títulos de encerramento
@@ -1658,7 +1658,7 @@ Planejado:
 4. **`!desistir` / forfeit** — penalidade 2x e proteção precoce ✔️
 5. **Timeout/AFK + disciplina progressiva + hardening exact-once** ✔️
 6. **Reset administrativo de Elo individual e geral** ✔️
-7. **Temporadas ranqueadas — infraestrutura mensal** 🧪
+7. **Temporadas ranqueadas — infraestrutura mensal implantada** ✔️
 8. **Passe de batalha da Temporada 1** ⏳
 9. **Soft reset sazonal + snapshot/recompensas de encerramento** ⏳
 10. **Habilidades de Suporte com efeitos reais** ⏳
@@ -1778,9 +1778,9 @@ Reset administrativo geral de Elo por geração ✔️
 - leitura comum de perfil não cria um Durable Object extra para consultar geração
 ```
 
-Desenvolvimento atual ainda NÃO considerado implantado em produção:
+Etapa 24 implantada em produção em 15/09/2026:
 ```txt
-Temporadas mensais por calendário civil 🧪
+Temporadas mensais por calendário civil ✔️
 - planejamento anual
 - autorização/agendamento mensal
 - catálogo oficial
@@ -1792,18 +1792,22 @@ Temporadas mensais por calendário civil 🧪
 - prioridade segura do alarm compartilhado com PvP
 - comandos !adm temporada definir/cancelar/encerrar
 - !temporada exibindo ativa ou próxima agendada
+- smoke test: nenhuma temporada cadastrada após deploy
+- smoke test: /season/start público retorna 404
+- smoke test: /rank preservou estado competitivo
+- smoke test: /estado preservou perfil e recursos
 ```
+
+A validação do ciclo real `SCHEDULED → ACTIVE → ENDED` fica reservada para a primeira temporada oficial autorizada. Nenhuma temporada real foi criada no deploy.
 
 Próximo passo técnico:
 ```txt
-revisão final de prontidão da Etapa 24
-→ somente depois decidir deploy real da infraestrutura de temporadas
+Etapa 25 — Passe de batalha da Temporada 1
 ```
 
 Depois:
 ```txt
-Passe de batalha da Temporada 1
-→ snapshot/recompensas de encerramento
+snapshot/recompensas de encerramento
 → soft reset sazonal de Elo
 → habilidades de Suporte com efeitos reais
 → aprendizado automático de habilidades por nível
