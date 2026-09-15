@@ -9,7 +9,8 @@ import {
 } from "./src/systems/pvp-season-plan-store.js";
 
 import {
-  schedulePvpSeasonYearMonth
+  schedulePvpSeasonYearMonth,
+  readPvpSeasonYearSchedule
 } from "./src/systems/pvp-season-schedule-store.js";
 
 import {
@@ -181,6 +182,10 @@ console.log("=== ATIVAÇÃO ATRASADA SEM PRORROGAR A TEMPORADA ===");
  * Caso 2:
  * Agosto foi autorizado, mas o sistema só tenta processá-lo já
  * em setembro. Agosto não pode nascer atrasado no mês seguinte.
+ *
+ * Além disso, o schedule vencido não pode permanecer órfão no
+ * storage. Ao detectar que aquele mês já fechou, a reconciliação
+ * deve descartá-lo sem criar pvp_current_season.
  */
 {
   const storage = createStorage();
@@ -225,7 +230,21 @@ console.log("=== ATIVAÇÃO ATRASADA SEM PRORROGAR A TEMPORADA ===");
   assert.equal(current.ok, true);
   assert.equal(current.season, null);
 
+  const augustSchedule =
+    await readPvpSeasonYearSchedule(
+      storage,
+      2026
+    );
+
+  assert.equal(augustSchedule.ok, true);
+  assert.equal(
+    augustSchedule.schedule?.months?.["08"] ?? null,
+    null,
+    "schedule expirado de agosto não pode permanecer órfão"
+  );
+
   console.log("✅ Se o processamento só ocorrer no mês seguinte, a temporada do mês anterior não é iniciada.");
+  console.log("✅ Um schedule mensal vencido é removido em vez de permanecer órfão no storage.");
 }
 
 
