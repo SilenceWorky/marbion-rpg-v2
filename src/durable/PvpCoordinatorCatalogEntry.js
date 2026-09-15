@@ -11,6 +11,11 @@ import {
 } from "../systems/pvp-season-next-schedule.js";
 
 import {
+  closeExpiredMonthlyPvpSeason,
+  getCurrentMonthlyPvpSeasonEndCandidate
+} from "../systems/pvp-season-expiration.js";
+
+import {
   getGlobalActivePvpBattle
 } from "../systems/pvp-queue.js";
 
@@ -114,14 +119,30 @@ function getBattleAlarmCandidate(
 }
 
 
+function getResultAlarmAt(
+  result
+) {
+  if (
+    result?.scheduled !== true ||
+    !Number.isFinite(
+      Number(result?.alarmAt)
+    )
+  ) {
+    return null;
+  }
+
+  return Number(result.alarmAt);
+}
+
+
 /*
  * Camada final do Durable Object global para o catálogo
  * oficial de temporadas.
  *
  * PvpCoordinatorEntry.js continua concentrando a integração
  * de planejamento, agendamento, alarm e ativação. Esta classe
- * apenas acrescenta a sincronização do catálogo de código,
- * mantendo o restante do PvP intacto.
+ * acrescenta sincronização do catálogo e as proteções finais do
+ * alarm compartilhado, mantendo o motor PvP original isolado.
  */
 export class PvpCoordinator extends SeasonPvpCoordinator {
   /*
@@ -131,10 +152,10 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
    * descarta esse falso desafio, porém isso poderia esconder um
    * alarm real de batalha que estava em segundo lugar.
    *
-   * Recalculamos somente o candidato real de batalha depois do
-   * coordenador completo e o restauramos quando ele ocorrer antes
-   * do resultado escolhido. Não alteramos o motor PvP legado nem
-   * a ordem normal entre desafios e batalhas reais.
+   * Depois de preservar esse candidato real de batalha, também
+   * inserimos o fim da temporada mensal atual na mesma disputa.
+   * Assim uma temporada encerra à meia-noite mesmo quando não há
+   * outra temporada futura autorizada para assumir em seguida.
    */
   async scheduleCoordinatorAlarm(
     data = null,
@@ -144,7 +165,10 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
       data ||
       await this.getData();
 
-    const result =
+    const now =
+      Date.now();
+
+    let result =
       await super.scheduleCoordinatorAlarm(
         currentData,
         preferredBattle
@@ -154,32 +178,69 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
       getBattleAlarmCandidate(
         currentData,
         preferredBattle,
-        Date.now()
+        now
       );
 
-    if (!battleAlarm) {
-      return result;
-    }
-
     if (
-      result?.kind === "battle"
+      battleAlarm &&
+      result?.kind !== "battle"
     ) {
+      const resultAlarmAt =
+        getResultAlarmAt(result);
+
+      if (
+        resultAlarmAt === null ||
+        battleAlarm.alarmAt <=
+          resultAlarmAt
+      ) {
+        if (
+          typeof this.state.storage.setAlarm ===
+          "function"
+        ) {
+          await this.state.storage.setAlarm(
+            battleAlarm.alarmAt
+          );
+
+          result =
+            battleAlarm;
+        }
+      }
+    }
+
+    const expiration =
+      await getCurrentMonthlyPvpSeasonEndCandidate(
+        this.state.storage,
+        now
+      );
+
+    if (!expiration.ok) {
+      console.error(
+        "[PVP_SEASON_EXPIRATION_ALARM]",
+        expiration.error
+      );
+
       return result;
     }
 
-    const resultAlarmAt =
-      Number(result?.alarmAt);
+    const endCandidate =
+      expiration.candidate;
 
-    const hasResultAlarm =
-      result?.scheduled === true &&
-      Number.isFinite(
-        resultAlarmAt
+    if (!endCandidate) {
+      return result;
+    }
+
+    const endAlarmAt =
+      Math.max(
+        now + 1,
+        Number(endCandidate.alarmAt)
       );
 
+    const selectedAlarmAt =
+      getResultAlarmAt(result);
+
     if (
-      hasResultAlarm &&
-      resultAlarmAt <
-        battleAlarm.alarmAt
+      selectedAlarmAt !== null &&
+      selectedAlarmAt <= endAlarmAt
     ) {
       return result;
     }
@@ -192,25 +253,51 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
     }
 
     await this.state.storage.setAlarm(
-      battleAlarm.alarmAt
+      endAlarmAt
     );
 
-    return battleAlarm;
+    return {
+      ok: true,
+      scheduled: true,
+      kind: "season",
+      stage: "SEASON_END",
+      alarmAt:
+        endAlarmAt,
+      seasonId:
+        endCandidate.season?.id ||
+        null
+    };
   }
 
 
   /*
-   * O alarm base possui dois caminhos transitórios em que agenda
-   * explicitamente um retry para now + 1000 ms. O coordenador de
-   * temporada recalcula o alarm ao final e, sem esta proteção,
-   * um turno já vencido poderia ser reinterpretado como now + 1.
+   * A virada mensal precisa obedecer esta ordem:
    *
-   * Quando o resultado base informa `deferred`, restauramos o
-   * retry de 1 segundo. Se uma temporada futura começar ainda
-   * antes desse retry, ela continua vencendo a disputa pelo único
-   * alarm do Durable Object.
+   * 1. encerrar a temporada anterior exatamente no endsAt;
+   * 2. permitir que a camada herdada ative o novo mês, se ele
+   *    estiver previamente autorizado/agendado;
+   * 3. processar normalmente o alarm PvP que compartilha o DO.
+   *
+   * Sem uma temporada seguinte autorizada, apenas o passo 1
+   * acontece. Nenhuma temporada é inventada automaticamente.
    */
   async alarm() {
+    const alarmNow =
+      Date.now();
+
+    const expiration =
+      await closeExpiredMonthlyPvpSeason(
+        this.state.storage,
+        alarmNow
+      );
+
+    if (!expiration.ok) {
+      console.error(
+        "[PVP_SEASON_EXPIRATION]",
+        expiration.error
+      );
+    }
+
     const result =
       await super.alarm();
 
@@ -235,7 +322,7 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
         now
       );
 
-    const seasonAlarmAt =
+    const seasonStartAlarmAt =
       nextSeason?.ok &&
       nextSeason?.entry &&
       Number.isFinite(
@@ -244,10 +331,46 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
         ? Number(nextSeason.alarmAt)
         : null;
 
+    const currentEnd =
+      await getCurrentMonthlyPvpSeasonEndCandidate(
+        this.state.storage,
+        now
+      );
+
+    const seasonEndAlarmAt =
+      currentEnd?.ok &&
+      currentEnd?.candidate &&
+      Number.isFinite(
+        Number(currentEnd.candidate.alarmAt)
+      )
+        ? Math.max(
+            now + 1,
+            Number(
+              currentEnd.candidate.alarmAt
+            )
+          )
+        : null;
+
+    const lifecycleAlarmAt =
+      [
+        seasonStartAlarmAt,
+        seasonEndAlarmAt
+      ]
+        .filter(
+          value =>
+            Number.isFinite(
+              Number(value)
+            )
+        )
+        .map(Number)
+        .sort(
+          (a, b) => a - b
+        )[0] ?? null;
+
     const alarmAt =
-      seasonAlarmAt !== null &&
-      seasonAlarmAt < retryAt
-        ? seasonAlarmAt
+      lifecycleAlarmAt !== null &&
+      lifecycleAlarmAt < retryAt
+        ? lifecycleAlarmAt
         : retryAt;
 
     await this.state.storage.setAlarm(
@@ -263,14 +386,8 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
    * é desistida ou deixa de precisar do timeout de turno.
    *
    * Como agora o mesmo Durable Object também usa esse único
-   * alarm para a próxima temporada, uma limpeza PvP não pode
-   * apagar silenciosamente um início mensal já agendado.
-   *
-   * Primeiro preservamos exatamente a limpeza original; em
-   * seguida, recalculamos o alarm compartilhado. Assim desafios
-   * ou batalhas que ainda existirem continuam tendo prioridade,
-   * e a temporada volta a ocupar o alarm quando for o próximo
-   * evento real.
+   * alarm para o ciclo mensal, uma limpeza PvP não pode apagar
+   * silenciosamente um início ou encerramento já agendado.
    */
   async clearBattleTurnAlarm() {
     const result =
