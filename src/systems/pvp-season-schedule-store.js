@@ -242,9 +242,9 @@ export async function schedulePvpSeasonYearMonth(
    * autorizado e não deve ser reescrito por retries,
    * pelo futuro painel ou por reconciliações repetidas.
    *
-   * Uma eventual edição de nome após o agendamento é
-   * uma política separada e será tratada explicitamente;
-   * não a escondemos dentro de um novo "agendar".
+   * Edições posteriores do nome são sincronizadas pela
+   * operação explícita syncScheduledPvpSeasonYearMonthName,
+   * preservando este contrato de idempotência.
    */
   const alreadyScheduled =
     existing.schedule
@@ -316,6 +316,141 @@ export async function schedulePvpSeasonYearMonth(
     ok: true,
     changed:
       next.changed,
+    entry:
+      next.entry,
+    schedule:
+      saved.schedule
+  };
+}
+
+
+/*
+ * Mantém o snapshot de um mês futuro alinhado com o nome
+ * do planejamento anual sem recriar o agendamento.
+ *
+ * O scheduledAt original, o ID e os limites civis permanecem
+ * intactos. Se o mês já foi ativado, seu agendamento já foi
+ * consumido/removido; portanto esta operação vira no-op e nunca
+ * renomeia automaticamente uma temporada ACTIVE.
+ */
+export async function syncScheduledPvpSeasonYearMonthName(
+  storage,
+  {
+    year,
+    month,
+    name
+  } = {}
+) {
+  const normalizedYear =
+    normalizeSeasonYear(year);
+
+  const normalizedMonth =
+    normalizeSeasonMonth(month);
+
+  const normalizedName =
+    String(name ?? "")
+      .trim();
+
+  if (!normalizedYear) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_YEAR"
+    };
+  }
+
+  if (!normalizedMonth) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_MONTH"
+    };
+  }
+
+  if (!normalizedName) {
+    return {
+      ok: false,
+      error: "INVALID_SEASON_NAME"
+    };
+  }
+
+  const existing =
+    await readPvpSeasonYearSchedule(
+      storage,
+      normalizedYear
+    );
+
+  if (!existing.ok) {
+    return existing;
+  }
+
+  if (!existing.schedule) {
+    return {
+      ok: true,
+      changed: false,
+      synced: false,
+      reason: "NO_SEASON_SCHEDULE",
+      schedule: null,
+      entry: null
+    };
+  }
+
+  const scheduled =
+    getPvpSeasonScheduledMonth(
+      existing.schedule,
+      normalizedMonth
+    );
+
+  if (!scheduled) {
+    return {
+      ok: true,
+      changed: false,
+      synced: false,
+      reason: "NO_SCHEDULED_SEASON_FOR_MONTH",
+      schedule:
+        existing.schedule,
+      entry: null
+    };
+  }
+
+  if (scheduled.name === normalizedName) {
+    return {
+      ok: true,
+      changed: false,
+      synced: true,
+      entry:
+        scheduled,
+      schedule:
+        existing.schedule
+    };
+  }
+
+  const next =
+    setPvpSeasonScheduledMonth(
+      existing.schedule,
+      {
+        ...scheduled,
+        name:
+          normalizedName
+      }
+    );
+
+  if (!next.ok) {
+    return next;
+  }
+
+  const saved =
+    await savePvpSeasonYearSchedule(
+      storage,
+      next.schedule
+    );
+
+  if (!saved.ok) {
+    return saved;
+  }
+
+  return {
+    ok: true,
+    changed: true,
+    synced: true,
     entry:
       next.entry,
     schedule:
