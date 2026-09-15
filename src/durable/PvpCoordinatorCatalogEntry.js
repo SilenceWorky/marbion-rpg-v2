@@ -7,12 +7,20 @@ import {
 } from "../systems/pvp-season-catalog-sync.js";
 
 import {
+  findNextScheduledPvpSeason
+} from "../systems/pvp-season-next-schedule.js";
+
+import {
   getGlobalActivePvpBattle
 } from "../systems/pvp-queue.js";
 
 import {
   getNextBattleTurnAlarmAt
 } from "../systems/pvp-timeout.js";
+
+
+const PVP_TRANSIENT_RETRY_MS =
+  1000;
 
 
 function readSyncTimestamp(
@@ -188,6 +196,65 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
     );
 
     return battleAlarm;
+  }
+
+
+  /*
+   * O alarm base possui dois caminhos transitórios em que agenda
+   * explicitamente um retry para now + 1000 ms. O coordenador de
+   * temporada recalcula o alarm ao final e, sem esta proteção,
+   * um turno já vencido poderia ser reinterpretado como now + 1.
+   *
+   * Quando o resultado base informa `deferred`, restauramos o
+   * retry de 1 segundo. Se uma temporada futura começar ainda
+   * antes desse retry, ela continua vencendo a disputa pelo único
+   * alarm do Durable Object.
+   */
+  async alarm() {
+    const result =
+      await super.alarm();
+
+    if (
+      result?.deferred !== true ||
+      typeof this.state.storage.setAlarm !==
+        "function"
+    ) {
+      return result;
+    }
+
+    const now =
+      Date.now();
+
+    const retryAt =
+      now +
+      PVP_TRANSIENT_RETRY_MS;
+
+    const nextSeason =
+      await findNextScheduledPvpSeason(
+        this.state.storage,
+        now
+      );
+
+    const seasonAlarmAt =
+      nextSeason?.ok &&
+      nextSeason?.entry &&
+      Number.isFinite(
+        Number(nextSeason.alarmAt)
+      )
+        ? Number(nextSeason.alarmAt)
+        : null;
+
+    const alarmAt =
+      seasonAlarmAt !== null &&
+      seasonAlarmAt < retryAt
+        ? seasonAlarmAt
+        : retryAt;
+
+    await this.state.storage.setAlarm(
+      alarmAt
+    );
+
+    return result;
   }
 
 
