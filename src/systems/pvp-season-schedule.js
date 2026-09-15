@@ -176,16 +176,6 @@ export function normalizePvpSeasonScheduleMonth(
     String(value.name ?? "")
       .trim();
 
-  const startsAt =
-    normalizeTimestamp(
-      value.startsAt
-    );
-
-  const endsAt =
-    normalizeTimestamp(
-      value.endsAt
-    );
-
   const scheduledAt =
     normalizeTimestamp(
       value.scheduledAt
@@ -195,14 +185,31 @@ export function normalizePvpSeasonScheduleMonth(
     !year ||
     !month ||
     !name ||
-    startsAt === null ||
-    endsAt === null ||
-    scheduledAt === null ||
-    endsAt <= startsAt
+    scheduledAt === null
   ) {
     return null;
   }
 
+  const bounds =
+    getMonthlySeasonBounds(
+      year,
+      month
+    );
+
+  if (
+    !bounds.ok ||
+    scheduledAt >= bounds.startsAt
+  ) {
+    return null;
+  }
+
+  /*
+   * startsAt/endsAt não são dados autoritativos do storage.
+   * O calendário civil do ano/mês é a fonte canônica.
+   *
+   * Isso impede que um snapshot antigo, corrompido ou editado
+   * desloque a virada mensal para uma data arbitrária.
+   */
   return {
     id:
       getMonthlySeasonId(
@@ -216,8 +223,10 @@ export function normalizePvpSeasonScheduleMonth(
     name,
     status:
       PVP_SEASON_SCHEDULE_STATUS_SCHEDULED,
-    startsAt,
-    endsAt,
+    startsAt:
+      bounds.startsAt,
+    endsAt:
+      bounds.endsAt,
     scheduledAt
   };
 }
@@ -269,10 +278,23 @@ export function normalizePvpSeasonYearSchedule(
       continue;
     }
 
+    const rawYear =
+      raw?.year === null ||
+      raw?.year === undefined
+        ? year
+        : normalizeSeasonYear(
+            raw.year
+          );
+
+    if (rawYear !== year) {
+      return null;
+    }
+
     const normalized =
       normalizePvpSeasonScheduleMonth(
         {
           ...raw,
+          year,
           month
         },
         year
