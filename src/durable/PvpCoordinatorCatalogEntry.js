@@ -16,6 +16,10 @@ import {
 } from "../systems/pvp-season-expiration.js";
 
 import {
+  syncScheduledPvpSeasonYearMonthName
+} from "../systems/pvp-season-schedule-store.js";
+
+import {
   getGlobalActivePvpBattle
 } from "../systems/pvp-queue.js";
 
@@ -404,6 +408,76 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
   ) {
     const url =
       new URL(request.url);
+
+    /*
+     * Editar o nome de um mês ainda agendado deve refletir no
+     * snapshot do agendamento sem recriá-lo nem alterar seu
+     * scheduledAt. Depois que a temporada é ativada, o snapshot
+     * já foi consumido, então a temporada ACTIVE permanece com
+     * o nome que possuía no momento da ativação.
+     */
+    if (
+      url.pathname ===
+      "/season/plan/define"
+    ) {
+      const baseResponse =
+        await super.fetch(request);
+
+      const result =
+        await baseResponse.json();
+
+      if (!result?.ok) {
+        return Response.json(
+          result,
+          { status: baseResponse.status }
+        );
+      }
+
+      const scheduleSync =
+        await syncScheduledPvpSeasonYearMonthName(
+          this.state.storage,
+          {
+            year:
+              result.definition?.year ??
+              url.searchParams.get("year"),
+            month:
+              result.definition?.month ??
+              url.searchParams.get("month"),
+            name:
+              result.definition?.name ??
+              url.searchParams.get("name")
+          }
+        );
+
+      if (!scheduleSync.ok) {
+        return Response.json(
+          {
+            ok: false,
+            error:
+              scheduleSync.error,
+            definition:
+              result.definition,
+            plan:
+              result.plan,
+            scheduleSync
+          },
+          {
+            status:
+              getCatalogSyncStatus(
+                scheduleSync
+              )
+          }
+        );
+      }
+
+      return Response.json(
+        {
+          ...result,
+          scheduleSync
+        },
+        { status: baseResponse.status }
+      );
+    }
 
     if (
       url.pathname ===
