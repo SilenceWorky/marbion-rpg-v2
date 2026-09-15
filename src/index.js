@@ -5,7 +5,7 @@ import {
 
 export {
   PvpCoordinator
-} from "./durable/PvpCoordinatorCatalogEntry.js";
+} from "./durable/PvpCoordinatorFinalEntry.js";
 
 
 function getGlobalPvpCoordinator(
