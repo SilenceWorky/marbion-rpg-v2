@@ -11,11 +11,20 @@ import {
 } from "../systems/pvp-season-next-schedule.js";
 
 import {
+  getSeasonCalendarPartsAt
+} from "../systems/pvp-season-calendar.js";
+
+import {
+  getPvpSeasonScheduledMonth
+} from "../systems/pvp-season-schedule.js";
+
+import {
   closeExpiredMonthlyPvpSeason,
   getCurrentMonthlyPvpSeasonEndCandidate
 } from "../systems/pvp-season-expiration.js";
 
 import {
+  readPvpSeasonYearSchedule,
   syncScheduledPvpSeasonYearMonthName
 } from "../systems/pvp-season-schedule-store.js";
 
@@ -30,6 +39,9 @@ import {
 
 const PVP_TRANSIENT_RETRY_MS =
   1000;
+
+const PVP_SEASON_ACTIVATION_RETRY_MS =
+  60 * 60 * 1000;
 
 
 function readSyncTimestamp(
@@ -139,6 +151,114 @@ function getResultAlarmAt(
 }
 
 
+async function getDueSeasonActivationRetryCandidate(
+  storage,
+  now
+) {
+  const calendar =
+    getSeasonCalendarPartsAt(now);
+
+  if (!calendar) {
+    return {
+      ok: false,
+      error:
+        "INVALID_SEASON_ACTIVATION_RETRY_TIME"
+    };
+  }
+
+  const scheduleResult =
+    await readPvpSeasonYearSchedule(
+      storage,
+      calendar.year
+    );
+
+  if (!scheduleResult.ok) {
+    return scheduleResult;
+  }
+
+  if (!scheduleResult.schedule) {
+    return {
+      ok: true,
+      candidate: null
+    };
+  }
+
+  const entry =
+    getPvpSeasonScheduledMonth(
+      scheduleResult.schedule,
+      calendar.month
+    );
+
+  if (
+    !entry ||
+    now < entry.startsAt ||
+    now >= entry.endsAt
+  ) {
+    return {
+      ok: true,
+      candidate: null
+    };
+  }
+
+  /*
+   * O retry fica ancorado nas horas civis da própria temporada.
+   * Ex.: uma falha às 00:00 tenta novamente às 01:00. Se algum
+   * outro fluxo recalcular o alarm às 00:30, o retry continua
+   * sendo 01:00 em vez de escorregar para 01:30.
+   *
+   * O último horário possível é sempre anterior ao endsAt. O
+   * retry nunca atravessa a virada nem prolonga a temporada.
+   */
+  const elapsed =
+    Math.max(
+      0,
+      Number(now) -
+        Number(entry.startsAt)
+    );
+
+  const completedIntervals =
+    Math.floor(
+      elapsed /
+        PVP_SEASON_ACTIVATION_RETRY_MS
+    );
+
+  const alarmAt =
+    Number(entry.startsAt) +
+    (
+      (completedIntervals + 1) *
+      PVP_SEASON_ACTIVATION_RETRY_MS
+    );
+
+  if (
+    !Number.isFinite(alarmAt) ||
+    alarmAt >= Number(entry.endsAt)
+  ) {
+    return {
+      ok: true,
+      candidate: null,
+      entry,
+      reason:
+        "SEASON_ACTIVATION_RETRY_WINDOW_CLOSED"
+    };
+  }
+
+  return {
+    ok: true,
+    candidate: {
+      ok: true,
+      scheduled: true,
+      kind: "season",
+      stage:
+        "SEASON_ACTIVATION_RETRY",
+      alarmAt,
+      seasonId:
+        entry.id,
+      entry
+    }
+  };
+}
+
+
 /*
  * Camada final do Durable Object global para o catálogo
  * oficial de temporadas.
@@ -157,9 +277,12 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
    * alarm real de batalha que estava em segundo lugar.
    *
    * Depois de preservar esse candidato real de batalha, também
-   * inserimos o fim da temporada mensal atual na mesma disputa.
-   * Assim uma temporada encerra à meia-noite mesmo quando não há
-   * outra temporada futura autorizada para assumir em seguida.
+   * inserimos dois candidatos do ciclo mensal:
+   * - retry horário de um mês autorizado que ainda não ativou;
+   * - encerramento da temporada mensal atual.
+   *
+   * Assim uma falha de ativação não abandona o mês e uma
+   * temporada ativa encerra à meia-noite mesmo sem sucessora.
    */
   async scheduleCoordinatorAlarm(
     data = null,
@@ -207,6 +330,44 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
 
           result =
             battleAlarm;
+        }
+      }
+    }
+
+    const activationRetry =
+      await getDueSeasonActivationRetryCandidate(
+        this.state.storage,
+        now
+      );
+
+    if (!activationRetry.ok) {
+      console.error(
+        "[PVP_SEASON_ACTIVATION_RETRY_ALARM]",
+        activationRetry.error
+      );
+    }
+    else if (activationRetry.candidate) {
+      const retryCandidate =
+        activationRetry.candidate;
+
+      const selectedAlarmAt =
+        getResultAlarmAt(result);
+
+      if (
+        selectedAlarmAt === null ||
+        retryCandidate.alarmAt <
+          selectedAlarmAt
+      ) {
+        if (
+          typeof this.state.storage.setAlarm ===
+          "function"
+        ) {
+          await this.state.storage.setAlarm(
+            retryCandidate.alarmAt
+          );
+
+          result =
+            retryCandidate;
         }
       }
     }
@@ -282,8 +443,9 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
    *    estiver previamente autorizado/agendado;
    * 3. processar normalmente o alarm PvP que compartilha o DO.
    *
-   * Sem uma temporada seguinte autorizada, apenas o passo 1
-   * acontece. Nenhuma temporada é inventada automaticamente.
+   * Se a ativação falhar e o snapshot do mês continuar agendado,
+   * scheduleCoordinatorAlarm() preserva um novo intento por hora.
+   * Sem uma temporada seguinte autorizada, nenhuma é inventada.
    */
   async alarm() {
     const alarmNow =
@@ -391,7 +553,7 @@ export class PvpCoordinator extends SeasonPvpCoordinator {
    *
    * Como agora o mesmo Durable Object também usa esse único
    * alarm para o ciclo mensal, uma limpeza PvP não pode apagar
-   * silenciosamente um início ou encerramento já agendado.
+   * silenciosamente um início, retry ou encerramento agendado.
    */
   async clearBattleTurnAlarm() {
     const result =
