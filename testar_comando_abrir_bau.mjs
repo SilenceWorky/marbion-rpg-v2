@@ -204,7 +204,7 @@ const openResponse =
 
 assert.equal(
   await openResponse.text(),
-  "📦 @abre, a abertura do Baú Atômico ⚛⚛ foi registrada com segurança e aguarda a entrega da recompensa."
+  "📦 @abre, o Baú Atômico ⚛⚛ abriu! As recompensas disponíveis foram aplicadas e a abertura ficou registrada com segurança."
 );
 
 const openStored =
@@ -229,6 +229,49 @@ assert.equal(
   "pendingOpen precisa ser persistido pela rota"
 );
 
+assert.deepEqual(
+  openStored.chests[0]
+    .metadata.atomic
+    .pendingOpen
+    .rewardPlan
+    .appliedRewardIndexes,
+  [
+    0,
+    1
+  ],
+  "XP e dinheiro base precisam ser marcados como aplicados"
+);
+
+assert.equal(
+  openStored.xp > 0,
+  true,
+  "a rota precisa aplicar o XP resolvido do plano"
+);
+
+const openMoneyBronzeEquivalent =
+  openStored.money.bronze +
+  openStored.money.silver * 10 +
+  openStored.money.gold * 100 +
+  openStored.money.platinum * 1000;
+
+assert.equal(
+  openMoneyBronzeEquivalent > 0,
+  true,
+  "a rota precisa aplicar o dinheiro resolvido do plano"
+);
+
+const rewardSnapshot =
+  structuredClone({
+    xp:
+      openStored.xp,
+    level:
+      openStored.level,
+    statusPoints:
+      openStored.statusPoints,
+    money:
+      openStored.money
+  });
+
 const pendingSnapshot =
   structuredClone(
     openStored.chests[0]
@@ -252,7 +295,7 @@ const retryOpenResponse =
 
 assert.equal(
   await retryOpenResponse.text(),
-  "📦 @abre, a abertura do Baú Atômico ⚛⚛ foi registrada com segurança e aguarda a entrega da recompensa."
+  "📦 @abre, o Baú Atômico ⚛⚛ abriu! As recompensas disponíveis foram aplicadas e a abertura ficou registrada com segurança."
 );
 
 const retryOpenStored =
@@ -282,6 +325,21 @@ assert.equal(
     .scriptIndex,
   scriptIndexSnapshot,
   "retry de pendingOpen não pode executar nem consumir outro passo do roteiro"
+);
+
+assert.deepEqual(
+  {
+    xp:
+      retryOpenStored.xp,
+    level:
+      retryOpenStored.level,
+    statusPoints:
+      retryOpenStored.statusPoints,
+    money:
+      retryOpenStored.money
+  },
+  rewardSnapshot,
+  "retry pela rota não pode duplicar XP nem dinheiro"
 );
 
 

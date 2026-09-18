@@ -11,6 +11,10 @@ import {
   attemptChestOpen
 } from "../systems/chest-open-service.js";
 
+import {
+  applyResolvedAtomicChestRewards
+} from "../systems/atomic-chest-reward-apply.js";
+
 
 const CHESTS_PER_PAGE =
   5;
@@ -180,9 +184,41 @@ async function handleOpenCommand(
     );
   }
 
+  if (
+    result.action === "open" &&
+    result.pending
+  ) {
+    const applied =
+      applyResolvedAtomicChestRewards(
+        profile,
+        result.chestId
+      );
+
+    /*
+     * Mesmo se a aplicação falhar, o pendingOpen já contém o
+     * plano congelado e precisa ser persistido para impedir
+     * qualquer reroll posterior.
+     */
+    await saveProfile(
+      env,
+      user,
+      profile
+    );
+
+    if (!applied.ok) {
+      return new Response(
+        `@${user}, a abertura foi registrada, mas não foi possível aplicar as recompensas resolvidas agora.`
+      );
+    }
+
+    return new Response(
+      `📦 @${user}, o Baú Atômico ${formatAtomicAtoms(result.currentAtoms)} abriu! As recompensas disponíveis foram aplicadas e a abertura ficou registrada com segurança.`
+    );
+  }
+
   /*
-   * Neste bloco ainda não há entrega de recompensa nem remoção
-   * do baú. Persistimos somente a tentativa/evolução/pendingOpen.
+   * Tentativas sem resultado e evoluções alteram o estado
+   * interno do baú e também precisam ser persistidas.
    */
   await saveProfile(
     env,
@@ -203,15 +239,6 @@ async function handleOpenCommand(
   ) {
     return new Response(
       `⚛️ @${user}, seu Baú Atômico evoluiu de ${formatAtomicAtoms(result.fromAtoms)} para ${formatAtomicAtoms(result.currentAtoms)}.`
-    );
-  }
-
-  if (
-    result.action === "open" &&
-    result.pending
-  ) {
-    return new Response(
-      `📦 @${user}, a abertura do Baú Atômico ${formatAtomicAtoms(result.currentAtoms)} foi registrada com segurança e aguarda a entrega da recompensa.`
     );
   }
 
