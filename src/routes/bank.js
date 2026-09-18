@@ -10,6 +10,7 @@ import {
 } from "../systems/bank-exchange.js";
 
 import {
+  cancelPendingBankPix,
   createPendingBankPix
 } from "../systems/bank-pix-state.js";
 
@@ -320,6 +321,56 @@ export async function bankRoute(
   }
 
   if (
+    command === "cancelar" ||
+    command === "cancel"
+  ) {
+    const result =
+      cancelPendingBankPix(
+        profile
+      );
+
+    if (!result.ok) {
+      if (
+        result.error ===
+        "PIX_NOT_FOUND"
+      ) {
+        return new Response(
+          `@${user}, você não possui um Pix pendente para cancelar.`
+        );
+      }
+
+      if (
+        result.error ===
+        "PIX_EXPIRED"
+      ) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, seu Pix pendente já havia expirado e foi limpo.`
+        );
+      }
+
+      return new Response(
+        `@${user}, não foi possível cancelar o Pix pendente.`
+      );
+    }
+
+    await saveProfile(
+      env,
+      user,
+      profile
+    );
+
+    return new Response(
+      `✅ @${user}, Pix para @${result.cancelled.recipient} cancelado.`
+    );
+  }
+
+  if (
     command === "confirmar" ||
     command === "confirm"
   ) {
@@ -454,6 +505,6 @@ export async function bankRoute(
   }
 
   return new Response(
-    `@${user}, uso: !banco | !banco unir ... | !banco separar ... | !banco pix ... | !banco confirmar`
+    `@${user}, uso: !banco | !banco unir ... | !banco separar ... | !banco pix ... | !banco confirmar | !banco cancelar`
   );
 }

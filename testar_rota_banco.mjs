@@ -371,6 +371,104 @@ assert.equal(
 );
 
 
+const cancelSender =
+  createBaseProfile(
+    "cancelador"
+  );
+
+cancelSender.race =
+  "Terrariano";
+
+cancelSender.money = {
+  bronze: 0,
+  silver: 0,
+  gold: 2,
+  platinum: 0
+};
+
+const cancelRecipient =
+  createBaseProfile(
+    "cancelado"
+  );
+
+cancelRecipient.race =
+  "Elfo";
+
+const cancelEnv =
+  createEnv({
+    cancelador:
+      cancelSender,
+    cancelado:
+      cancelRecipient
+  });
+
+const createCancelPixResponse =
+  await bankRoute(
+    new Request(
+      "https://worker.test/banco?user=cancelador&args=pix%201%20ouro%20%40cancelado"
+    ),
+    cancelEnv
+  );
+
+assert.ok(
+  (
+    await createCancelPixResponse.text()
+  ).includes(
+    "Pix pendente"
+  )
+);
+
+const cancelResponse =
+  await bankRoute(
+    new Request(
+      "https://worker.test/banco?user=cancelador&args=cancelar"
+    ),
+    cancelEnv
+  );
+
+assert.equal(
+  await cancelResponse.text(),
+  "✅ @cancelador, Pix para @cancelado cancelado."
+);
+
+const cancelledStored =
+  JSON.parse(
+    cancelEnv.store.get(
+      "cancelador"
+    )
+  );
+
+assert.equal(
+  cancelledStored.bank.pendingPix,
+  null,
+  "cancelar deve limpar o Pix pendente"
+);
+
+assert.deepEqual(
+  cancelledStored.money,
+  {
+    bronze: 0,
+    silver: 0,
+    gold: 2,
+    platinum: 0
+  },
+  "cancelar Pix não pode movimentar dinheiro"
+);
+
+const cancelAgainResponse =
+  await bankRoute(
+    new Request(
+      "https://worker.test/banco?user=cancelador&args=cancelar"
+    ),
+    cancelEnv
+  );
+
+assert.equal(
+  await cancelAgainResponse.text(),
+  "@cancelador, você não possui um Pix pendente para cancelar."
+);
+
+
 const noCharacter =
   createBaseProfile(
     "semchar"
