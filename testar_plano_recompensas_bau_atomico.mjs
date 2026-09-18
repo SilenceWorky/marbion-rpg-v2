@@ -117,7 +117,7 @@ const four =
     sequenceRandom([
       0,
       0,
-      0.99,
+      0.10,
       0.10
     ])
   );
