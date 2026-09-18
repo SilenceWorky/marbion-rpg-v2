@@ -66,6 +66,10 @@ export function createBaseProfile(user) {
     // INVENTÁRIO
     inventory: {},
 
+    // BAÚS
+    chests: [],
+    chestSequence: 0,
+
     // MOEDAS / BANCO
     money: {
       bronze: 0,
@@ -199,6 +203,21 @@ export function ensureProfileDefaults(profile, user = null) {
   return {
     ...defaults,
     ...profile,
+
+    chests:
+      Array.isArray(
+        profile.chests
+      )
+        ? profile.chests
+        : defaults.chests,
+
+    chestSequence:
+      Number.isSafeInteger(
+        profile.chestSequence
+      ) &&
+      profile.chestSequence >= 0
+        ? profile.chestSequence
+        : defaults.chestSequence,
 
     money: {
       ...defaults.money,
