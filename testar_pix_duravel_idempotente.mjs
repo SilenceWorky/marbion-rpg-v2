@@ -276,6 +276,95 @@ assert.equal(
 );
 
 
+const conflictingCredit =
+  await applyBankPixCreditSide(
+    recipientStorage,
+    {
+      ...transaction,
+      amount: 2,
+      totalBronze: 200
+    }
+  );
+
+assert.equal(
+  conflictingCredit.ok,
+  false
+);
+
+assert.equal(
+  conflictingCredit.error,
+  "PIX_TRANSACTION_CONFLICT",
+  "o mesmo transactionId não pode ser reutilizado com valor diferente"
+);
+
+assert.deepEqual(
+  (
+    await recipientStorage.get(
+      "profile"
+    )
+  ).money,
+  {
+    bronze: 0,
+    silver: 0,
+    gold: 1,
+    platinum: 0
+  },
+  "conflito de idempotência não pode creditar novamente"
+);
+
+
+const invalidTotalRecipient =
+  createBaseProfile(
+    "totaltarget"
+  );
+
+const invalidTotalStorage =
+  createStorage({
+    profile:
+      invalidTotalRecipient
+  });
+
+const invalidTotal =
+  await applyBankPixCreditSide(
+    invalidTotalStorage,
+    {
+      transactionId:
+        "pix:origem:total",
+      sender: "origem",
+      recipient:
+        "totaltarget",
+      amount: 1,
+      coin: "gold",
+      totalBronze: 10
+    }
+  );
+
+assert.equal(
+  invalidTotal.ok,
+  false
+);
+
+assert.equal(
+  invalidTotal.error,
+  "PIX_TOTAL_MISMATCH"
+);
+
+assert.deepEqual(
+  (
+    await invalidTotalStorage.get(
+      "profile"
+    )
+  ).money,
+  {
+    bronze: 0,
+    silver: 0,
+    gold: 0,
+    platinum: 0
+  },
+  "total em Bronze inconsistente não pode gerar crédito"
+);
+
+
 const wrongSender =
   createBaseProfile(
     "origem"

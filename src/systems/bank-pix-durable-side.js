@@ -1,4 +1,5 @@
 import {
+  MONEY_VALUES_IN_BRONZE,
   addMoney,
   subtractMoneyWithChange
 } from "./money.js";
@@ -204,6 +205,25 @@ function validateCommon(
     };
   }
 
+  const expectedTotalBronze =
+    amount *
+    MONEY_VALUES_IN_BRONZE[
+      coin
+    ];
+
+  if (
+    totalBronze !==
+    expectedTotalBronze
+  ) {
+    return {
+      ok: false,
+      error:
+        "PIX_TOTAL_MISMATCH",
+      expectedTotalBronze,
+      totalBronze
+    };
+  }
+
   return {
     ok: true,
     transactionId,
@@ -223,6 +243,45 @@ function validateStorage(
     storage &&
     typeof storage.transaction ===
       "function"
+  );
+}
+
+
+function transactionMarkerMatches(
+  marker,
+  data,
+  side
+) {
+  return Boolean(
+    marker &&
+    normalizeId(
+      marker.transactionId
+    ) ===
+      data.transactionId &&
+    marker.side ===
+      side &&
+    normalizeUser(
+      marker.sender
+    ) ===
+      data.sender &&
+    normalizeUser(
+      marker.recipient
+    ) ===
+      data.recipient &&
+    normalizeAmount(
+      marker.amount
+    ) ===
+      data.amount &&
+    normalizeCoin(
+      marker.coin
+    ) ===
+      data.coin &&
+    Math.floor(
+      Number(
+        marker.totalBronze
+      )
+    ) ===
+      data.totalBronze
   );
 }
 
@@ -331,6 +390,20 @@ export async function applyBankPixDebitSide(
       }
 
       if (alreadyApplied) {
+        if (
+          !transactionMarkerMatches(
+            alreadyApplied,
+            data,
+            "debit"
+          )
+        ) {
+          return {
+            ok: false,
+            error:
+              "PIX_TRANSACTION_CONFLICT"
+          };
+        }
+
         return {
           ok: true,
           applied: false,
@@ -483,6 +556,20 @@ export async function applyBankPixCreditSide(
       }
 
       if (alreadyApplied) {
+        if (
+          !transactionMarkerMatches(
+            alreadyApplied,
+            data,
+            "credit"
+          )
+        ) {
+          return {
+            ok: false,
+            error:
+              "PIX_TRANSACTION_CONFLICT"
+          };
+        }
+
         return {
           ok: true,
           applied: false,
@@ -609,6 +696,20 @@ export async function finalizeBankPixSenderSide(
       }
 
       if (alreadyFinalized) {
+        if (
+          !transactionMarkerMatches(
+            alreadyFinalized,
+            data,
+            "finalize"
+          )
+        ) {
+          return {
+            ok: false,
+            error:
+              "PIX_TRANSACTION_CONFLICT"
+          };
+        }
+
         return {
           ok: true,
           applied: false,
@@ -629,6 +730,20 @@ export async function finalizeBankPixSenderSide(
           ok: false,
           error:
             "PIX_DEBIT_NOT_APPLIED"
+        };
+      }
+
+      if (
+        !transactionMarkerMatches(
+          debitApplied,
+          data,
+          "debit"
+        )
+      ) {
+        return {
+          ok: false,
+          error:
+            "PIX_TRANSACTION_CONFLICT"
         };
       }
 
