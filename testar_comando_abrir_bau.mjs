@@ -229,6 +229,61 @@ assert.equal(
   "pendingOpen precisa ser persistido pela rota"
 );
 
+const pendingSnapshot =
+  structuredClone(
+    openStored.chests[0]
+      .metadata.atomic
+      .pendingOpen
+  );
+
+const scriptIndexSnapshot =
+  openStored.chests[0]
+    .metadata.atomic
+    .scriptIndex;
+
+
+const retryOpenResponse =
+  await chestRoute(
+    new Request(
+      "https://worker.test/bau?user=abre&args=abrir%201"
+    ),
+    openEnv
+  );
+
+assert.equal(
+  await retryOpenResponse.text(),
+  "📦 @abre, a abertura do Baú Atômico ⚛⚛ foi registrada com segurança e aguarda a entrega da recompensa."
+);
+
+const retryOpenStored =
+  JSON.parse(
+    openEnv.store.get(
+      "abre"
+    )
+  );
+
+assert.equal(
+  retryOpenStored.chests.length,
+  1,
+  "retry de pendingOpen não pode consumir o baú"
+);
+
+assert.deepEqual(
+  retryOpenStored.chests[0]
+    .metadata.atomic
+    .pendingOpen,
+  pendingSnapshot,
+  "retry pela rota deve reutilizar exatamente o mesmo pendingOpen"
+);
+
+assert.equal(
+  retryOpenStored.chests[0]
+    .metadata.atomic
+    .scriptIndex,
+  scriptIndexSnapshot,
+  "retry de pendingOpen não pode executar nem consumir outro passo do roteiro"
+);
+
 
 const seasonalProfile =
   createBaseProfile(
