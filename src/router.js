@@ -18,6 +18,7 @@ import { rankRoute } from "./routes/rank.js";
 import { estadoRoute } from "./routes/estado.js";
 import { seasonRoute } from "./routes/season.js";
 import { bankRoute } from "./routes/bank.js";
+import { confirmRoute } from "./routes/bank-confirm.js";
 
 
 export async function handleRequest(request, env, ctx) {
@@ -159,6 +160,13 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/banco") {
     return bankRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/confirmar") {
+    return confirmRoute(
       request,
       env
     );

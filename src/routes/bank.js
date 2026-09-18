@@ -17,6 +17,10 @@ import {
   moneyToBronze
 } from "../systems/money.js";
 
+import {
+  confirmBankPixForProfile
+} from "./bank-confirm.js";
+
 
 function normalizeUser(
   value
@@ -315,6 +319,17 @@ export async function bankRoute(
     );
   }
 
+  if (
+    command === "confirmar" ||
+    command === "confirm"
+  ) {
+    return confirmBankPixForProfile(
+      env,
+      user,
+      profile
+    );
+  }
+
   if (command === "pix") {
     const amount =
       Math.floor(
@@ -439,6 +454,6 @@ export async function bankRoute(
   }
 
   return new Response(
-    `@${user}, uso: !banco | !banco unir ... | !banco separar ...`
+    `@${user}, uso: !banco | !banco unir ... | !banco separar ... | !banco pix ... | !banco confirmar`
   );
 }
