@@ -98,7 +98,12 @@ export async function executeBankPixProfileStoreSide(
     result =
       await applyBankPixDebitSide(
         storage,
-        transaction
+        transaction,
+        {
+          now:
+            transaction?.requestedAt ??
+            Date.now()
+        }
       );
   }
   else if (

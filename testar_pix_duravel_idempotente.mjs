@@ -123,7 +123,11 @@ const transaction = {
 const debit =
   await applyBankPixDebitSide(
     senderStorage,
-    transaction
+    transaction,
+    {
+      now:
+        now + 1000
+    }
   );
 
 assert.equal(
@@ -155,7 +159,12 @@ assert.ok(
 const debitRetry =
   await applyBankPixDebitSide(
     senderStorage,
-    transaction
+    transaction,
+    {
+      now:
+        now +
+        (3 * 60 * 1000)
+    }
   );
 
 assert.equal(
@@ -365,6 +374,85 @@ assert.deepEqual(
 );
 
 
+const expiredFresh =
+  createBaseProfile(
+    "expirado"
+  );
+
+expiredFresh.money = {
+  bronze: 0,
+  silver: 0,
+  gold: 2,
+  platinum: 0
+};
+
+createPendingBankPix(
+  expiredFresh,
+  {
+    recipient:
+      "destino-expirado",
+    amount: 1,
+    coin: "gold",
+    now
+  }
+);
+
+const expiredFreshPending =
+  expiredFresh.bank.pendingPix;
+
+const expiredFreshStorage =
+  createStorage({
+    profile:
+      expiredFresh
+  });
+
+const expiredFreshResult =
+  await applyBankPixDebitSide(
+    expiredFreshStorage,
+    {
+      transactionId:
+        expiredFreshPending.id,
+      sender:
+        "expirado",
+      recipient:
+        "destino-expirado",
+      amount: 1,
+      coin: "gold",
+      totalBronze: 100
+    },
+    {
+      now:
+        now +
+        (3 * 60 * 1000)
+    }
+  );
+
+assert.equal(
+  expiredFreshResult.ok,
+  false
+);
+
+assert.equal(
+  expiredFreshResult.error,
+  "PIX_EXPIRED"
+);
+
+assert.deepEqual(
+  (
+    await expiredFreshStorage.get(
+      "profile"
+    )
+  ).money,
+  {
+    bronze: 0,
+    silver: 0,
+    gold: 2,
+    platinum: 0
+  },
+  "Pix expirado sem débito prévio não pode retirar dinheiro"
+);
+
+
 const wrongSender =
   createBaseProfile(
     "origem"
@@ -414,6 +502,10 @@ const mismatch =
       amount: 1,
       coin: "gold",
       totalBronze: 100
+    },
+    {
+      now:
+        now + 1000
     }
   );
 

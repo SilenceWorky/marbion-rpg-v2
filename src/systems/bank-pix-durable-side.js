@@ -4,6 +4,10 @@ import {
   subtractMoneyWithChange
 } from "./money.js";
 
+import {
+  isBankPixExpired
+} from "./bank-pix-state.js";
+
 
 const SIDE_PREFIX =
   "bank_pix_side:";
@@ -331,7 +335,10 @@ async function readCurrentProfile(
 
 export async function applyBankPixDebitSide(
   storage,
-  input
+  input,
+  {
+    now = Date.now()
+  } = {}
 ) {
   if (!validateStorage(storage)) {
     return {
@@ -424,6 +431,25 @@ export async function applyBankPixDebitSide(
           ok: false,
           error:
             "PIX_PENDING_MISMATCH"
+        };
+      }
+
+      /*
+       * A expiração só bloqueia o INÍCIO da transferência.
+       * Se o débito já foi aplicado, o marcador acima torna o
+       * retry idempotente e permite terminar crédito/finalização
+       * mesmo após os 2 minutos, evitando dinheiro "preso".
+       */
+      if (
+        isBankPixExpired(
+          profile?.bank?.pendingPix,
+          now
+        )
+      ) {
+        return {
+          ok: false,
+          error:
+            "PIX_EXPIRED"
         };
       }
 

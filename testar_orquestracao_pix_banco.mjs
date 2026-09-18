@@ -300,9 +300,23 @@ const expired =
         now +
         (3 * 60 * 1000),
 
-      async callSide() {
+      async callSide(
+        env,
+        input
+      ) {
         expiredCalled =
           true;
+
+        if (
+          input.side ===
+          "debit"
+        ) {
+          return {
+            ok: false,
+            error:
+              "PIX_EXPIRED"
+          };
+        }
 
         return {
           ok: true
@@ -323,8 +337,60 @@ assert.equal(
 
 assert.equal(
   expiredCalled,
-  false,
-  "Pix expirado não pode iniciar nenhuma etapa financeira"
+  true,
+  "a camada forte do débito deve decidir se um Pix expirado pode iniciar ou se já é um retry"
+);
+
+
+const resumedAfterExpiryCalls = [];
+
+const resumedAfterExpiry =
+  await confirmBankPixDistributed(
+    {},
+    expiredSender,
+    {
+      now:
+        now +
+        (3 * 60 * 1000),
+
+      async callSide(
+        env,
+        input
+      ) {
+        resumedAfterExpiryCalls.push(
+          input.side
+        );
+
+        if (
+          input.side ===
+          "debit"
+        ) {
+          return {
+            ok: true,
+            idempotent: true
+          };
+        }
+
+        return {
+          ok: true
+        };
+      }
+    }
+  );
+
+assert.equal(
+  resumedAfterExpiry.ok,
+  true
+);
+
+assert.deepEqual(
+  resumedAfterExpiryCalls,
+  [
+    "debit",
+    "credit",
+    "finalize"
+  ],
+  "uma transferência já debitada deve poder terminar mesmo depois do TTL"
 );
 
 

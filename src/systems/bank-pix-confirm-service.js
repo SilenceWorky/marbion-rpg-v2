@@ -2,11 +2,6 @@ import {
   callBankPixProfileSide
 } from "./bank-pix-profile-client.js";
 
-import {
-  isBankPixExpired
-} from "./bank-pix-state.js";
-
-
 function normalizeUser(
   value
 ) {
@@ -93,19 +88,6 @@ export async function confirmBankPixDistributed(
   }
 
   if (
-    isBankPixExpired(
-      pending,
-      now
-    )
-  ) {
-    return {
-      ok: false,
-      error:
-        "PIX_EXPIRED"
-    };
-  }
-
-  if (
     normalizeUser(
       pending.sender
     ) !== sender
@@ -165,7 +147,8 @@ export async function confirmBankPixDistributed(
           "debit",
         user:
           sender,
-        transaction
+        transaction,
+        now
       }
     );
 

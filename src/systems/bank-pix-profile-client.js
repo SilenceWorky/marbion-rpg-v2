@@ -41,7 +41,8 @@ export async function callBankPixProfileSide(
   {
     side,
     user,
-    transaction
+    transaction,
+    now = Date.now()
   } = {}
 ) {
   const normalizedUser =
@@ -112,9 +113,11 @@ export async function callBankPixProfileSide(
                 "application/json"
             },
             body:
-              JSON.stringify(
-                transaction
-              )
+              JSON.stringify({
+                ...transaction,
+                requestedAt:
+                  Number(now)
+              })
           }
         )
       );
