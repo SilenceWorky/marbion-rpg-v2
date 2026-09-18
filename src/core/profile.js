@@ -66,6 +66,14 @@ export function createBaseProfile(user) {
     // INVENTÁRIO
     inventory: {},
 
+    // MOEDAS / BANCO
+    money: {
+      bronze: 0,
+      silver: 0,
+      gold: 0,
+      platinum: 0
+    },
+
     // PASSE DE TEMPORADA
     seasonPass: {
       seasonId: null,
@@ -186,6 +194,11 @@ export function ensureProfileDefaults(profile, user = null) {
   return {
     ...defaults,
     ...profile,
+
+    money: {
+      ...defaults.money,
+      ...(profile.money || {})
+    },
 
     seasonPass: {
       ...defaults.seasonPass,
