@@ -1,3 +1,103 @@
+const ATOMIC_XP_BASE_MAX =
+  23;
+
+const ATOMIC_MONEY_BASE_MAX =
+  9;
+
+
+function buildProgressiveRange(
+  atoms,
+  {
+    firstMin,
+    firstMax
+  }
+) {
+  const normalized =
+    Math.floor(
+      Number(atoms)
+    );
+
+  if (
+    !Number.isFinite(normalized) ||
+    normalized < 1 ||
+    normalized > 5
+  ) {
+    return null;
+  }
+
+  let min =
+    firstMin;
+
+  let max =
+    firstMax;
+
+  for (
+    let current = 2;
+    current <= normalized;
+    current += 1
+  ) {
+    const previousMax =
+      max;
+
+    min =
+      Math.floor(
+        previousMax / 2
+      );
+
+    max =
+      previousMax * 2;
+  }
+
+  return Object.freeze({
+    min,
+    max
+  });
+}
+
+
+export function getAtomicChestXpRange(
+  atoms
+) {
+  return buildProgressiveRange(
+    atoms,
+    {
+      firstMin: 1,
+      firstMax:
+        ATOMIC_XP_BASE_MAX
+    }
+  );
+}
+
+
+export function getAtomicChestMoneyRange(
+  atoms
+) {
+  const range =
+    buildProgressiveRange(
+      atoms,
+      {
+        firstMin: 1,
+        firstMax:
+          ATOMIC_MONEY_BASE_MAX
+      }
+    );
+
+  if (!range) {
+    return null;
+  }
+
+  return Object.freeze({
+    min:
+      range.min,
+    max:
+      range.max,
+    unit:
+      "bronze_equivalent",
+    autoConvert: true
+  });
+}
+
+
 function freezeList(
   values
 ) {
@@ -47,11 +147,6 @@ export const ATOMIC_CHEST_REWARD_RULES =
     1: freezeRule({
       atoms: 1,
 
-      /*
-       * O valor exato de XP/dinheiro ainda não foi definido.
-       * A regra aprovada até aqui só estabelece que a recompensa
-       * principal é XP normal OU dinheiro.
-       */
       primaryChoice: Object.freeze({
         choices:
           freezeList([
@@ -59,7 +154,18 @@ export const ATOMIC_CHEST_REWARD_RULES =
             "money"
           ]),
         weights:
-          null
+          null,
+        amountRanges:
+          Object.freeze({
+            normal_xp:
+              getAtomicChestXpRange(
+                1
+              ),
+            money:
+              getAtomicChestMoneyRange(
+                1
+              )
+          })
       }),
 
       optional:
@@ -81,14 +187,18 @@ export const ATOMIC_CHEST_REWARD_RULES =
           {
             type:
               "normal_xp",
-            amount:
-              null
+            amountRange:
+              getAtomicChestXpRange(
+                2
+              )
           },
           {
             type:
               "money",
-            amount:
-              null
+            amountRange:
+              getAtomicChestMoneyRange(
+                2
+              )
           }
         ]),
 
@@ -128,14 +238,18 @@ export const ATOMIC_CHEST_REWARD_RULES =
           {
             type:
               "normal_xp",
-            amount:
-              null
+            amountRange:
+              getAtomicChestXpRange(
+                3
+              )
           },
           {
             type:
               "money",
-            amount:
-              null
+            amountRange:
+              getAtomicChestMoneyRange(
+                3
+              )
           },
           {
             type:
@@ -191,14 +305,18 @@ export const ATOMIC_CHEST_REWARD_RULES =
           {
             type:
               "normal_xp",
-            amount:
-              null
+            amountRange:
+              getAtomicChestXpRange(
+                4
+              )
           },
           {
             type:
               "money",
-            amount:
-              null
+            amountRange:
+              getAtomicChestMoneyRange(
+                4
+              )
           },
           {
             type:
@@ -250,14 +368,18 @@ export const ATOMIC_CHEST_REWARD_RULES =
           {
             type:
               "normal_xp",
-            amount:
-              null
+            amountRange:
+              getAtomicChestXpRange(
+                5
+              )
           },
           {
             type:
               "money",
-            amount:
-              null
+            amountRange:
+              getAtomicChestMoneyRange(
+                5
+              )
           },
           {
             type:
