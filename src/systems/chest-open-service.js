@@ -114,7 +114,22 @@ export function attemptChestOpen(
   if (
     result.action === "open"
   ) {
-    atomic.state.pendingOpen = {
+    /*
+     * resolveAtomicChestAttempt() normaliza novamente o estado
+     * interno do baú e pode substituir chest.metadata.atomic.
+     * Portanto, não devemos gravar pendingOpen pela referência
+     * "atomic" obtida antes da tentativa: ela pode estar stale.
+     */
+    const latestAtomic =
+      getAtomicChestState(
+        chest
+      );
+
+    if (!latestAtomic.ok) {
+      return latestAtomic;
+    }
+
+    latestAtomic.state.pendingOpen = {
       atoms:
         result.currentAtoms,
       attemptNumber:
@@ -135,7 +150,7 @@ export function attemptChestOpen(
         chest.type,
       pending: true,
       pendingOpen:
-        atomic.state.pendingOpen
+        latestAtomic.state.pendingOpen
     };
   }
 
