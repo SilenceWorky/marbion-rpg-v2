@@ -33,6 +33,63 @@ function normalizeInteger(
 }
 
 
+function normalizePendingOpen(
+  value
+) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  const atoms =
+    normalizeInteger(
+      value.atoms
+    );
+
+  const attemptNumber =
+    normalizeInteger(
+      value.attemptNumber
+    );
+
+  const createdAt =
+    normalizeInteger(
+      value.createdAt
+    );
+
+  if (
+    atoms === null ||
+    atoms <
+      ATOMIC_CHEST_MIN_ATOMS ||
+    atoms >
+      ATOMIC_CHEST_MAX_ATOMS ||
+    attemptNumber === null ||
+    attemptNumber <= 0 ||
+    createdAt === null ||
+    createdAt < 0
+  ) {
+    return null;
+  }
+
+  return {
+    atoms,
+    attemptNumber,
+    scripted:
+      value.scripted === true,
+    createdAt
+  };
+}
+
+
 function normalizeScriptedSteps(
   value
 ) {
@@ -62,7 +119,8 @@ export function createAtomicChestState(
     maxAtoms = 5,
     minimumOpenAtoms = 1,
     attemptsAtLevel = 0,
-    scriptedSteps = []
+    scriptedSteps = [],
+    pendingOpen = null
   } = {}
 ) {
   const current =
@@ -168,7 +226,12 @@ export function createAtomicChestState(
           scriptedSteps
         ),
 
-      scriptIndex: 0
+      scriptIndex: 0,
+
+      pendingOpen:
+        normalizePendingOpen(
+          pendingOpen
+        )
     }
   };
 }
@@ -219,6 +282,11 @@ export function normalizeAtomicChestState(
   created.state.scriptIndex =
     rawScriptIndex;
 
+  created.state.pendingOpen =
+    normalizePendingOpen(
+      value.pendingOpen
+    );
+
   return created;
 }
 
@@ -231,6 +299,7 @@ export function createAtomicChest(
     minimumOpenAtoms = 1,
     attemptsAtLevel = 0,
     scriptedSteps = [],
+    pendingOpen = null,
     metadata = {},
     createdAt = Date.now()
   } = {}
@@ -241,7 +310,8 @@ export function createAtomicChest(
       maxAtoms,
       minimumOpenAtoms,
       attemptsAtLevel,
-      scriptedSteps
+      scriptedSteps,
+      pendingOpen
     });
 
   if (!atomic.ok) {
