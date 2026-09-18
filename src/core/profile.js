@@ -74,6 +74,11 @@ export function createBaseProfile(user) {
       platinum: 0
     },
 
+    // BANCO
+    bank: {
+      pendingPix: null
+    },
+
     // PASSE DE TEMPORADA
     seasonPass: {
       seasonId: null,
@@ -198,6 +203,11 @@ export function ensureProfileDefaults(profile, user = null) {
     money: {
       ...defaults.money,
       ...(profile.money || {})
+    },
+
+    bank: {
+      ...defaults.bank,
+      ...(profile.bank || {})
     },
 
     seasonPass: {
