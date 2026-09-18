@@ -31,6 +31,34 @@ function normalizeCommand(
 }
 
 
+function normalizeCoin(
+  value
+) {
+  const coin =
+    normalizeCommand(
+      value
+    );
+
+  const aliases = {
+    bronze: "bronze",
+
+    prata: "silver",
+    silver: "silver",
+
+    ouro: "gold",
+    gold: "gold",
+
+    platina: "platinum",
+    platinum: "platinum"
+  };
+
+  return (
+    aliases[coin] ||
+    coin
+  );
+}
+
+
 function formatMoney(
   user,
   money
@@ -170,7 +198,7 @@ export async function bankRoute(
 
   if (command === "unir") {
     const coin =
-      normalizeCommand(
+      normalizeCoin(
         args[1]
       );
 
@@ -235,7 +263,7 @@ export async function bankRoute(
     command === "dividir"
   ) {
     const coin =
-      normalizeCommand(
+      normalizeCoin(
         args[1]
       );
 

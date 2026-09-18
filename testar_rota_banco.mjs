@@ -156,6 +156,45 @@ assert.ok(
 );
 
 
+const joinGoldProfile =
+  createBaseProfile(
+    "ouroteste"
+  );
+
+joinGoldProfile.race =
+  "Terrariano";
+
+joinGoldProfile.money = {
+  bronze: 0,
+  silver: 0,
+  gold: 20,
+  platinum: 0
+};
+
+const envJoinGold =
+  createEnv({
+    ouroteste:
+      joinGoldProfile
+  });
+
+const joinGoldResponse =
+  await bankRoute(
+    new Request(
+      "https://worker.test/banco?user=ouroteste&args=unir%20ouro%201"
+    ),
+    envJoinGold
+  );
+
+assert.ok(
+  (
+    await joinGoldResponse.text()
+  ).includes(
+    "Ouro: 10 ┃ Platina: 1"
+  ),
+  "nomes portugueses de moeda devem ser aceitos pela rota"
+);
+
+
 const invalidResponse =
   await bankRoute(
     new Request(
