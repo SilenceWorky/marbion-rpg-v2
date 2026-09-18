@@ -9,6 +9,14 @@ import {
   splitMoney
 } from "../systems/bank-exchange.js";
 
+import {
+  createPendingBankPix
+} from "../systems/bank-pix-state.js";
+
+import {
+  moneyToBronze
+} from "../systems/money.js";
+
 
 function normalizeUser(
   value
@@ -308,8 +316,125 @@ export async function bankRoute(
   }
 
   if (command === "pix") {
+    const amount =
+      Math.floor(
+        Number(
+          args[1]
+        )
+      );
+
+    const coin =
+      normalizeCoin(
+        args[2]
+      );
+
+    const recipientUser =
+      normalizeUser(
+        args[3]
+      );
+
+    if (
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      !coin ||
+      !recipientUser
+    ) {
+      return new Response(
+        `@${user}, uso: !banco pix quantidade bronze/prata/ouro/platina @usuário`
+      );
+    }
+
+    if (
+      recipientUser ===
+      user
+    ) {
+      return new Response(
+        `@${user}, você não pode enviar Pix para si mesmo.`
+      );
+    }
+
+    const recipientProfile =
+      await getProfile(
+        env,
+        recipientUser
+      );
+
+    if (
+      !recipientProfile ||
+      !recipientProfile.race
+    ) {
+      return new Response(
+        `@${user}, o destinatário @${recipientUser} ainda não possui um personagem.`
+      );
+    }
+
+    const valueByCoin = {
+      bronze: 1,
+      silver: 10,
+      gold: 100,
+      platinum: 1000
+    };
+
+    const totalBronze =
+      amount *
+      valueByCoin[coin];
+
+    if (
+      moneyToBronze(
+        profile.money
+      ) <
+      totalBronze
+    ) {
+      return new Response(
+        `@${user}, saldo insuficiente para criar esse Pix.`
+      );
+    }
+
+    const result =
+      createPendingBankPix(
+        profile,
+        {
+          sender:
+            user,
+          recipient:
+            recipientUser,
+          amount,
+          coin
+        }
+      );
+
+    if (!result.ok) {
+      if (
+        result.error ===
+        "PIX_ALREADY_PENDING"
+      ) {
+        return new Response(
+          `@${user}, você já possui um Pix pendente. Aguarde a expiração antes de criar outro.`
+        );
+      }
+
+      if (
+        result.error ===
+        "PIX_SELF_TRANSFER"
+      ) {
+        return new Response(
+          `@${user}, você não pode enviar Pix para si mesmo.`
+        );
+      }
+
+      return new Response(
+        `@${user}, não foi possível criar o Pix pendente.`
+      );
+    }
+
+    await saveProfile(
+      env,
+      user,
+      profile
+    );
+
     return new Response(
-      `@${user}, o Pix está sendo integrado ao Banco e ainda não está disponível nesta rota.`
+      `💸 @${user}, Pix pendente: ${amount} ${args[2]} para @${recipientUser}. Confirme em até 2 minutos.`
     );
   }
 

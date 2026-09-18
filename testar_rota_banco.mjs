@@ -209,6 +209,168 @@ assert.equal(
 );
 
 
+const pixSender =
+  createBaseProfile(
+    "pixsender"
+  );
+
+pixSender.race =
+  "Terrariano";
+
+pixSender.money = {
+  bronze: 0,
+  silver: 0,
+  gold: 0,
+  platinum: 1
+};
+
+const pixRecipient =
+  createBaseProfile(
+    "pixdestino"
+  );
+
+pixRecipient.race =
+  "Tritão";
+
+const pixEnv =
+  createEnv({
+    pixsender:
+      pixSender,
+    pixdestino:
+      pixRecipient
+  });
+
+const pixResponse =
+  await bankRoute(
+    new Request(
+      "https://worker.test/banco?user=pixsender&args=pix%201%20ouro%20%40pixdestino"
+    ),
+    pixEnv
+  );
+
+const pixText =
+  await pixResponse.text();
+
+assert.ok(
+  pixText.includes(
+    "Pix pendente: 1 ouro para @pixdestino"
+  ),
+  "a rota deve criar um Pix pendente usando nomes portugueses de moeda"
+);
+
+const storedPixSender =
+  JSON.parse(
+    pixEnv.store.get(
+      "pixsender"
+    )
+  );
+
+assert.equal(
+  storedPixSender.bank
+    .pendingPix.recipient,
+  "pixdestino"
+);
+
+assert.equal(
+  storedPixSender.bank
+    .pendingPix.coin,
+  "gold"
+);
+
+assert.equal(
+  storedPixSender.bank
+    .pendingPix.totalBronze,
+  100
+);
+
+assert.deepEqual(
+  storedPixSender.money,
+  {
+    bronze: 0,
+    silver: 0,
+    gold: 0,
+    platinum: 1
+  },
+  "criar o Pix não pode mover dinheiro antes da confirmação"
+);
+
+const storedPixRecipient =
+  JSON.parse(
+    pixEnv.store.get(
+      "pixdestino"
+    )
+  );
+
+assert.deepEqual(
+  storedPixRecipient.money,
+  {
+    bronze: 0,
+    silver: 0,
+    gold: 0,
+    platinum: 0
+  },
+  "criar o Pix não pode creditar o destinatário antes da confirmação"
+);
+
+
+const poorPixSender =
+  createBaseProfile(
+    "pixpobre"
+  );
+
+poorPixSender.race =
+  "Terrariano";
+
+poorPixSender.money = {
+  bronze: 5,
+  silver: 0,
+  gold: 0,
+  platinum: 0
+};
+
+const poorPixRecipient =
+  createBaseProfile(
+    "pixrico"
+  );
+
+poorPixRecipient.race =
+  "Elfo";
+
+const poorPixEnv =
+  createEnv({
+    pixpobre:
+      poorPixSender,
+    pixrico:
+      poorPixRecipient
+  });
+
+const poorPixResponse =
+  await bankRoute(
+    new Request(
+      "https://worker.test/banco?user=pixpobre&args=pix%201%20ouro%20%40pixrico"
+    ),
+    poorPixEnv
+  );
+
+assert.equal(
+  await poorPixResponse.text(),
+  "@pixpobre, saldo insuficiente para criar esse Pix."
+);
+
+const poorStored =
+  JSON.parse(
+    poorPixEnv.store.get(
+      "pixpobre"
+    )
+  );
+
+assert.equal(
+  poorStored.bank.pendingPix,
+  null,
+  "Pix sem saldo não deve ser criado"
+);
+
+
 const noCharacter =
   createBaseProfile(
     "semchar"
