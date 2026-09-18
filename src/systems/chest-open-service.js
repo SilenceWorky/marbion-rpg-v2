@@ -14,6 +14,10 @@ import {
   resolveAtomicChestAttempt
 } from "./atomic-chest-mechanic.js";
 
+import {
+  rollAtomicChestRewardPlan
+} from "./atomic-chest-reward-plan.js";
+
 
 function normalizeNow(
   value
@@ -129,6 +133,16 @@ export function attemptChestOpen(
       return latestAtomic;
     }
 
+    const rewardPlan =
+      rollAtomicChestRewardPlan(
+        result.currentAtoms,
+        random
+      );
+
+    if (!rewardPlan.ok) {
+      return rewardPlan;
+    }
+
     latestAtomic.state.pendingOpen = {
       atoms:
         result.currentAtoms,
@@ -139,7 +153,17 @@ export function attemptChestOpen(
       createdAt:
         normalizeNow(
           now
-        )
+        ),
+      rewardPlan: {
+        atoms:
+          rewardPlan.atoms,
+        rewards:
+          structuredClone(
+            rewardPlan.rewards
+          ),
+        hasUnresolvedRewards:
+          rewardPlan.hasUnresolvedRewards
+      }
     };
 
     return {

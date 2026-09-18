@@ -109,7 +109,11 @@ const opens =
       random:
         sequenceRandom([
           0.90,
-          0.90
+          0.90,
+          0,
+          0,
+          0.99,
+          0.99
         ]),
       now: 2000
     }
@@ -137,7 +141,43 @@ assert.deepEqual(
     atoms: 2,
     attemptNumber: 2,
     scripted: false,
-    createdAt: 2000
+    createdAt: 2000,
+    rewardPlan: {
+      atoms: 2,
+      rewards: [
+        {
+          ok: true,
+          type: "normal_xp",
+          atoms: 2,
+          amount: 11,
+          range: {
+            min: 11,
+            max: 46
+          },
+          resolved: true
+        },
+        {
+          ok: true,
+          type: "money",
+          atoms: 2,
+          bronzeEquivalent: 4,
+          money: {
+            bronze: 4,
+            silver: 0,
+            gold: 0,
+            platinum: 0
+          },
+          range: {
+            min: 4,
+            max: 18,
+            unit: "bronze_equivalent",
+            autoConvert: true
+          },
+          resolved: true
+        }
+      ],
+      hasUnresolvedRewards: false
+    }
   }
 );
 
@@ -173,13 +213,9 @@ assert.equal(
 
 assert.deepEqual(
   retryPending.pendingOpen,
-  {
-    atoms: 2,
-    attemptNumber: 2,
-    scripted: false,
-    createdAt: 2000
-  },
-  "uma abertura pendente precisa ser idempotente e não pode rerrolar"
+  atomic.metadata.atomic
+    .pendingOpen,
+  "uma abertura pendente precisa preservar exatamente o mesmo plano de recompensas sem rerrolar"
 );
 
 

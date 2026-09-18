@@ -33,6 +33,46 @@ function normalizeInteger(
 }
 
 
+function normalizePendingRewardPlan(
+  value,
+  atoms
+) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  const planAtoms =
+    normalizeInteger(
+      value.atoms
+    );
+
+  if (
+    planAtoms !== atoms ||
+    !Array.isArray(
+      value.rewards
+    )
+  ) {
+    return null;
+  }
+
+  return {
+    atoms:
+      planAtoms,
+    rewards:
+      structuredClone(
+        value.rewards
+      ),
+    hasUnresolvedRewards:
+      value.hasUnresolvedRewards ===
+      true
+  };
+}
+
+
 function normalizePendingOpen(
   value
 ) {
@@ -80,12 +120,23 @@ function normalizePendingOpen(
     return null;
   }
 
+  const rewardPlan =
+    normalizePendingRewardPlan(
+      value.rewardPlan,
+      atoms
+    );
+
+  if (!rewardPlan) {
+    return null;
+  }
+
   return {
     atoms,
     attemptNumber,
     scripted:
       value.scripted === true,
-    createdAt
+    createdAt,
+    rewardPlan
   };
 }
 
