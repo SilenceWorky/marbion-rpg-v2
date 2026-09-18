@@ -1,10 +1,15 @@
 import {
-  getProfile
+  getProfile,
+  saveProfile
 } from "../core/database.js";
 
 import {
   getChestGroups
 } from "../systems/chest-inventory.js";
+
+import {
+  attemptChestOpen
+} from "../systems/chest-open-service.js";
 
 
 const CHESTS_PER_PAGE =
@@ -96,6 +101,126 @@ function parsePage(
 }
 
 
+
+
+function formatAtomicAtoms(
+  atoms
+) {
+  const count =
+    Math.max(
+      1,
+      Math.floor(
+        Number(atoms) || 1
+      )
+    );
+
+  return "⚛".repeat(
+    count
+  );
+}
+
+
+async function handleOpenCommand(
+  env,
+  user,
+  profile,
+  args
+) {
+  if (
+    args.length !== 2
+  ) {
+    return new Response(
+      `@${user}, uso: !baú abrir <número>`
+    );
+  }
+
+  const selection =
+    Number(
+      args[1]
+    );
+
+  if (
+    !Number.isSafeInteger(
+      selection
+    ) ||
+    selection <= 0
+  ) {
+    return new Response(
+      `@${user}, informe um número de baú válido. Ex.: !baú abrir 1`
+    );
+  }
+
+  const result =
+    attemptChestOpen(
+      profile,
+      selection
+    );
+
+  if (!result.ok) {
+    if (
+      result.error ===
+        "CHEST_GROUP_NOT_FOUND"
+    ) {
+      return new Response(
+        `@${user}, esse número de baú não existe na sua lista.`
+      );
+    }
+
+    if (
+      result.error ===
+        "CHEST_OPEN_NOT_IMPLEMENTED"
+    ) {
+      return new Response(
+        `@${user}, a abertura desse tipo de baú ainda não está implementada.`
+      );
+    }
+
+    return new Response(
+      `@${user}, não foi possível tentar abrir esse baú.`
+    );
+  }
+
+  /*
+   * Neste bloco ainda não há entrega de recompensa nem remoção
+   * do baú. Persistimos somente a tentativa/evolução/pendingOpen.
+   */
+  await saveProfile(
+    env,
+    user,
+    profile
+  );
+
+  if (
+    result.action === "nothing"
+  ) {
+    return new Response(
+      `📦 @${user}, o Baú Atômico ${formatAtomicAtoms(result.currentAtoms)} não abriu nem evoluiu nesta tentativa. Tentativa ${result.attemptNumber}/3.`
+    );
+  }
+
+  if (
+    result.action === "evolve"
+  ) {
+    return new Response(
+      `⚛️ @${user}, seu Baú Atômico evoluiu de ${formatAtomicAtoms(result.fromAtoms)} para ${formatAtomicAtoms(result.currentAtoms)}.`
+    );
+  }
+
+  if (
+    result.action === "open" &&
+    result.pending
+  ) {
+    return new Response(
+      `📦 @${user}, a abertura do Baú Atômico ${formatAtomicAtoms(result.currentAtoms)} foi registrada com segurança e aguarda a entrega da recompensa.`
+    );
+  }
+
+  return new Response(
+    `@${user}, resultado de abertura não reconhecido.`
+  );
+}
+
+
 function formatChestGroup(
   group,
   number
@@ -151,16 +276,40 @@ export async function chestRoute(
     );
   }
 
-  const parsedPage =
-    parsePage(
+  const rawArgs =
+    String(
       url.searchParams.get(
         "args"
-      )
+      ) ?? ""
+    ).trim();
+
+  const args =
+    rawArgs
+      .split(/\s+/)
+      .filter(Boolean);
+
+  if (
+    args.length > 0 &&
+    normalizeCommand(
+      args[0]
+    ) === "abrir"
+  ) {
+    return handleOpenCommand(
+      env,
+      user,
+      profile,
+      args
+    );
+  }
+
+  const parsedPage =
+    parsePage(
+      rawArgs
     );
 
   if (!parsedPage.ok) {
     return new Response(
-      `@${user}, uso: !baú | !baú página 2`
+      `@${user}, uso: !baú | !baú página 2 | !baú abrir <número>`
     );
   }
 
