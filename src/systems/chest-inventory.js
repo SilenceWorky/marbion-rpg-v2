@@ -8,6 +8,16 @@ export const CHEST_TYPES =
   });
 
 
+export const CHEST_TYPE_ORDER =
+  Object.freeze([
+    CHEST_TYPES.ATOMIC,
+    CHEST_TYPES.SEASONAL,
+    CHEST_TYPES.MONSTER,
+    CHEST_TYPES.BOSS,
+    CHEST_TYPES.ADMIN
+  ]);
+
+
 export const CHEST_TYPE_LABELS =
   Object.freeze({
     [CHEST_TYPES.ATOMIC]:
@@ -316,11 +326,31 @@ export function getChestGroups(
     );
   }
 
+  const order =
+    new Map(
+      CHEST_TYPE_ORDER.map(
+        (type, index) => [
+          type,
+          index
+        ]
+      )
+    );
+
   return {
     ok: true,
     groups:
       Array.from(
         groups.values()
+      ).sort(
+        (left, right) =>
+          (
+            order.get(left.type) ??
+            Number.MAX_SAFE_INTEGER
+          ) -
+          (
+            order.get(right.type) ??
+            Number.MAX_SAFE_INTEGER
+          )
       )
   };
 }

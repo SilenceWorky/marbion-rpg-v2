@@ -19,6 +19,7 @@ import { estadoRoute } from "./routes/estado.js";
 import { seasonRoute } from "./routes/season.js";
 import { bankRoute } from "./routes/bank.js";
 import { confirmRoute } from "./routes/bank-confirm.js";
+import { chestRoute } from "./routes/chest.js";
 
 
 export async function handleRequest(request, env, ctx) {
@@ -167,6 +168,16 @@ export async function handleRequest(request, env, ctx) {
 
   if (path === "/confirmar") {
     return confirmRoute(
+      request,
+      env
+    );
+  }
+
+  if (
+    path === "/bau" ||
+    path === "/baú"
+  ) {
+    return chestRoute(
       request,
       env
     );
