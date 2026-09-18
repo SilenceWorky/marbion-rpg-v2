@@ -359,6 +359,50 @@ assert.equal(
 );
 
 
+const invalidScriptProfile =
+  createBaseProfile(
+    "script-invalido"
+  );
+
+const invalidScriptChest =
+  createAtomicChest(
+    invalidScriptProfile,
+    {
+      currentAtoms: 5,
+      maxAtoms: 5,
+      scriptedSteps: [
+        "evolve"
+      ]
+    }
+  ).chest;
+
+const invalidScriptResult =
+  resolveAtomicChestAttempt(
+    invalidScriptChest,
+    {
+      random:
+        sequenceRandom([])
+    }
+  );
+
+assert.equal(
+  invalidScriptResult.ok,
+  false
+);
+
+assert.equal(
+  invalidScriptResult.error,
+  "ATOMIC_SCRIPT_EVOLVE_AT_MAX"
+);
+
+assert.equal(
+  invalidScriptChest.metadata.atomic
+    .scriptIndex,
+  0,
+  "um passo de roteiro impossível não pode ser consumido"
+);
+
+
 console.log(
   "✅ Mecânica de tentativas e evolução do Baú Atômico validada."
 );

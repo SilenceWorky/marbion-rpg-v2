@@ -256,6 +256,18 @@ function resolveScriptedStep(
     };
   }
 
+  if (
+    step === "evolve" &&
+    state.currentAtoms >=
+      state.maxAtoms
+  ) {
+    return {
+      ok: false,
+      error:
+        "ATOMIC_SCRIPT_EVOLVE_AT_MAX"
+    };
+  }
+
   state.scriptIndex += 1;
 
   if (step === "nothing") {
@@ -269,17 +281,6 @@ function resolveScriptedStep(
   }
 
   if (step === "evolve") {
-    if (
-      state.currentAtoms >=
-        state.maxAtoms
-    ) {
-      return {
-        ok: false,
-        error:
-          "ATOMIC_SCRIPT_EVOLVE_AT_MAX"
-      };
-    }
-
     return applyEvolution(
       state,
       {
