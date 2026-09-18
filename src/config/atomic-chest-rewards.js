@@ -154,7 +154,10 @@ export const ATOMIC_CHEST_REWARD_RULES =
             "money"
           ]),
         weights:
-          null,
+          freezeList([
+            0.50,
+            0.50
+          ]),
         amountRanges:
           Object.freeze({
             normal_xp:

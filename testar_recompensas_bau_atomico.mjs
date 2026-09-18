@@ -30,10 +30,13 @@ assert.deepEqual(
   ]
 );
 
-assert.equal(
+assert.deepEqual(
   one.primaryChoice.weights,
-  null,
-  "os pesos de XP vs dinheiro continuam não definidos"
+  [
+    0.50,
+    0.50
+  ],
+  "o Baú Atômico de 1 átomo deve ter 50% XP e 50% dinheiro"
 );
 
 assert.deepEqual(
