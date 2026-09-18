@@ -64,7 +64,10 @@ export function createBaseProfile(user) {
     adminWeaponDurability: null,
 
     // INVENTÁRIO
-    inventory: {},
+    inventory: {
+      scrolls: [],
+      scrollSequence: 0
+    },
 
     // BAÚS
     chests: [],
@@ -203,6 +206,24 @@ export function ensureProfileDefaults(profile, user = null) {
   return {
     ...defaults,
     ...profile,
+
+    inventory: {
+      ...defaults.inventory,
+      ...(profile.inventory || {}),
+      scrolls:
+        Array.isArray(
+          profile?.inventory?.scrolls
+        )
+          ? profile.inventory.scrolls
+          : defaults.inventory.scrolls,
+      scrollSequence:
+        Number.isSafeInteger(
+          profile?.inventory?.scrollSequence
+        ) &&
+        profile.inventory.scrollSequence >= 0
+          ? profile.inventory.scrollSequence
+          : defaults.inventory.scrollSequence
+    },
 
     chests:
       Array.isArray(
