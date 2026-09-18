@@ -66,6 +66,16 @@ export function createBaseProfile(user) {
     // INVENTÁRIO
     inventory: {},
 
+    // PASSE DE TEMPORADA
+    seasonPass: {
+      seasonId: null,
+      xp: 0,
+      tier: 0,
+      completed: false,
+      postPassXp: 0,
+      claimedRewards: []
+    },
+
     // MORTE / REBUFF
     dead: false,
     deaths: 0,
@@ -176,6 +186,11 @@ export function ensureProfileDefaults(profile, user = null) {
   return {
     ...defaults,
     ...profile,
+
+    seasonPass: {
+      ...defaults.seasonPass,
+      ...(profile.seasonPass || {})
+    },
 
     rebuffBonus: {
       ...defaults.rebuffBonus,
