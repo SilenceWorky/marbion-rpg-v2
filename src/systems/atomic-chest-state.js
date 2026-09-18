@@ -59,6 +59,33 @@ function normalizePendingRewardPlan(
     return null;
   }
 
+  const appliedRewardIndexes =
+    Array.isArray(
+      value.appliedRewardIndexes
+    )
+      ? Array.from(
+          new Set(
+            value.appliedRewardIndexes
+              .map(
+                entry =>
+                  normalizeInteger(
+                    entry
+                  )
+              )
+              .filter(
+                entry =>
+                  entry !== null &&
+                  entry >= 0 &&
+                  entry <
+                    value.rewards.length
+              )
+          )
+        ).sort(
+          (left, right) =>
+            left - right
+        )
+      : [];
+
   return {
     atoms:
       planAtoms,
@@ -68,7 +95,8 @@ function normalizePendingRewardPlan(
       ),
     hasUnresolvedRewards:
       value.hasUnresolvedRewards ===
-      true
+      true,
+    appliedRewardIndexes
   };
 }
 
