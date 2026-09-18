@@ -10,6 +10,10 @@ import {
   getCurrentMonthlyPvpSeasonEndCandidate
 } from "../systems/pvp-season-expiration.js";
 
+import {
+  executeBankPixProfileStoreSide
+} from "../systems/bank-pix-profile-store.js";
+
 
 const PVP_TRANSIENT_RETRY_MS =
   1000;
@@ -46,6 +50,77 @@ function toPresentFiniteNumber(
  * `deferred`, descartando explicitamente candidatos ausentes.
  */
 export class PvpCoordinator extends CatalogPvpCoordinator {
+  async fetch(
+    request
+  ) {
+    const url =
+      new URL(
+        request.url
+      );
+
+    if (
+      url.pathname ===
+        "/profile-store/pix-side"
+    ) {
+      let transaction = null;
+
+      try {
+        transaction =
+          await request.json();
+      }
+      catch {
+        return Response.json(
+          {
+            profileStore: true,
+            pixSide: true,
+            ok: false,
+            error:
+              "INVALID_JSON"
+          },
+          {
+            status: 400
+          }
+        );
+      }
+
+      const result =
+        await executeBankPixProfileStoreSide(
+          this.state.storage,
+          this.env,
+          {
+            side:
+              url.searchParams.get(
+                "side"
+              ),
+            user:
+              url.searchParams.get(
+                "user"
+              ),
+            transaction
+          }
+        );
+
+      return Response.json(
+        {
+          profileStore: true,
+          pixSide: true,
+          ...result
+        },
+        {
+          status:
+            result.ok
+              ? 200
+              : 409
+        }
+      );
+    }
+
+    return super.fetch(
+      request
+    );
+  }
+
+
   async alarm() {
     const result =
       await super.alarm();
