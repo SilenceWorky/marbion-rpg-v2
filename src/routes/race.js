@@ -1,6 +1,7 @@
 import {
   getProfile,
-  saveProfile
+  saveProfile,
+  markCharacterIndexed
 } from "../core/database.js";
 
 import {
@@ -119,6 +120,11 @@ export async function raceRoute(
     env,
     user,
     profile
+  );
+
+  await markCharacterIndexed(
+    env,
+    user
   );
 
 

@@ -4,7 +4,8 @@ import {
 
 import {
   getProfile,
-  saveProfile
+  saveProfile,
+  markCharacterIndexed
 } from "../core/database.js";
 
 import {
@@ -204,6 +205,11 @@ export async function adminSetRace(
     env,
     targetUser,
     profile
+  );
+
+  await markCharacterIndexed(
+    env,
+    targetUser
   );
 
 

@@ -21,6 +21,7 @@ import { bankRoute } from "./routes/bank.js";
 import { confirmRoute } from "./routes/bank-confirm.js";
 import { chestRoute } from "./routes/chest.js";
 import { characterApiV1Route } from "./routes/api-character-v1.js";
+import { adminCharactersApiRoute } from "./routes/api-admin-characters.js";
 
 
 export async function handleRequest(request, env, ctx) {
@@ -188,6 +189,16 @@ export async function handleRequest(request, env, ctx) {
     path === "/api/v1/character"
   ) {
     return characterApiV1Route(
+      request,
+      env
+    );
+  }
+
+  if (
+    path === "/api/v1/admin/characters" ||
+    path === "/api/v1/admin/character"
+  ) {
+    return adminCharactersApiRoute(
       request,
       env
     );

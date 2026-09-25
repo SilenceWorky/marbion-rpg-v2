@@ -563,3 +563,26 @@ export async function deleteProfile(
     normalizedUser
   );
 }
+
+
+export async function markCharacterIndexed(
+  env,
+  user
+) {
+  const normalizedUser =
+    normalizeUser(user);
+
+  if (
+    !normalizedUser ||
+    !env?.MARBION_USERS_V2 ||
+    typeof env.MARBION_USERS_V2.put !==
+      "function"
+  ) {
+    return;
+  }
+
+  await env.MARBION_USERS_V2.put(
+    `__character_index__:${normalizedUser}`,
+    String(Date.now())
+  );
+}
