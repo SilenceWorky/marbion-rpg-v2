@@ -115,6 +115,9 @@ export async function adminSetLevel(
       targetUser
     );
 
+  const beforeLevel =
+    Number(profile.level) || 1;
+
 
   profile.level =
     newLevel;
@@ -139,6 +142,7 @@ export async function adminSetLevel(
   return {
     ok: true,
     user: targetUser,
+    beforeLevel,
     level: newLevel
   };
 }
@@ -188,6 +192,9 @@ export async function adminSetRace(
       targetUser
     );
 
+  const beforeRace =
+    profile.race ?? null;
+
 
   profile.race =
     race;
@@ -203,6 +210,7 @@ export async function adminSetRace(
   return {
     ok: true,
     user: targetUser,
+    beforeRace,
     race
   };
 }
@@ -316,6 +324,11 @@ export async function adminSetElements(
       targetUser
     );
 
+  const beforeElements =
+    Array.isArray(profile.elements)
+      ? [...profile.elements]
+      : [];
+
 
   const newElementXp = {};
   const newElementLevels = {};
@@ -364,6 +377,7 @@ export async function adminSetElements(
   return {
     ok: true,
     user: targetUser,
+    beforeElements,
     elements:
       selectedElements
   };
@@ -593,6 +607,9 @@ export async function adminAddStatusPoints(
 
     user:
       targetUser,
+
+    beforeStatusPoints:
+      current,
 
     added:
       points,

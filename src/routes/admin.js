@@ -43,6 +43,48 @@ function normalizeCommand(value) {
 }
 
 
+function encodeAuditHeader(
+  value
+) {
+  const json =
+    JSON.stringify(
+      value ?? {}
+    );
+
+  const bytes =
+    new TextEncoder()
+      .encode(json);
+
+  let binary = "";
+
+  for (const byte of bytes) {
+    binary +=
+      String.fromCharCode(byte);
+  }
+
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+
+function auditedResponse(
+  text,
+  audit
+) {
+  return new Response(
+    text,
+    {
+      headers: {
+        "x-marbion-audit":
+          encodeAuditHeader(audit)
+      }
+    }
+  );
+}
+
+
 function getCoordinator(
   env
 ) {
@@ -248,8 +290,16 @@ export async function adminRoute(
     }
 
 
-    return new Response(
-      `✅ ADM | @${result.user} agora está no nível ${result.level}.`
+    return auditedResponse(
+      `✅ ADM | @${result.user} agora está no nível ${result.level}.`,
+      {
+        type: "RPG_MUTATION",
+        subcommand: "level",
+        targetLogin: result.user,
+        label: "o nível",
+        before: result.beforeLevel,
+        after: result.level
+      }
     );
   }
 
@@ -311,8 +361,16 @@ export async function adminRoute(
     }
 
 
-    return new Response(
-      `✅ ADM | A raça de @${result.user} agora é ${result.race}.`
+    return auditedResponse(
+      `✅ ADM | A raça de @${result.user} agora é ${result.race}.`,
+      {
+        type: "RPG_MUTATION",
+        subcommand: "raça",
+        targetLogin: result.user,
+        label: "a raça",
+        before: result.beforeRace,
+        after: result.race
+      }
     );
   }
 
@@ -390,8 +448,16 @@ export async function adminRoute(
     }
 
 
-    return new Response(
-      `✅ ADM | Elemento de @${result.user}: ${result.elements.join(" + ")}.`
+    return auditedResponse(
+      `✅ ADM | Elemento de @${result.user}: ${result.elements.join(" + ")}.`,
+      {
+        type: "RPG_MUTATION",
+        subcommand: "elemento",
+        targetLogin: result.user,
+        label: "os elementos",
+        before: result.beforeElements,
+        after: result.elements
+      }
     );
   }
 
@@ -549,8 +615,22 @@ export async function adminRoute(
         : "";
 
 
-    return new Response(
-      `🛠️ ADM | @${result.user} | ${result.icon} ${result.label}: ${result.before} → ${result.after}/${result.max} | ${operationText} | ${scopeText}${clampText}.`
+    return auditedResponse(
+      `🛠️ ADM | @${result.user} | ${result.icon} ${result.label}: ${result.before} → ${result.after}/${result.max} | ${operationText} | ${scopeText}${clampText}.`,
+      {
+        type: "RPG_MUTATION",
+        subcommand: resource,
+        targetLogin: result.user,
+        label:
+          resource === "hp"
+            ? "o HP"
+            : "a Mentalidade",
+        before: result.before,
+        after: result.after,
+        max: result.max,
+        scope: scopeText,
+        operation: operationText
+      }
     );
   }
 
@@ -823,14 +903,22 @@ export async function adminRoute(
     }
 
 
-    return new Response(
+    return auditedResponse(
       `🛠️ ADM | Status de @${result.user} resetados. ` +
       `Pontos: 0 | Força: ${result.after.strength} | ` +
       `Força Mágica: ${result.after.magicStrength} | ` +
       `Velocidade: ${result.after.speed} | ` +
       `Evasão: ${result.after.evasion} | ` +
       `Precisão: ${result.after.accuracy} | ` +
-      `Defesa: ${result.after.defense}.`
+      `Defesa: ${result.after.defense}.`,
+      {
+        type: "RPG_ACTION",
+        subcommand: "status reset",
+        targetLogin: result.user,
+        label: "os Status",
+        before: result.before,
+        after: result.after
+      }
     );
   }
 
@@ -889,9 +977,18 @@ export async function adminRoute(
     }
 
 
-    return new Response(
+    return auditedResponse(
       `✅ ADM | @${result.user} recebeu ${result.added} Status Points. ` +
-      `Total disponível: ${result.statusPoints}.`
+      `Total disponível: ${result.statusPoints}.`,
+      {
+        type: "RPG_MUTATION",
+        subcommand: "pontos",
+        targetLogin: result.user,
+        label: "os Status Points",
+        before: result.beforeStatusPoints,
+        after: result.statusPoints,
+        added: result.added
+      }
     );
   }
 
