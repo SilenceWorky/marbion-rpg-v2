@@ -41,6 +41,30 @@ function createStorage() {
 
     async delete(key) {
       data.delete(key);
+    },
+
+    async list({ prefix } = {}) {
+      const result =
+        new Map();
+
+      for (
+        const [key, value]
+        of data.entries()
+      ) {
+        if (
+          !prefix ||
+          String(key).startsWith(
+            prefix
+          )
+        ) {
+          result.set(
+            key,
+            structuredClone(value)
+          );
+        }
+      }
+
+      return result;
     }
   };
 }
@@ -225,10 +249,11 @@ console.log("=== ATIVAÇÃO DE TEMPORADA AGENDADA ===");
       )
     );
 
-  assert.equal(result.ok, false);
+  assert.equal(result.ok, true);
+  assert.equal(result.activated, true);
   assert.equal(
-    result.error,
-    "SEASON_BASE_THEME_NOT_CONFIGURED"
+    result.season.baseTheme,
+    "Noite do Terror"
   );
 
   const current =
@@ -237,9 +262,16 @@ console.log("=== ATIVAÇÃO DE TEMPORADA AGENDADA ===");
     );
 
   assert.equal(current.ok, true);
-  assert.equal(current.season, null);
+  assert.equal(
+    current.season?.id,
+    "2026-10"
+  );
+  assert.equal(
+    current.season?.baseTheme,
+    "Noite do Terror"
+  );
 
-  console.log("✅ Mês sem tema-base canônico não é ativado por engano.");
+  console.log("✅ Outubro ativa normalmente com o tema-base canônico Noite do Terror.");
 }
 
 

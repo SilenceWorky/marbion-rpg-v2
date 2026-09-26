@@ -101,6 +101,11 @@ try {
       "2027-09-01T00:00:00.000-03:00"
     );
 
+  const september2026End =
+    Date.parse(
+      "2026-10-01T00:00:00.000-03:00"
+    );
+
   Date.now = () => now;
 
 
@@ -205,7 +210,7 @@ try {
 
   assert.equal(
     await storage.getAlarm(),
-    september2027Start
+    september2026End
   );
 
   const nextAlarm =
@@ -215,10 +220,10 @@ try {
   assert.equal(nextAlarm.kind, "season");
   assert.equal(
     nextAlarm.alarmAt,
-    september2027Start
+    september2026End
   );
 
-  console.log("✅ Após a ativação, o coordenador mantém automaticamente o próximo mês/ano futuro no alarm.");
+  console.log("✅ Após a ativação, o encerramento da temporada atual tem prioridade; o agendamento futuro de 2027 permanece preservado.");
 }
 finally {
   Date.now = originalDateNow;

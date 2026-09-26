@@ -179,12 +179,17 @@ try {
   console.log("✅ Ao disparar, o alarm real do coordenador ativa a temporada agendada.");
 
 
+  const expectedEnd =
+    Date.parse(
+      "2026-10-01T00:00:00.000-03:00"
+    );
+
   assert.equal(
     await storage.getAlarm(),
-    null
+    expectedEnd
   );
 
-  console.log("✅ Depois da ativação, o alarm mensal não entra em loop nem fica reagendado para now + 1.");
+  console.log("✅ Depois da ativação, o alarm passa para o encerramento canônico da temporada ativa.");
 }
 finally {
   Date.now =

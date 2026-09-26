@@ -287,29 +287,41 @@ try {
   console.log("✅ O antigo !adm temporada iniciar não pode mais criar temporadas arbitrárias de 30 dias.");
 
 
-  const unsupportedTheme =
+  const octoberDefinition =
     await callAdmin(
       env,
       "temporada definir 2026 10 Temporada de Outubro"
     );
 
   assert.match(
-    unsupportedTheme.text,
-    /tema-base canônico/
+    octoberDefinition.text,
+    /Outubro\/2026 preparada/
   );
 
-  const planAfterUnsupported =
+  const planWithOctober =
     await readPvpSeasonYearPlan(
       storage,
       2026
     );
 
   assert.equal(
-    planAfterUnsupported.plan.months["10"] ?? null,
-    null
+    planWithOctober.plan.months["10"]?.name,
+    "Temporada de Outubro"
   );
 
-  console.log("✅ Um mês sem tema-base canônico não pode ser autorizado por engano.");
+  console.log("✅ Outubro agora é reconhecido com seu tema-base canônico confirmado.");
+
+
+  const cancelOctober =
+    await callAdmin(
+      env,
+      "temporada cancelar 2026 10"
+    );
+
+  assert.match(
+    cancelOctober.text,
+    /Agendamento de Outubro\/2026 cancelado/
+  );
 
 
   const cancelled =

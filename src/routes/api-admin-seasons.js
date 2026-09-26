@@ -3,6 +3,14 @@ import {
 } from "../config/admins.js";
 
 import {
+  ELEMENTS_URL
+} from "../config/urls.js";
+
+import {
+  fetchJson
+} from "../core/content.js";
+
+import {
   SEASON_PASS_REWARDS
 } from "../config/season-pass-rewards.js";
 
@@ -18,6 +26,7 @@ import {
   getSeasonBaseTheme,
   getSeasonCalendarPartsAt,
   getSeasonMonthName,
+  normalizeSeasonMonth,
   normalizeSeasonYear,
   PVP_SEASON_TIMEZONE
 } from "../systems/pvp-season-calendar.js";
@@ -69,22 +78,39 @@ function getGlobalPvpCoordinator(env) {
 
 async function callCoordinatorJson(
   coordinator,
-  path
+  path,
+  {
+    method = "GET",
+    body = null
+  } = {}
 ) {
   try {
     const response =
       await coordinator.fetch(
         new Request(
-          `https://pvp.internal${path}`
+          `https://pvp.internal${path}`,
+          {
+            method,
+            ...(body === null
+              ? {}
+              : {
+                  headers: {
+                    "Content-Type":
+                      "application/json"
+                  },
+                  body:
+                    JSON.stringify(body)
+                })
+          }
         )
       );
 
-    const body =
+    const result =
       await response.json();
 
     return {
       httpStatus: response.status,
-      ...body
+      ...result
     };
   }
   catch {
@@ -147,6 +173,183 @@ function buildPassCatalog() {
       )
   };
 }
+
+function normalizeLookup(value) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+async function loadCanonicalElements() {
+  const data =
+    await fetchJson(
+      ELEMENTS_URL
+    );
+
+  const entries =
+    Object.keys(
+      data &&
+      typeof data === "object"
+        ? data
+        : {}
+    );
+
+  const byLookup =
+    new Map(
+      entries.map(name => [
+        normalizeLookup(name),
+        name
+      ])
+    );
+
+  return {
+    entries,
+    byLookup
+  };
+}
+
+function normalizeFeaturedElements(
+  value,
+  byLookup
+) {
+  if (!Array.isArray(value)) {
+    return {
+      ok: true,
+      value: []
+    };
+  }
+
+  const resolved = [];
+
+  for (
+    const raw
+    of value.slice(0, 8)
+  ) {
+    const canonical =
+      byLookup.get(
+        normalizeLookup(raw)
+      );
+
+    if (!canonical) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASON_ELEMENT",
+        value: raw
+      };
+    }
+
+    if (!resolved.includes(canonical)) {
+      resolved.push(canonical);
+    }
+  }
+
+  return {
+    ok: true,
+    value: resolved
+  };
+}
+
+function normalizeSeasonalSkills(
+  value,
+  byLookup
+) {
+  if (!Array.isArray(value)) {
+    return {
+      ok: true,
+      value: []
+    };
+  }
+
+  const skills = [];
+
+  for (
+    const raw
+    of value.slice(0, 50)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object"
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASON_SKILL"
+      };
+    }
+
+    const element =
+      byLookup.get(
+        normalizeLookup(
+          raw.element
+        )
+      );
+
+    const name =
+      String(
+        raw.name ?? ""
+      ).trim();
+
+    const baseDamage =
+      raw.baseDamage === null ||
+      raw.baseDamage === undefined ||
+      raw.baseDamage === ""
+        ? null
+        : Math.round(
+            Number(
+              raw.baseDamage
+            )
+          );
+
+    if (
+      !element ||
+      !name ||
+      (
+        baseDamage !== null &&
+        (
+          !Number.isFinite(
+            baseDamage
+          ) ||
+          baseDamage < 0 ||
+          baseDamage > 999999
+        )
+      )
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASON_SKILL",
+        value: raw
+      };
+    }
+
+    skills.push({
+      id:
+        String(
+          raw.id ?? ""
+        ).trim() || undefined,
+      element,
+      name:
+        name.slice(0, 120),
+      baseDamage,
+      description:
+        String(
+          raw.description ?? ""
+        )
+          .trim()
+          .slice(0, 1200) ||
+        null
+    });
+  }
+
+  return {
+    ok: true,
+    value: skills
+  };
+}
+
 export async function adminSeasonsApiRoute(
   request,
   env
@@ -164,7 +367,15 @@ export async function adminSeasonsApiRoute(
     );
   }
 
-  if (request.method !== "GET") {
+  const method =
+    String(
+      request.method ?? "GET"
+    ).toUpperCase();
+
+  if (
+    method !== "GET" &&
+    method !== "PATCH"
+  ) {
     return Response.json(
       {
         ok: false,
@@ -173,6 +384,7 @@ export async function adminSeasonsApiRoute(
       { status: 405 }
     );
   }
+
   const now =
     Date.now();
 
@@ -197,6 +409,7 @@ export async function adminSeasonsApiRoute(
       { status: 400 }
     );
   }
+
   const coordinator =
     getGlobalPvpCoordinator(env);
 
@@ -211,10 +424,225 @@ export async function adminSeasonsApiRoute(
     );
   }
 
+  if (method === "PATCH") {
+    const month =
+      normalizeSeasonMonth(
+        url.searchParams.get("month")
+      );
+
+    if (!month) {
+      return Response.json(
+        {
+          ok: false,
+          error:
+            "INVALID_SEASON_MONTH"
+        },
+        { status: 400 }
+      );
+    }
+
+    let input;
+
+    try {
+      input =
+        await request.json();
+    }
+    catch {
+      return Response.json(
+        {
+          ok: false,
+          error: "INVALID_JSON"
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      !input ||
+      typeof input !== "object" ||
+      Array.isArray(input)
+    ) {
+      return Response.json(
+        {
+          ok: false,
+          error:
+            "INVALID_SEASON_CONTENT"
+        },
+        { status: 400 }
+      );
+    }
+
+    let elementCatalog;
+
+    try {
+      elementCatalog =
+        await loadCanonicalElements();
+    }
+    catch {
+      return Response.json(
+        {
+          ok: false,
+          error:
+            "ELEMENT_CATALOG_UNAVAILABLE"
+        },
+        { status: 502 }
+      );
+    }
+
+    const featured =
+      normalizeFeaturedElements(
+        input.featuredElements,
+        elementCatalog.byLookup
+      );
+
+    if (!featured.ok) {
+      return Response.json(
+        featured,
+        { status: 400 }
+      );
+    }
+
+    const skills =
+      normalizeSeasonalSkills(
+        input.seasonalSkills,
+        elementCatalog.byLookup
+      );
+
+    if (!skills.ok) {
+      return Response.json(
+        skills,
+        { status: 400 }
+      );
+    }
+
+    const featuredElements =
+      [...featured.value];
+
+    for (const skill of skills.value) {
+      if (
+        !featuredElements.includes(
+          skill.element
+        )
+      ) {
+        featuredElements.push(
+          skill.element
+        );
+      }
+    }
+
+    let definition = null;
+
+    const requestedName =
+      String(
+        input.name ?? ""
+      ).trim();
+
+    if (requestedName) {
+      const renameUrl =
+        new URL(
+          "https://pvp.internal/season/plan/rename"
+        );
+
+      renameUrl.searchParams.set(
+        "year",
+        String(requestedYear)
+      );
+
+      renameUrl.searchParams.set(
+        "month",
+        String(month)
+      );
+
+      renameUrl.searchParams.set(
+        "name",
+        requestedName.slice(0, 160)
+      );
+
+      const renamed =
+        await callCoordinatorJson(
+          coordinator,
+          `${renameUrl.pathname}${renameUrl.search}`,
+          {
+            method: "POST"
+          }
+        );
+
+      if (!renamed.ok) {
+        return Response.json(
+          {
+            ok: false,
+            error:
+              renamed.error ??
+              "SEASON_RENAME_FAILED"
+          },
+          {
+            status:
+              renamed.httpStatus >= 400
+                ? renamed.httpStatus
+                : 502
+          }
+        );
+      }
+
+      definition =
+        renamed.definition ?? null;
+    }
+
+    const saved =
+      await callCoordinatorJson(
+        coordinator,
+        `/season/content/month/save?year=${requestedYear}&month=${month}`,
+        {
+          method: "POST",
+          body: {
+            summary:
+              String(
+                input.summary ?? ""
+              ).trim() || null,
+            featuredElements,
+            seasonalSkills:
+              skills.value
+          }
+        }
+      );
+
+    if (!saved.ok) {
+      return Response.json(
+        {
+          ok: false,
+          error:
+            saved.error ??
+            "SEASON_CONTENT_SAVE_FAILED"
+        },
+        {
+          status:
+            saved.httpStatus >= 400
+              ? saved.httpStatus
+              : 502
+        }
+      );
+    }
+
+    return Response.json({
+      ok: true,
+      year:
+        requestedYear,
+      month,
+      monthName:
+        getSeasonMonthName(month),
+      baseTheme:
+        getSeasonBaseTheme(month),
+      definition,
+      content:
+        saved.content
+    });
+  }
+
   const [
     current,
     plan,
-    schedule
+    schedule,
+    content
   ] = await Promise.all([
     callCoordinatorJson(
       coordinator,
@@ -227,13 +655,18 @@ export async function adminSeasonsApiRoute(
     callCoordinatorJson(
       coordinator,
       `/season/schedule?year=${requestedYear}`
+    ),
+    callCoordinatorJson(
+      coordinator,
+      `/season/content/year?year=${requestedYear}`
     )
   ]);
 
   if (
     !current.ok ||
     !plan.ok ||
-    !schedule.ok
+    !schedule.ok ||
+    !content.ok
   ) {
     return Response.json(
       {
@@ -242,11 +675,13 @@ export async function adminSeasonsApiRoute(
           current.error ??
           plan.error ??
           schedule.error ??
+          content.error ??
           "SEASON_READ_FAILED"
       },
       { status: 502 }
     );
   }
+
   return Response.json({
     ok: true,
     now,
@@ -272,6 +707,8 @@ export async function adminSeasonsApiRoute(
       plan.plan ?? null,
     schedule:
       schedule.schedule ?? null,
+    content:
+      content.months ?? {},
     pass:
       buildPassCatalog()
   });

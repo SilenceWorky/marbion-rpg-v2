@@ -22,13 +22,23 @@ const MONTH_NAMES = [
 /*
  * Temas-base permanentes por mês.
  *
- * Só registramos aqui temas já definidos canonicamente.
- * Meses ainda não fechados ficam sem tema e não podem
- * ser ativados em produção até receberem um tema-base.
+ * Os 12 temas abaixo foram confirmados canonicamente.
+ * O nome anual da temporada continua separado do
+ * tema-base e pode variar de um ano para outro.
  */
 const BASE_THEMES = {
+  1: "Novo Amanhecer",
+  2: "Festival das Cores",
+  3: "Marcha das Tempestades",
+  4: "Véu das Ilusões",
+  5: "Florescimento de Auroris",
+  6: "Fogueiras de Marbion",
+  7: "Coração do Inverno",
   8: "Arquivo do Infinito",
-  9: "Jardim do Criador"
+  9: "Jardim do Criador",
+  10: "Noite do Terror",
+  11: "Marcha do Caos",
+  12: "Festival de Natal"
 };
 
 

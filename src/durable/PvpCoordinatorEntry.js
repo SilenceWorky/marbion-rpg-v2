@@ -25,8 +25,15 @@ import {
 import {
   schedulePvpSeasonYearMonth,
   cancelScheduledPvpSeasonYearMonth,
-  readPvpSeasonYearSchedule
+  readPvpSeasonYearSchedule,
+  syncScheduledPvpSeasonYearMonthName
 } from "../systems/pvp-season-schedule-store.js";
+
+import {
+  readPvpSeasonMonthContent,
+  readPvpSeasonYearContent,
+  savePvpSeasonMonthContent
+} from "../systems/pvp-season-content-store.js";
 
 import {
   getNextChallengeExpiry
@@ -83,6 +90,7 @@ function getSeasonErrorStatus(
     error.startsWith("SEASON_STORAGE_") ||
     error.startsWith("SEASON_PLAN_STORAGE_") ||
     error.startsWith("SEASON_SCHEDULE_STORAGE_") ||
+    error.startsWith("SEASON_CONTENT_STORAGE_") ||
     result?.error ===
       "SEASON_SCHEDULE_LIST_UNAVAILABLE" ||
     result?.error ===
@@ -358,6 +366,149 @@ export class PvpCoordinator extends BasePvpCoordinator {
               url.searchParams.get("month"),
             name:
               url.searchParams.get("name")
+          }
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/season/plan/rename"
+    ) {
+      const defined =
+        await definePvpSeasonYearMonth(
+          this.state.storage,
+          {
+            year:
+              url.searchParams.get("year"),
+            month:
+              url.searchParams.get("month"),
+            name:
+              url.searchParams.get("name")
+          }
+        );
+
+      if (!defined.ok) {
+        return Response.json(
+          defined,
+          {
+            status:
+              getSeasonErrorStatus(
+                defined
+              )
+          }
+        );
+      }
+
+      const synced =
+        await syncScheduledPvpSeasonYearMonthName(
+          this.state.storage,
+          {
+            year:
+              defined.definition.year,
+            month:
+              defined.definition.month,
+            name:
+              defined.definition.name
+          }
+        );
+
+      return Response.json(
+        {
+          ok: true,
+          changed:
+            defined.changed ||
+            Boolean(synced?.changed),
+          definition:
+            defined.definition,
+          scheduleSync:
+            synced
+        }
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/season/content/year"
+    ) {
+      const result =
+        await readPvpSeasonYearContent(
+          this.state.storage,
+          url.searchParams.get("year")
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/season/content/month"
+    ) {
+      const result =
+        await readPvpSeasonMonthContent(
+          this.state.storage,
+          url.searchParams.get("year"),
+          url.searchParams.get("month")
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/season/content/month/save"
+    ) {
+      let body;
+
+      try {
+        body =
+          await request.json();
+      }
+      catch {
+        body = null;
+      }
+
+      const result =
+        await savePvpSeasonMonthContent(
+          this.state.storage,
+          {
+            ...(body &&
+            typeof body === "object"
+              ? body
+              : {}),
+            year:
+              url.searchParams.get("year"),
+            month:
+              url.searchParams.get("month")
           }
         );
 
