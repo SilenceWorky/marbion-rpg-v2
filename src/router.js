@@ -22,6 +22,7 @@ import { confirmRoute } from "./routes/bank-confirm.js";
 import { chestRoute } from "./routes/chest.js";
 import { characterApiV1Route } from "./routes/api-character-v1.js";
 import { adminCharactersApiRoute } from "./routes/api-admin-characters.js";
+import { adminSeasonsApiRoute } from "./routes/api-admin-seasons.js";
 import { elementFusionsApiRoute } from "./routes/api-element-fusions.js";
 
 
@@ -200,6 +201,15 @@ export async function handleRequest(request, env, ctx) {
     path === "/api/v1/admin/character"
   ) {
     return adminCharactersApiRoute(
+      request,
+      env
+    );
+  }
+
+  if (
+    path === "/api/v1/admin/seasons"
+  ) {
+    return adminSeasonsApiRoute(
       request,
       env
     );
