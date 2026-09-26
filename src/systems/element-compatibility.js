@@ -171,6 +171,20 @@ const ELEMENT_FUSIONS = [
 ];
 
 
+export function getElementFusionRules() {
+  return ELEMENT_FUSIONS.map(
+    fusion => ({
+      requires: [
+        ...fusion.requires
+      ],
+      unlocks: [
+        ...fusion.unlocks
+      ]
+    })
+  );
+}
+
+
 /*
  * AFINIDADES DE PERGAMINHO
  *

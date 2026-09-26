@@ -22,6 +22,7 @@ import { confirmRoute } from "./routes/bank-confirm.js";
 import { chestRoute } from "./routes/chest.js";
 import { characterApiV1Route } from "./routes/api-character-v1.js";
 import { adminCharactersApiRoute } from "./routes/api-admin-characters.js";
+import { elementFusionsApiRoute } from "./routes/api-element-fusions.js";
 
 
 export async function handleRequest(request, env, ctx) {
@@ -202,6 +203,12 @@ export async function handleRequest(request, env, ctx) {
       request,
       env
     );
+  }
+
+  if (
+    path === "/api/v1/catalog/fusions"
+  ) {
+    return elementFusionsApiRoute();
   }
 
   return new Response(
