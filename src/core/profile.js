@@ -66,7 +66,9 @@ export function createBaseProfile(user) {
     // INVENTÁRIO
     inventory: {
       scrolls: [],
-      scrollSequence: 0
+      scrollSequence: 0,
+      consumables: [],
+      consumableSequence: 0
     },
 
     // BAÚS
@@ -222,7 +224,20 @@ export function ensureProfileDefaults(profile, user = null) {
         ) &&
         profile.inventory.scrollSequence >= 0
           ? profile.inventory.scrollSequence
-          : defaults.inventory.scrollSequence
+          : defaults.inventory.scrollSequence,
+      consumables:
+        Array.isArray(
+          profile?.inventory?.consumables
+        )
+          ? profile.inventory.consumables
+          : defaults.inventory.consumables,
+      consumableSequence:
+        Number.isSafeInteger(
+          profile?.inventory?.consumableSequence
+        ) &&
+        profile.inventory.consumableSequence >= 0
+          ? profile.inventory.consumableSequence
+          : defaults.inventory.consumableSequence
     },
 
     chests:

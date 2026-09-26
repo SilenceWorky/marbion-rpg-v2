@@ -22,7 +22,9 @@ assert.deepEqual(
   profile.inventory,
   {
     scrolls: [],
-    scrollSequence: 0
+    scrollSequence: 0,
+    consumables: [],
+    consumableSequence: 0
   }
 );
 
