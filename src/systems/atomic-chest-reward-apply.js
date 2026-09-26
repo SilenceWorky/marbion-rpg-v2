@@ -14,6 +14,10 @@ import {
   addXp
 } from "./progression.js";
 
+import {
+  addScrollToInventory
+} from "./scroll-inventory.js";
+
 
 function validateResolvedReward(
   reward
@@ -70,6 +74,43 @@ function validateResolvedReward(
         ok: false,
         error:
           "INVALID_ATOMIC_MONEY_REWARD"
+      };
+    }
+
+    return {
+      ok: true,
+      applicable: true
+    };
+  }
+
+  if (
+    reward.type ===
+      "scroll"
+  ) {
+    if (
+      !reward.scroll ||
+      typeof reward.scroll !==
+        "object" ||
+      Array.isArray(
+        reward.scroll
+      ) ||
+      !String(
+        reward.scroll.tier ?? ""
+      ).trim() ||
+      !reward.scroll.skill ||
+      typeof reward.scroll.skill !==
+        "object" ||
+      Array.isArray(
+        reward.scroll.skill
+      ) ||
+      !String(
+        reward.scroll.skill.id ?? ""
+      ).trim()
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_ATOMIC_SCROLL_REWARD"
       };
     }
 
@@ -160,6 +201,7 @@ export function applyResolvedAtomicChestRewards(
   const appliedNow = [];
   const xpResults = [];
   const moneyRewards = [];
+  const scrollRewards = [];
 
   for (
     let index = 0;
@@ -210,6 +252,42 @@ export function applyResolvedAtomicChestRewards(
         )
       );
     }
+    else if (
+      reward.type ===
+        "scroll"
+    ) {
+      const delivered =
+        addScrollToInventory(
+          profile,
+          {
+            tier:
+              reward.scroll.tier,
+            skill:
+              reward.scroll.skill,
+            source:
+              "atomic_chest",
+            grantId:
+              `atomic_chest:${found.chest.id}:reward:${index}`,
+            createdAt:
+              pendingOpen.createdAt
+          }
+        );
+
+      if (!delivered.ok) {
+        return delivered;
+      }
+
+      scrollRewards.push({
+        index,
+        duplicate:
+          delivered.duplicate ===
+          true,
+        scroll:
+          structuredClone(
+            delivered.scroll
+          )
+      });
+    }
 
     applied.add(index);
     appliedNow.push(index);
@@ -258,6 +336,7 @@ export function applyResolvedAtomicChestRewards(
       unresolvedIndexes.length ===
       0,
     xpResults,
-    moneyRewards
+    moneyRewards,
+    scrollRewards
   };
 }

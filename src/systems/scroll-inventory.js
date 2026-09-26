@@ -74,6 +74,7 @@ export function addScrollToInventory(
     tier,
     skill,
     source = "unknown",
+    grantId = null,
     createdAt = Date.now()
   } = {}
 ) {
@@ -114,6 +115,29 @@ export function addScrollToInventory(
     };
   }
 
+  const normalizedGrantId =
+    String(
+      grantId ?? ""
+    ).trim() || null;
+
+  if (normalizedGrantId) {
+    const existing =
+      state.scrolls.find(
+        entry =>
+          entry?.grantId ===
+          normalizedGrantId
+      ) || null;
+
+    if (existing) {
+      return {
+        ok: true,
+        duplicate: true,
+        scroll:
+          existing
+      };
+    }
+  }
+
   if (
     profile.inventory
       .scrollSequence >=
@@ -150,6 +174,14 @@ export function addScrollToInventory(
     },
     source:
       String(source ?? "unknown"),
+    ...(
+      normalizedGrantId
+        ? {
+            grantId:
+              normalizedGrantId
+          }
+        : {}
+    ),
     createdAt:
       Math.max(
         0,
@@ -166,6 +198,7 @@ export function addScrollToInventory(
 
   return {
     ok: true,
+    duplicate: false,
     scroll
   };
 }
