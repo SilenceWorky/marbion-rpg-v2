@@ -7,6 +7,11 @@ import {
 } from "../config/season-pass-rewards.js";
 
 import {
+  SEASONAL_SKILL_EFFECTS,
+  normalizeSeasonalSkillEffect
+} from "../config/seasonal-skill-effects.js";
+
+import {
   SEASON_PASS_MAX_TIER,
   SEASON_PASS_TOTAL_XP,
   SEASON_PASS_POST_REWARD_XP,
@@ -241,6 +246,23 @@ function normalizeSeasonalSkills(
             )
           );
 
+    const effect =
+      normalizeSeasonalSkillEffect(
+        raw.effect
+      );
+
+    if (
+      effect === undefined
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASON_SKILL_EFFECT",
+        value:
+          raw.effect
+      };
+    }
+
     if (
       !element ||
       !name ||
@@ -272,6 +294,7 @@ function normalizeSeasonalSkills(
       name:
         name.slice(0, 120),
       baseDamage,
+      effect,
       description:
         String(
           raw.description ?? ""
@@ -542,6 +565,8 @@ export async function adminSeasonsApiRoute(
         getSeasonMonthName(month),
       baseTheme:
         getSeasonBaseTheme(month),
+      skillEffects:
+        SEASONAL_SKILL_EFFECTS,
       definition,
       content:
         saved.content
@@ -619,6 +644,8 @@ export async function adminSeasonsApiRoute(
       schedule.schedule ?? null,
     content:
       content.months ?? {},
+    skillEffects:
+      SEASONAL_SKILL_EFFECTS,
     pass:
       buildPassCatalog()
   });

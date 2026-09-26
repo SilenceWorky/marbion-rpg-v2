@@ -5,6 +5,10 @@ import {
   normalizeSeasonYear
 } from "./pvp-season-calendar.js";
 
+import {
+  normalizeSeasonalSkillEffect
+} from "../config/seasonal-skill-effects.js";
+
 export const PVP_SEASON_CONTENT_VERSION = 1;
 export const PVP_SEASON_CONTENT_STORAGE_PREFIX =
   "pvp_season_content:";
@@ -73,6 +77,11 @@ function normalizeSkill(value, index) {
       value.baseDamage
     );
 
+  const effect =
+    normalizeSeasonalSkillEffect(
+      value.effect
+    );
+
   if (!element || !name) {
     return null;
   }
@@ -98,6 +107,10 @@ function normalizeSkill(value, index) {
     element,
     name,
     baseDamage,
+    effect:
+      effect === undefined
+        ? null
+        : effect,
     description
   };
 }
