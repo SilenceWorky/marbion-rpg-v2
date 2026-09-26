@@ -1,5 +1,6 @@
 import {
   getMonthlySeasonId,
+  getSeasonalFeaturedElements,
   normalizeSeasonMonth,
   normalizeSeasonYear
 } from "./pvp-season-calendar.js";
@@ -46,22 +47,6 @@ function normalizeDamage(value) {
   }
 
   return Math.round(damage);
-}
-
-function normalizeElements(value) {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return [
-    ...new Set(
-      value
-        .map(item =>
-          String(item ?? "").trim()
-        )
-        .filter(Boolean)
-        .slice(0, 8)
-    )
-  ];
 }
 
 function normalizeSkill(value, index) {
@@ -144,9 +129,10 @@ export function normalizePvpSeasonContent(
     return null;
   }
   const featuredElements =
-    normalizeElements(
-      value.featuredElements
-    );
+    getSeasonalFeaturedElements(
+      year,
+      month
+    ) ?? [];
 
   const rawSkills =
     Array.isArray(

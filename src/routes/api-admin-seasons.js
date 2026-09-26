@@ -3,14 +3,6 @@ import {
 } from "../config/admins.js";
 
 import {
-  ELEMENTS_URL
-} from "../config/urls.js";
-
-import {
-  fetchJson
-} from "../core/content.js";
-
-import {
   SEASON_PASS_REWARDS
 } from "../config/season-pass-rewards.js";
 
@@ -26,6 +18,7 @@ import {
   getSeasonBaseTheme,
   getSeasonCalendarPartsAt,
   getSeasonMonthName,
+  getSeasonalFeaturedElements,
   normalizeSeasonMonth,
   normalizeSeasonYear,
   PVP_SEASON_TIMEZONE
@@ -134,7 +127,12 @@ function buildCalendar(year) {
       monthName:
         getSeasonMonthName(month),
       baseTheme:
-        getSeasonBaseTheme(month)
+        getSeasonBaseTheme(month),
+      featuredElements:
+        getSeasonalFeaturedElements(
+          year,
+          month
+        ) ?? []
     });
   }
 
@@ -182,80 +180,20 @@ function normalizeLookup(value) {
     .toLowerCase();
 }
 
-async function loadCanonicalElements() {
-  const data =
-    await fetchJson(
-      ELEMENTS_URL
-    );
-
-  const entries =
-    Object.keys(
-      data &&
-      typeof data === "object"
-        ? data
-        : {}
-    );
-
-  const byLookup =
-    new Map(
-      entries.map(name => [
-        normalizeLookup(name),
-        name
-      ])
-    );
-
-  return {
-    entries,
-    byLookup
-  };
-}
-
-function normalizeFeaturedElements(
-  value,
-  byLookup
-) {
-  if (!Array.isArray(value)) {
-    return {
-      ok: true,
-      value: []
-    };
-  }
-
-  const resolved = [];
-
-  for (
-    const raw
-    of value.slice(0, 8)
-  ) {
-    const canonical =
-      byLookup.get(
-        normalizeLookup(raw)
-      );
-
-    if (!canonical) {
-      return {
-        ok: false,
-        error:
-          "INVALID_SEASON_ELEMENT",
-        value: raw
-      };
-    }
-
-    if (!resolved.includes(canonical)) {
-      resolved.push(canonical);
-    }
-  }
-
-  return {
-    ok: true,
-    value: resolved
-  };
-}
-
 function normalizeSeasonalSkills(
   value,
-  byLookup
+  allowedElements
 ) {
+  const byLookup =
+    new Map(
+      allowedElements.map(
+        element => [
+          normalizeLookup(element),
+          element
+        ]
+      )
+    );
+
   if (!Array.isArray(value)) {
     return {
       ok: true,
@@ -472,32 +410,19 @@ export async function adminSeasonsApiRoute(
       );
     }
 
-    let elementCatalog;
+    const featuredElements =
+      getSeasonalFeaturedElements(
+        requestedYear,
+        month
+      );
 
-    try {
-      elementCatalog =
-        await loadCanonicalElements();
-    }
-    catch {
+    if (!featuredElements) {
       return Response.json(
         {
           ok: false,
           error:
-            "ELEMENT_CATALOG_UNAVAILABLE"
+            "INVALID_SEASON_ELEMENTS"
         },
-        { status: 502 }
-      );
-    }
-
-    const featured =
-      normalizeFeaturedElements(
-        input.featuredElements,
-        elementCatalog.byLookup
-      );
-
-    if (!featured.ok) {
-      return Response.json(
-        featured,
         { status: 400 }
       );
     }
@@ -505,7 +430,7 @@ export async function adminSeasonsApiRoute(
     const skills =
       normalizeSeasonalSkills(
         input.seasonalSkills,
-        elementCatalog.byLookup
+        featuredElements
       );
 
     if (!skills.ok) {
@@ -513,21 +438,6 @@ export async function adminSeasonsApiRoute(
         skills,
         { status: 400 }
       );
-    }
-
-    const featuredElements =
-      [...featured.value];
-
-    for (const skill of skills.value) {
-      if (
-        !featuredElements.includes(
-          skill.element
-        )
-      ) {
-        featuredElements.push(
-          skill.element
-        );
-      }
     }
 
     let definition = null;

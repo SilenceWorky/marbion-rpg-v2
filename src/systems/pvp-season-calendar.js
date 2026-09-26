@@ -42,6 +42,72 @@ const BASE_THEMES = {
 };
 
 
+export const PVP_SEASON_ELEMENT_BASE_YEAR =
+  2026;
+
+const SEASONAL_ELEMENT_TRIOS_2026 = [
+  ["Luz", "Tempo", "Fogo"],
+  ["Cristal", "Ilusão", "Radiação"],
+  ["Eletricidade", "Som", "Vento"],
+  ["Psíquico", "Sombra", "Neutro"],
+  ["Natureza", "Terra", "Água"],
+  ["Lava", "Plasma", "Metal"],
+  ["Gelo", "Fluxo", "Gravidade"],
+  ["Espaço", "Matéria", "Singularidade"],
+  ["Vidro", "Vapor", "Magnetismo"],
+  ["Veneno", "Ácido", "Obsidiana"],
+  ["Água", "Fogo", "Vento"],
+  ["Gelo", "Terra", "Natureza"]
+];
+
+function positiveModulo(
+  value,
+  divisor
+) {
+  return (
+    (value % divisor) +
+    divisor
+  ) % divisor;
+}
+
+export function getSeasonalFeaturedElements(
+  year,
+  month
+) {
+  const normalizedYear =
+    normalizeSeasonYear(year);
+
+  const normalizedMonth =
+    normalizeSeasonMonth(month);
+
+  if (
+    !normalizedYear ||
+    !normalizedMonth
+  ) {
+    return null;
+  }
+
+  const displacement =
+    normalizedYear -
+    PVP_SEASON_ELEMENT_BASE_YEAR;
+
+  const monthIndex =
+    normalizedMonth - 1;
+
+  const baseIndex =
+    positiveModulo(
+      monthIndex - displacement,
+      SEASONAL_ELEMENT_TRIOS_2026.length
+    );
+
+  return [
+    ...SEASONAL_ELEMENT_TRIOS_2026[
+      baseIndex
+    ]
+  ];
+}
+
+
 function normalizeText(value) {
   const text =
     String(value ?? "")
