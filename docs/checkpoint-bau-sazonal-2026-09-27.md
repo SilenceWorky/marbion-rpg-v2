@@ -438,3 +438,72 @@ Passaram:
 O Baú Sazonal ainda não é removido/finalizado nesta etapa porque finalizador, mensagem de vitória, cosmético e relíquia continuam pendentes de implementação.
 
 Nenhum deploy de produção foi executado.
+
+# 13. Distribuição anual de Baús Sazonais no Passe — 27/09/2026
+
+Implementação concluída no commit `4e9c823` (`feat: vincula recompensas anuais aos baus sazonais`), já reconciliada com o commit paralelo de Finalizadores PvP Sazonais `e821460`.
+
+A identidade dos Baús Sazonais já era anual porque `seasonId` usa `YYYY-MM`. A lacuna resolvida nesta etapa era definir qual identidade concreta cada recompensa genérica `seasonal_chest` deve entregar em cada mês/ano.
+
+O conteúdo mensal foi evoluído para `PVP_SEASON_CONTENT_VERSION = 3` e ganhou:
+
+```txt
+seasonalChestRewardBindings[]
+```
+
+Cada binding possui:
+
+```txt
+key
+seasonalChestId
+```
+
+Slots canônicos atuais do Passe:
+- cada patamar do catálogo que contém `seasonal_chest` possui uma chave `season_pass:tier:<N>`;
+- o pós-passe possui `season_pass:post`;
+- atualmente são 13 patamares com Baú Sazonal + 1 slot de pós-passe = 14 bindings possíveis.
+
+Exemplos:
+
+```txt
+2026-12
+season_pass:tier:5   -> seasonal:2026-12:chest:<id-A>
+season_pass:tier:75  -> seasonal:2026-12:chest:<id-B>
+season_pass:tier:100 -> seasonal:2026-12:chest:<id-C>
+season_pass:post     -> seasonal:2026-12:chest:<id-C>
+
+2027-12
+season_pass:tier:5   -> seasonal:2027-12:chest:<outro-id>
+```
+
+Regras:
+- o binding sempre aponta para o ID exato do baú;
+- só pode apontar para baú existente dentro do mesmo conteúdo/seasonId;
+- patamar que não possui recompensa `seasonal_chest` não pode receber binding artificial;
+- binding ausente significa explicitamente `não definido`; não existe escolha automática do #1, último ou mais novo;
+- quantidade continua vindo do catálogo do Passe: por exemplo, Patamar 75 = 2 unidades do baú selecionado e Patamar 100 = 3 unidades do baú selecionado;
+- o pós-passe possui escolha independente;
+- revisões históricas do conteúdo preservam os bindings daquela revisão;
+- dados antigos são normalizados com `seasonalChestRewardBindings: []`, sem inventar distribuição.
+
+Foi criado o resolver canônico:
+`src/systems/seasonal-chest-reward-binding-resolver.js`.
+
+Ele resolve um slot para a definição completa do baú e valida `seasonId`, identidade e `poolRevision`. Esse resolver fica pronto para a futura integração da entrega física do Passe.
+
+Importante: `deliveryIntegrated` do Passe continua `false`. Esta etapa configura corretamente qual baú deverá ser entregue, mas não finge que o resgate físico completo das recompensas do Passe já existe.
+
+Teste novo:
+`testar_vinculo_recompensas_baus_sazonais.mjs`.
+
+Validado:
+- 2026 e 2027 podem mapear os mesmos patamares para IDs diferentes;
+- cross-season é recusado;
+- revisão histórica preserva binding antigo;
+- quantidades 1/2/3 do catálogo permanecem corretas;
+- pós-passe possui binding próprio;
+- slot inexistente é recusado;
+- conteúdo antigo não recebe binding automático;
+- integração coexistindo com Consumíveis Sazonais e Finalizadores PvP Sazonais passou sem regressão.
+
+Nenhum deploy de produção foi executado.
