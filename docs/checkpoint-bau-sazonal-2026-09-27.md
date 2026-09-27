@@ -363,3 +363,78 @@ Testes concluídos:
 - `testar_comando_abrir_bau.mjs`.
 
 Nenhum deploy de produção foi executado.
+
+
+# 13. Aplicação idempotente e Consumíveis Sazonais — 27/09/2026
+
+A abertura sazonal agora possui aplicador próprio de recompensas resolvidas. O Worker aplica somente recompensas com `resolved: true` e persiste `rewardPlan.appliedRewardIndexes`, impedindo duplicação em retry.
+
+Tipos já aplicáveis:
+
+```txt
+normal_xp
+money
+seasonal_skill
+seasonal_consumable
+```
+
+A habilidade sazonal é aprendida permanentemente com `source: "seasonal_chest"`.
+
+O Consumível Sazonal é entregue ao inventário base de consumíveis com `source: "seasonal_chest"` e `grantId` determinístico por instância de baú + índice da recompensa + unidade. Assim, repetir a aplicação não cria uma segunda cópia acidental da mesma entrega.
+
+## Catálogo sazonal de consumíveis
+
+O conteúdo mensal passou a aceitar `seasonalConsumables[]`, preservado também nos snapshots históricos de revisão. Cada entrada possui, nesta etapa:
+
+```txt
+id
+key
+name
+rarity
+description
+introducedInSeasonalChestId
+introducedInSeasonalChestOrder
+```
+
+O catálogo usa as seis raridades canônicas. O sorteio do Baú Sazonal segue exatamente:
+
+```txt
+Comum        39,9%
+Raro         30%
+Super Raro   20%
+Mítico        8%
+Lendário      2%
+Único          0,1%
+```
+
+A elegibilidade respeita o mesmo isolamento e progressão histórica dos demais conteúdos:
+
+```txt
+mesmo seasonId
++
+mesmo snapshot poolRevision
++
+introducedInSeasonalChestOrder <= chestOrder
+```
+
+Logo, um consumível introduzido no Baú #2 não pode sair no Baú #1; o Baú #2 pode acessar consumíveis do #1 e #2; outra temporada não participa do pool.
+
+Consumíveis sazonais são acumuláveis. Não foi definido nesta etapa nenhum efeito de uso específico deles; portanto o sistema atual cobre cadastro, versionamento histórico, sorteio, entrega e persistência no inventário, sem inventar regras de efeito/uso que ainda não foram aprovadas.
+
+## Testes concluídos
+
+Passaram:
+
+- `testar_consumiveis_bau_sazonal.mjs`: pesos, raridade Único, progressão cumulativa e isolamento;
+- `testar_catalogo_consumiveis_sazonais.mjs`: normalização e persistência do catálogo mensal;
+- `testar_aplicacao_recompensas_bau_sazonal.mjs`: aplicação idempotente de XP, dinheiro, habilidade e consumível;
+- `testar_rota_consumivel_bau_sazonal.mjs`: resolução, entrega e retry sem duplicação na rota real;
+- `testar_rota_bau_sazonal_pending.mjs`;
+- `testar_comando_abrir_bau.mjs`;
+- `testar_editor_baus_sazonais.mjs`;
+- `testar_habilidade_bau_sazonal.mjs`;
+- `testar_plano_bau_sazonal.mjs`.
+
+O Baú Sazonal ainda não é removido/finalizado nesta etapa porque finalizador, mensagem de vitória, cosmético e relíquia continuam pendentes de implementação.
+
+Nenhum deploy de produção foi executado.
