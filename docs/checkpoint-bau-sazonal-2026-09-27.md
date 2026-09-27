@@ -325,3 +325,41 @@ Passaram:
 - `testar_integracao_temporada_mensal_coordenador.mjs`.
 
 Nenhum deploy de produção foi executado nesta fase.
+
+
+# 12. Abertura segura inicial do Baú Sazonal — 27/09/2026
+
+Implementação concluída no commit `4247fbd` (`feat: inicia abertura segura do bau sazonal`).
+
+O comando/serviço de abertura agora reconhece Baú Sazonal com identidade completa e cria um `pendingOpen` congelado contendo:
+
+```txt
+seasonId
+seasonalChestId
+chestOrder
+poolRevision
+nameSnapshot
+descriptionSnapshot
+createdAt
+rewardPlan
+```
+
+O primeiro pedido de abertura sorteia o plano e grava o pending no próprio baú. Repetir a abertura enquanto existe pending reutiliza exatamente o mesmo plano; o RNG não é chamado novamente.
+
+Baús legados que possuem apenas `seasonId` continuam no inventário, mas a abertura segura é recusada com `SEASONAL_CHEST_IDENTITY_REQUIRED`; nenhum ID/ordem/revisão histórica é inventado.
+
+Quando o plano possui recompensa `seasonal_skill`, a rota busca o snapshot histórico pelo `poolRevision` do próprio baú via `/season/content/revision` e chama o resolver de habilidade contra esse snapshot. Portanto a abertura não consulta simplesmente a temporada atual.
+
+Se o catálogo histórico estiver temporariamente indisponível, o perfil é salvo com o mesmo `pendingOpen` e o jogador pode tentar novamente sem reroll. O Baú Sazonal ainda não é removido antes da finalização completa de todas as recompensas.
+
+Nesta fase somente a recompensa de habilidade sazonal já possui resolução temática integrada. Consumível sazonal, finalizador, mensagem de vitória, cosmético e relíquia continuam como próximas resoluções do pending; não foram simulados nem inventados.
+
+Testes concluídos:
+- `testar_pending_bau_sazonal.mjs`;
+- `testar_abertura_servico_bau_sazonal.mjs`;
+- `testar_rota_bau_sazonal_pending.mjs`;
+- `testar_progressao_baus_sazonais_habilidades.mjs`;
+- `testar_habilidade_bau_sazonal.mjs`;
+- `testar_comando_abrir_bau.mjs`.
+
+Nenhum deploy de produção foi executado.
