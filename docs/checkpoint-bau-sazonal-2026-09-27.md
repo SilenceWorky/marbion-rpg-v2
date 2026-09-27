@@ -250,3 +250,78 @@ A implementação deve preservar:
 - retries sem reroll indevido;
 - aplicação sem duplicação;
 - finalização segura do baú somente depois que todas as recompensas forem resolvidas/aplicadas.
+
+---
+
+# 11. Editor e identidade permanente dos Baús Sazonais — 27/09/2026
+
+Implementação concluída no RPG Worker no commit `e3dda37` (`feat: adiciona identidade e progressao dos baus sazonais`).
+
+O conteúdo mensal continua sendo a fonte canônica única. Não foi criada tabela/fonte paralela. O objeto persistido por mês foi evoluído para `PVP_SEASON_CONTENT_VERSION = 2` e agora contém também:
+
+```txt
+revision
+seasonalChests[]
+seasonalSkills[].introducedInSeasonalChestId
+seasonalSkills[].introducedInSeasonalChestOrder
+```
+
+Dados antigos v1 continuam legíveis. Eles são normalizados com `revision: 0`, `seasonalChests: []` e habilidades históricas sem associação explícita a baú.
+
+## Identidade de cada Baú Sazonal
+
+Cada definição persistida de baú contém:
+
+```txt
+id
+seasonId
+order
+name
+description
+poolRevision
+createdAt
+updatedAt
+```
+
+Para baús novos, o ID moderno usa o formato técnico `seasonal:YYYY-MM:chest:<token>`. IDs legados já usados pelo Worker, como `YYYY-MM:bau-rena`, continuam aceitos para compatibilidade e nunca são renomeados automaticamente.
+
+Após o primeiro save/publicação do baú, `id`, `seasonId`, `order` e `poolRevision` são identidade imutável. Nome e descrição permanecem editáveis. Baú publicado não pode ser removido silenciosamente pelo save mensal.
+
+## Revisões históricas e congelamento do pool
+
+Cada save mensal incrementa `content.revision`. Antes de avançar o conteúdo atual, o Worker grava também um snapshot histórico imutável daquela revisão em chave separada.
+
+Cada baú recebe `poolRevision` no momento em que é criado. Assim, um Baú #1 criado na revisão 1 continua apontando para a revisão 1 mesmo depois que o mês chega às revisões 2, 3, 4 etc.
+
+O PVP Coordinator ganhou leitura por revisão em `/season/content/revision`. A abertura versionada deve usar a revisão congelada do próprio baú e nunca consultar apenas o conteúdo atual da temporada.
+
+Instâncias novas de Baú Sazonal podem carregar `seasonId + seasonalChestId + chestOrder + poolRevision + snapshots de nome/descrição`. Instâncias antigas com apenas `seasonId` continuam legíveis como legado, sem inventar ID, ordem ou revisão.
+
+## Progressão cumulativa
+
+A elegibilidade de habilidade sazonal segue a regra:
+
+```txt
+mesmo seasonId
++
+introducedInSeasonalChestOrder <= chestOrder
++
+snapshot revision == poolRevision do baú
+```
+
+Logo, Natal #1 nunca vê recompensas introduzidas no #2/#3; Natal #2 vê #1+#2; Natal #3 vê #1+#2+#3. Outra temporada com ordem igual não participa do pool.
+
+Conteúdo histórico sem associação a baú não é ligado automaticamente nem aleatoriamente: permanece explicitamente fora do pool de Baú Sazonal até o ADM definir a associação.
+
+## Testes concluídos
+
+Passaram:
+
+- `testar_editor_baus_sazonais.mjs`: persistência, edição, recarregamento, revisão histórica e imutabilidade;
+- `testar_progressao_baus_sazonais_habilidades.mjs`: progressão cumulativa, isolamento entre temporadas e revisão congelada;
+- `testar_habilidade_bau_sazonal.mjs`: resolver de habilidade com identidade versionada;
+- testes antigos de elementos, raridades, efeitos e vínculo season-only;
+- `testar_integracao_temporada_coordenador.mjs`;
+- `testar_integracao_temporada_mensal_coordenador.mjs`.
+
+Nenhum deploy de produção foi executado nesta fase.
