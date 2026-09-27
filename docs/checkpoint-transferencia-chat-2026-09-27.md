@@ -1,0 +1,201 @@
+# Checkpoint de transferência — Marbion RPG V2 / Baú Sazonal — 27/09/2026
+
+Este arquivo é o ponto canônico para continuar o projeto em um novo chat sem recomeçar trabalho já concluído.
+
+## Repositório / ambiente
+
+- Repositório: `SilenceWorky/marbion-rpg-v2`
+- Branch: `main`
+- Pasta local: `C:\Users\KABUM\Desktop\marbion-rpg-v2`
+- Worker produção: `https://marbion-rpg-v2.wellingsonpl.workers.dev`
+- KV: `MARBION_USERS_V2`
+- Durable Object: `PVP_COORDINATOR`, instância global `marbion-global-pvp`
+- Não houve deploy de produção neste bloco do Baú Sazonal.
+- Nunca ativar/criar temporada real em produção sem autorização explícita.
+- Não usar `git add .`.
+- Arquivos locais protegidos e que não devem ser apagados/commitados por acidente: `skills-v1-1500-debuff.json`, `skills-v1-1500-final.json`, `skills-v1-1500.json`.
+
+## Fluxo de trabalho
+
+O usuário prefere implementação extremamente incremental: uma operação/teste por vez, conferir saída exata, depois continuar.
+
+Remote Desktop disponível:
+- dispositivo: `SilenceDesk`
+- id: `6b11737e-1109-4e40-b1d8-f849b801ecfd`
+
+Quando chegar em comandos do MarbionBot/site, NÃO configurar automaticamente. Avisar o usuário qual comando/campos precisam ser cadastrados; o usuário fará a configuração manualmente no painel.
+
+## Roadmap prático
+
+Etapas 1–24 concluídas.
+Etapa 25 em andamento: Economia / Baús / Passe.
+Dentro da Etapa 25:
+- Baú Atômico I–V: funcionalmente fechado e validado.
+- Baú Sazonal: implementação atual.
+- Depois de fechar Etapa 25: PADM.
+- Depois: Etapa 26 (fechamento de temporada, snapshot, recompensas, soft reset).
+- Mobs/Bosses vêm depois de blocos intermediários e infraestrutura de spawn/permissões.
+
+## Baú Sazonal — regras canônicas
+
+Recompensa base:
+- 50% XP, 50–180;
+- 50% dinheiro, 20–80 Bronze-equivalente, convertido canonicamente pelo próprio baú.
+
+Pool especial:
+- 12% habilidade temática sazonal;
+- 38% consumível sazonal;
+- 15% finalizador PvP sazonal;
+- 15% mensagem de vitória sazonal;
+- 10% item/acessório sazonal;
+- 10% relíquia/item especial sazonal.
+
+Habilidade temática:
+- somente habilidades sazonais da revisão histórica do baú;
+- compatíveis com o personagem;
+- não possuídas;
+- pesos: Comum 40%, Raro 30%, Super Raro 20%, Mítico 8%, Lendário 2%, Único 0%;
+- sem habilidade compatível/nova disponível -> 1 Platina.
+
+Consumível sazonal:
+- somente consumíveis cadastrados na temporada;
+- não mistura com Poções normais;
+- acumulável e continua após o fim da temporada;
+- pesos: Comum 39,9%, Raro 30%, Super Raro 20%, Mítico 8%, Lendário 2%, Único 0,1%;
+- ainda NÃO foi definido efeito/uso específico dos consumíveis sazonais; não inventar.
+
+Colecionáveis:
+- finalizador, mensagem, cosmético/acessório e relíquia são permanentes;
+- priorizam item ainda não possuído;
+- coleção completa da categoria/temporada -> 1 Platina.
+
+## Identidade permanente / progressão cumulativa dos baús
+
+Cada baú sazonal possui:
+- `seasonId`
+- `seasonalChestId` estável e permanente;
+- `chestOrder` dentro da temporada;
+- `poolRevision` histórica;
+- `nameSnapshot`;
+- `descriptionSnapshot`.
+
+Regra central:
+- conteúdo introduzido no Baú #1 pode sair no #1, #2, #3... da MESMA temporada;
+- conteúdo introduzido no #2 nunca sai no #1;
+- conteúdo introduzido no #3 nunca sai no #1/#2;
+- nunca atravessa temporadas.
+
+Elegibilidade usa:
+`mesmo seasonId + mesmo snapshot poolRevision + introducedInSeasonalChestOrder <= chestOrder`.
+
+O `poolRevision` congela o catálogo histórico. Um baú antigo jamais deve começar a dar conteúdo publicado depois.
+
+Baús guardados por meses/anos continuam com identidade original. ADMs poderão futuramente distribuir baús históricos por ID.
+
+Conteúdo histórico sem associação a baú não é ligado automaticamente nem aleatoriamente.
+
+## Implementação concluída
+
+Commit `e3dda37 feat: adiciona identidade e progressao dos baus sazonais`
+- conteúdo mensal versionado;
+- `seasonalChests[]`;
+- `introducedInSeasonalChestId` / `introducedInSeasonalChestOrder`;
+- revisões históricas;
+- identidade permanente;
+- progressão cumulativa/isolamento.
+
+Commit `4247fbd feat: inicia abertura segura do bau sazonal`
+- `pendingOpen` próprio do Baú Sazonal;
+- retry reutiliza exatamente o mesmo plano, sem reroll;
+- ramo sazonal separado do Atômico em `!baú abrir`;
+- busca revisão histórica via `/season/content/revision`;
+- habilidade temática resolvida contra snapshot histórico;
+- baú legado/incompleto é bloqueado em vez de receber identidade inventada.
+
+Commit `ca311e6 docs: registra abertura segura do bau sazonal`.
+
+Commit `c9847fd feat: adicionar consumiveis ao bau sazonal`
+- aplicador idempotente de recompensas sazonais;
+- tipos aplicáveis atualmente: `normal_xp`, `money`, `seasonal_skill`, `seasonal_consumable`;
+- controle por `rewardPlan.appliedRewardIndexes`;
+- habilidade aprendida com `source: "seasonal_chest"`, permanente;
+- consumível entregue com `source: "seasonal_chest"`;
+- `grantId` determinístico por baú + índice da recompensa + unidade;
+- `seasonalConsumables[]` adicionado ao conteúdo mensal e snapshots históricos;
+- resolver de consumíveis com pesos completos, incluindo Único 0,1%;
+- progressão cumulativa por baú e isolamento por temporada;
+- rota real resolve, entrega e preserva retry sem duplicação.
+
+Commit `0bc621c docs: registra consumiveis do bau sazonal`.
+
+Último HEAD conhecido neste checkpoint:
+`0bc621c docs: registra consumiveis do bau sazonal`
+
+Antes de qualquer alteração no novo chat, executar:
+`git status --short`
+`git log -8 --oneline`
+para detectar trabalho concorrente.
+
+## Testes que já passaram
+
+- `testar_editor_baus_sazonais.mjs`
+- `testar_progressao_baus_sazonais_habilidades.mjs`
+- `testar_habilidade_bau_sazonal.mjs`
+- `testar_pending_bau_sazonal.mjs`
+- `testar_abertura_servico_bau_sazonal.mjs`
+- `testar_rota_bau_sazonal_pending.mjs`
+- `testar_comando_abrir_bau.mjs`
+- `testar_consumiveis_bau_sazonal.mjs`
+- `testar_catalogo_consumiveis_sazonais.mjs`
+- `testar_aplicacao_recompensas_bau_sazonal.mjs`
+- `testar_rota_consumivel_bau_sazonal.mjs`
+- `testar_plano_bau_sazonal.mjs`
+- testes de integração de temporada/coordenador citados no checkpoint específico.
+
+## Estado funcional atual do Baú Sazonal
+
+Já faz:
+1. identifica baú e revisão histórica;
+2. cria/reutiliza `pendingOpen`;
+3. congela o plano;
+4. carrega o snapshot histórico correto;
+5. resolve habilidade temática;
+6. resolve consumível sazonal;
+7. aplica XP;
+8. aplica dinheiro;
+9. aplica habilidade sazonal;
+10. aplica consumível sazonal;
+11. impede duplicação em retry.
+
+Ainda NÃO faz:
+- resolver/entregar finalizador PvP sazonal;
+- resolver/entregar mensagem de vitória sazonal;
+- resolver/entregar item/acessório sazonal;
+- resolver/entregar relíquia sazonal;
+- finalização/removal definitiva do Baú Sazonal após todos os rewards.
+
+O Baú Sazonal deliberadamente ainda não é removido porque essas quatro categorias especiais ainda não foram implementadas.
+
+## Próximo passo exato
+
+Continuar pela próxima categoria do pool especial: **Finalizador de PvP Sazonal (15%)**.
+
+Antes de codificar:
+1. conferir status/HEAD;
+2. procurar se já existe sistema real de finalizadores/colecionáveis no repo;
+3. reutilizar arquitetura existente, se houver;
+4. se não houver, criar primeiro a base mínima de inventário/coleção permanente e equipável sem inventar gatilho visual final;
+5. preservar `seasonId`, `seasonalChestId`, `chestOrder`, `poolRevision`;
+6. priorizar finalizador não possuído da mesma temporada;
+7. coleção completa -> 1 Platina;
+8. aplicação idempotente;
+9. não finalizar/remover o baú até todas as categorias do pool estarem resolvidas/aplicadas.
+
+Não implementar mensagem/cosmético/relíquia no mesmo passo; manter fluxo incremental.
+
+## Referência detalhada
+
+Também ler:
+`docs/checkpoint-bau-sazonal-2026-09-27.md`
+
+Esse arquivo contém as regras canônicas detalhadas e o histórico de implementação específico do Baú Sazonal.
