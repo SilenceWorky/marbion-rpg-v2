@@ -498,6 +498,76 @@ function normalizeSeasonalPvpFinisher(
 }
 
 
+function normalizeSeasonalVictoryMessage(
+  value,
+  index
+) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  const text =
+    normalizeText(
+      value.text,
+      500
+    );
+
+  const rawId =
+    normalizeText(
+      value.id,
+      160
+    );
+
+  const id =
+    rawId ??
+    [
+      "seasonal-victory-message",
+      text ?? "message",
+      index + 1
+    ]
+      .join(":")
+      .normalize("NFD")
+      .replace(
+        /[\u0300-\u036f]/g,
+        ""
+      )
+      .replace(
+        /[^a-zA-Z0-9:_-]+/g,
+        "_"
+      )
+      .toLowerCase();
+
+  const introducedInSeasonalChestId =
+    normalizeSeasonalChestId(
+      value.introducedInSeasonalChestId
+    );
+
+  const introducedInSeasonalChestOrder =
+    normalizePositiveInteger(
+      value.introducedInSeasonalChestOrder
+    );
+
+  if (
+    !text ||
+    !introducedInSeasonalChestId ||
+    !introducedInSeasonalChestOrder
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    text,
+    introducedInSeasonalChestId,
+    introducedInSeasonalChestOrder
+  };
+}
+
+
 function validateSeasonalChestRelations(
   chests,
   skills
@@ -993,6 +1063,28 @@ export function normalizePvpSeasonContent(
     return null;
   }
 
+  const rawVictoryMessages =
+    Array.isArray(
+      value.seasonalVictoryMessages
+    )
+      ? value.seasonalVictoryMessages
+      : [];
+
+  const seasonalVictoryMessages =
+    rawVictoryMessages
+      .slice(0, 100)
+      .map(
+        normalizeSeasonalVictoryMessage
+      )
+      .filter(Boolean);
+
+  if (
+    seasonalVictoryMessages.length !==
+    rawVictoryMessages.slice(0, 100).length
+  ) {
+    return null;
+  }
+
   if (
     !validateSeasonalChestRelations(
       seasonalChests,
@@ -1005,6 +1097,10 @@ export function normalizePvpSeasonContent(
     !validateSeasonalChestRelations(
       seasonalChests,
       seasonalPvpFinishers
+    ) ||
+    !validateSeasonalChestRelations(
+      seasonalChests,
+      seasonalVictoryMessages
     )
   ) {
     return null;
@@ -1040,6 +1136,7 @@ export function normalizePvpSeasonContent(
     seasonalSkills,
     seasonalConsumables,
     seasonalPvpFinishers,
+    seasonalVictoryMessages,
     updatedAt
   };
 }
@@ -1062,6 +1159,7 @@ export function createEmptyPvpSeasonContent(
     seasonalSkills: [],
     seasonalConsumables: [],
     seasonalPvpFinishers: [],
+    seasonalVictoryMessages: [],
     updatedAt: 0
   });
 }
@@ -1601,6 +1699,11 @@ export async function savePvpSeasonMonthContent(
           undefined
           ? existing.seasonalPvpFinishers
           : input.seasonalPvpFinishers,
+      seasonalVictoryMessages:
+        input?.seasonalVictoryMessages ===
+          undefined
+          ? existing.seasonalVictoryMessages
+          : input.seasonalVictoryMessages,
       updatedAt:
         now
     });

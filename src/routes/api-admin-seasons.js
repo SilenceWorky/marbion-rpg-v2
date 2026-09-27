@@ -636,6 +636,146 @@ export function normalizeSeasonalPvpFinishers(
 }
 
 
+export function normalizeSeasonalVictoryMessages(
+  value,
+  seasonalChests = null
+) {
+  if (value === undefined) {
+    return {
+      ok: true,
+      value: undefined
+    };
+  }
+
+  if (!Array.isArray(value)) {
+    return {
+      ok: false,
+      error: "INVALID_SEASONAL_VICTORY_MESSAGES"
+    };
+  }
+
+  const messages = [];
+  const ids = new Set();
+
+  for (
+    const raw of value.slice(0, 100)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      return {
+        ok: false,
+        error: "INVALID_SEASONAL_VICTORY_MESSAGE"
+      };
+    }
+
+    const text =
+      String(
+        raw.text ?? ""
+      ).trim();
+
+    const introducedInSeasonalChestId =
+      normalizeSeasonalChestId(
+        raw.introducedInSeasonalChestId
+      );
+
+    const introducedInSeasonalChestOrder =
+      Number(
+        raw.introducedInSeasonalChestOrder
+      );
+
+    if (
+      !text ||
+      !introducedInSeasonalChestId ||
+      !Number.isSafeInteger(
+        introducedInSeasonalChestOrder
+      ) ||
+      introducedInSeasonalChestOrder < 1
+    ) {
+      return {
+        ok: false,
+        error: "INVALID_SEASONAL_VICTORY_MESSAGE",
+        value: raw
+      };
+    }
+
+    if (
+      Array.isArray(seasonalChests)
+    ) {
+      const chest =
+        seasonalChests.find(
+          entry =>
+            entry.id ===
+            introducedInSeasonalChestId
+        );
+
+      if (
+        !chest ||
+        chest.order !==
+          introducedInSeasonalChestOrder
+      ) {
+        return {
+          ok: false,
+          error: "INVALID_SEASONAL_VICTORY_MESSAGE_CHEST",
+          value: raw
+        };
+      }
+    }
+
+    const rawId =
+      String(
+        raw.id ?? ""
+      ).trim();
+
+    const id =
+      rawId ||
+      [
+        "seasonal-victory-message",
+        text,
+        messages.length + 1
+      ]
+        .join(":")
+        .normalize("NFD")
+        .replace(
+          /[\u0300-\u036f]/g,
+          ""
+        )
+        .replace(
+          /[^a-zA-Z0-9:_-]+/g,
+          "_"
+        )
+        .toLowerCase();
+
+    const normalizedId =
+      id.slice(0, 160);
+
+    if (ids.has(normalizedId)) {
+      return {
+        ok: false,
+        error: "DUPLICATE_SEASONAL_VICTORY_MESSAGE_ID",
+        value: normalizedId
+      };
+    }
+
+    ids.add(normalizedId);
+
+    messages.push({
+      id: normalizedId,
+      text: text.slice(0, 500),
+      introducedInSeasonalChestId,
+      introducedInSeasonalChestOrder
+    });
+  }
+
+  return {
+    ok: true,
+    value: messages
+  };
+}
+
+
 export function normalizeSeasonalSkills(
   value,
   allowedElements,
@@ -1150,6 +1290,19 @@ export async function adminSeasonsApiRoute(
       );
     }
 
+    const victoryMessages =
+      normalizeSeasonalVictoryMessages(
+        input.seasonalVictoryMessages,
+        chests.value ?? null
+      );
+
+    if (!victoryMessages.ok) {
+      return Response.json(
+        victoryMessages,
+        { status: 400 }
+      );
+    }
+
     let definition = null;
 
     const requestedName =
@@ -1262,6 +1415,13 @@ export async function adminSeasonsApiRoute(
               : {
                   seasonalPvpFinishers:
                     pvpFinishers.value
+                }),
+            ...(victoryMessages.value ===
+              undefined
+              ? {}
+              : {
+                  seasonalVictoryMessages:
+                    victoryMessages.value
                 })
           }
         }
