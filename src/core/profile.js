@@ -122,6 +122,12 @@ export function createBaseProfile(user) {
       equipped: null
     },
 
+    // MENSAGENS DE VITÓRIA
+    victoryMessages: {
+      owned: [],
+      equipped: null
+    },
+
     // PVP
     pvp: {
       wins: 0,
@@ -298,6 +304,26 @@ export function ensureProfileDefaults(profile, user = null) {
         typeof profile.pvpFinishers.equipped === "object" &&
         !Array.isArray(profile.pvpFinishers.equipped)
           ? profile.pvpFinishers.equipped
+          : null
+    },
+
+    victoryMessages: {
+      ...defaults.victoryMessages,
+      ...(
+        profile.victoryMessages ||
+        {}
+      ),
+      owned:
+        Array.isArray(
+          profile?.victoryMessages?.owned
+        )
+          ? profile.victoryMessages.owned
+          : defaults.victoryMessages.owned,
+      equipped:
+        profile?.victoryMessages?.equipped &&
+        typeof profile.victoryMessages.equipped === "object" &&
+        !Array.isArray(profile.victoryMessages.equipped)
+          ? profile.victoryMessages.equipped
           : null
     },
 
