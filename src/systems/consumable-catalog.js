@@ -1,3 +1,47 @@
+export const SPECIAL_CONSUMABLE_BASE_CHANCE =
+  0.001;
+
+
+export const ATOMIC_CONSUMABLE_TIER_POOLS =
+  Object.freeze({
+    1: Object.freeze([
+      Object.freeze({
+        tier: "simples",
+        weight: 1
+      })
+    ]),
+    2: Object.freeze([
+      Object.freeze({
+        tier: "simples",
+        weight: 0.75
+      }),
+      Object.freeze({
+        tier: "comum",
+        weight: 0.25
+      })
+    ]),
+    3: Object.freeze([
+      Object.freeze({
+        tier: "simples",
+        weight: 0.55
+      }),
+      Object.freeze({
+        tier: "comum",
+        weight: 0.30
+      }),
+      Object.freeze({
+        tier: "melhorada",
+        weight: 0.149
+      }),
+      Object.freeze({
+        tier: "especial",
+        weight:
+          SPECIAL_CONSUMABLE_BASE_CHANCE
+      })
+    ])
+  });
+
+
 export const CONSUMABLE_CATALOG =
   Object.freeze({
     vida_simples: Object.freeze({
@@ -158,5 +202,22 @@ export function getConsumableDefinition(
 export function listConsumableDefinitions() {
   return Object.values(
     CONSUMABLE_CATALOG
+  );
+}
+
+
+export function getAtomicConsumableTierPool(
+  atoms
+) {
+  const normalized =
+    Math.floor(
+      Number(atoms)
+    );
+
+  return (
+    ATOMIC_CONSUMABLE_TIER_POOLS[
+      normalized
+    ] ||
+    null
   );
 }

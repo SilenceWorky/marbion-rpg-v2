@@ -18,6 +18,10 @@ import {
   addScrollToInventory
 } from "./scroll-inventory.js";
 
+import {
+  addConsumableToInventory
+} from "./consumable-inventory.js";
+
 
 function validateResolvedReward(
   reward
@@ -120,6 +124,41 @@ function validateResolvedReward(
     };
   }
 
+  if (
+    reward.type ===
+      "consumable"
+  ) {
+    const quantity =
+      reward.quantity ?? 1;
+
+    if (
+      !reward.consumable ||
+      typeof reward.consumable !==
+        "object" ||
+      Array.isArray(
+        reward.consumable
+      ) ||
+      !String(
+        reward.consumable.key ?? ""
+      ).trim() ||
+      !Number.isSafeInteger(
+        quantity
+      ) ||
+      quantity <= 0
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_ATOMIC_CONSUMABLE_REWARD"
+      };
+    }
+
+    return {
+      ok: true,
+      applicable: true
+    };
+  }
+
   return {
     ok: false,
     error:
@@ -202,6 +241,7 @@ export function applyResolvedAtomicChestRewards(
   const xpResults = [];
   const moneyRewards = [];
   const scrollRewards = [];
+  const consumableRewards = [];
 
   for (
     let index = 0;
@@ -288,6 +328,52 @@ export function applyResolvedAtomicChestRewards(
           )
       });
     }
+    else if (
+      reward.type ===
+        "consumable"
+    ) {
+      const quantity =
+        reward.quantity ?? 1;
+
+      for (
+        let unit = 0;
+        unit < quantity;
+        unit += 1
+      ) {
+        const delivered =
+          addConsumableToInventory(
+            profile,
+            {
+              key:
+                reward.consumable.key,
+              name:
+                reward.consumable.name,
+              source:
+                "atomic_chest",
+              grantId:
+                `atomic_chest:${found.chest.id}:reward:${index}:unit:${unit}`,
+              createdAt:
+                pendingOpen.createdAt
+            }
+          );
+
+        if (!delivered.ok) {
+          return delivered;
+        }
+
+        consumableRewards.push({
+          index,
+          unit,
+          duplicate:
+            delivered.duplicate ===
+            true,
+          consumable:
+            structuredClone(
+              delivered.consumable
+            )
+        });
+      }
+    }
 
     applied.add(index);
     appliedNow.push(index);
@@ -337,6 +423,7 @@ export function applyResolvedAtomicChestRewards(
       0,
     xpResults,
     moneyRewards,
-    scrollRewards
+    scrollRewards,
+    consumableRewards
   };
 }

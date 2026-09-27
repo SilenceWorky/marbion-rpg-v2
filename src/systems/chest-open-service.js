@@ -18,6 +18,10 @@ import {
   rollAtomicChestRewardPlan
 } from "./atomic-chest-reward-plan.js";
 
+import {
+  resolveAtomicChestConsumableRewards
+} from "./atomic-chest-consumable-resolver.js";
+
 
 function normalizeNow(
   value
@@ -165,6 +169,16 @@ export function attemptChestOpen(
           rewardPlan.hasUnresolvedRewards
       }
     };
+
+    const consumables =
+      resolveAtomicChestConsumableRewards(
+        latestAtomic.state.pendingOpen,
+        random
+      );
+
+    if (!consumables.ok) {
+      return consumables;
+    }
 
     return {
       ...result,
