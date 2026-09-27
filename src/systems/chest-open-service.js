@@ -26,6 +26,10 @@ import {
   resolveAtomicChestConsumableRewards
 } from "./atomic-chest-consumable-resolver.js";
 
+import {
+  prepareSeasonalChestOpen
+} from "./seasonal-chest-open.js";
+
 
 function normalizeNow(
   value
@@ -66,6 +70,45 @@ export function attemptChestOpen(
 
   const chest =
     selected.chest;
+
+  if (
+    chest.type ===
+      CHEST_TYPES.SEASONAL
+  ) {
+    const seasonal =
+      prepareSeasonalChestOpen(
+        chest,
+        {
+          random,
+          now
+        }
+      );
+
+    if (!seasonal.ok) {
+      return {
+        ...seasonal,
+        chestType:
+          chest.type,
+        chestId:
+          chest.id
+      };
+    }
+
+    return {
+      ok: true,
+      action:
+        "open",
+      pending: true,
+      chestId:
+        chest.id,
+      chestType:
+        chest.type,
+      pendingOpen:
+        seasonal.pendingOpen,
+      reused:
+        seasonal.reused === true
+    };
+  }
 
   if (
     chest.type !==

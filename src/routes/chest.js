@@ -43,6 +43,10 @@ import {
   finalizeAtomicChestOpen
 } from "../systems/atomic-chest-finalizer.js";
 
+import {
+  resolveSeasonalChestSkillRewards
+} from "../systems/seasonal-chest-skill-resolver.js";
+
 
 const CHESTS_PER_PAGE =
   5;
@@ -135,6 +139,139 @@ function parsePage(
 
 
 
+function getGlobalPvpCoordinator(
+  env
+) {
+  const namespace =
+    env?.PVP_COORDINATOR;
+
+  if (
+    !namespace ||
+    typeof namespace.idFromName !==
+      "function" ||
+    typeof namespace.get !==
+      "function"
+  ) {
+    return null;
+  }
+
+  const id =
+    namespace.idFromName(
+      "marbion-global-pvp"
+    );
+
+  return namespace.get(id);
+}
+
+
+function parseMonthlySeasonId(
+  value
+) {
+  const match =
+    String(value ?? "")
+      .trim()
+      .match(
+        /^(\d{4})-(0[1-9]|1[0-2])$/
+      );
+
+  if (!match) {
+    return null;
+  }
+
+  return {
+    year:
+      Number(match[1]),
+    month:
+      Number(match[2])
+  };
+}
+
+
+async function readSeasonContentRevision(
+  env,
+  pendingOpen
+) {
+  const parts =
+    parseMonthlySeasonId(
+      pendingOpen?.seasonId
+    );
+
+  const revision =
+    Number(
+      pendingOpen?.poolRevision
+    );
+
+  if (
+    !parts ||
+    !Number.isSafeInteger(
+      revision
+    ) ||
+    revision <= 0
+  ) {
+    return {
+      ok: false,
+      error:
+        "INVALID_SEASONAL_CHEST_REVISION"
+    };
+  }
+
+  const coordinator =
+    getGlobalPvpCoordinator(
+      env
+    );
+
+  if (!coordinator) {
+    return {
+      ok: false,
+      error:
+        "PVP_COORDINATOR_UNAVAILABLE"
+    };
+  }
+
+  try {
+    const response =
+      await coordinator.fetch(
+        new Request(
+          "https://pvp.internal" +
+          "/season/content/revision" +
+          `?year=${parts.year}` +
+          `&month=${parts.month}` +
+          `&revision=${revision}`
+        )
+      );
+
+    const result =
+      await response.json();
+
+    if (
+      !response.ok ||
+      result?.ok !== true ||
+      !result.content
+    ) {
+      return {
+        ok: false,
+        error:
+          result?.error ??
+          "SEASON_CONTENT_REVISION_READ_FAILED"
+      };
+    }
+
+    return {
+      ok: true,
+      content:
+        result.content
+    };
+  }
+  catch {
+    return {
+      ok: false,
+      error:
+        "PVP_COORDINATOR_UNAVAILABLE"
+    };
+  }
+}
+
+
 function formatAtomicAtoms(
   atoms
 ) {
@@ -207,8 +344,97 @@ async function handleOpenCommand(
       );
     }
 
+    if (
+      [
+        "SEASONAL_CHEST_IDENTITY_REQUIRED",
+        "SEASONAL_CHEST_SEASON_NOT_BOUND",
+        "INVALID_SEASONAL_CHEST_IDENTITY"
+      ].includes(
+        result.error
+      )
+    ) {
+      return new Response(
+        `@${user}, esse Baú Sazonal é antigo e não possui identidade histórica completa para uma abertura segura.`
+      );
+    }
+
     return new Response(
       `@${user}, não foi possível tentar abrir esse baú.`
+    );
+  }
+
+  if (
+    result.action === "open" &&
+    result.pending &&
+    result.chestType === "seasonal"
+  ) {
+    const pendingOpen =
+      result.pendingOpen;
+
+    const needsSeasonalSkill =
+      pendingOpen.rewardPlan.rewards
+        .some(
+          reward =>
+            reward?.type ===
+              "seasonal_skill" &&
+            reward?.resolved !==
+              true
+        );
+
+    if (needsSeasonalSkill) {
+      const revisionResult =
+        await readSeasonContentRevision(
+          env,
+          pendingOpen
+        );
+
+      if (!revisionResult.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas o catálogo histórico desse Baú Sazonal não pôde ser carregado agora. Tente novamente para concluir a recompensa.`
+        );
+      }
+
+      const resolvedSkill =
+        resolveSeasonalChestSkillRewards(
+          profile,
+          pendingOpen,
+          revisionResult.content
+        );
+
+      if (!resolvedSkill.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas a habilidade temática do Baú Sazonal ainda não pôde ser resolvida.`
+        );
+      }
+    }
+
+    await saveProfile(
+      env,
+      user,
+      profile
+    );
+
+    const chestName =
+      String(
+        pendingOpen?.nameSnapshot ??
+        "Baú Sazonal"
+      ).trim() ||
+      "Baú Sazonal";
+
+    return new Response(
+      `📦 @${user}, ${chestName} teve a abertura registrada. O plano de recompensas foi congelado e as recompensas sazonais disponíveis foram resolvidas com o catálogo histórico correto.`
     );
   }
 

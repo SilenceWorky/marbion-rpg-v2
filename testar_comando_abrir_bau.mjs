@@ -328,7 +328,7 @@ const seasonalResponse =
 
 assert.equal(
   await seasonalResponse.text(),
-  "@sazonal, a abertura desse tipo de baú ainda não está implementada."
+  "@sazonal, esse Baú Sazonal é antigo e não possui identidade histórica completa para uma abertura segura."
 );
 
 
