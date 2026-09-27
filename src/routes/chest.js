@@ -52,6 +52,10 @@ import {
 } from "../systems/seasonal-chest-consumable-resolver.js";
 
 import {
+  resolveSeasonalChestPvpFinisherRewards
+} from "../systems/seasonal-chest-pvp-finisher-resolver.js";
+
+import {
   applyResolvedSeasonalChestRewards
 } from "../systems/seasonal-chest-reward-apply.js";
 
@@ -385,7 +389,8 @@ async function handleOpenCommand(
           reward =>
             [
               "seasonal_skill",
-              "seasonal_consumable"
+              "seasonal_consumable",
+              "seasonal_pvp_finisher"
             ].includes(
               reward?.type
             ) &&
@@ -446,6 +451,25 @@ async function handleOpenCommand(
 
         return new Response(
           `@${user}, a abertura foi registrada, mas o Consumível Sazonal ainda não pôde ser resolvido.`
+        );
+      }
+
+      const resolvedPvpFinisher =
+        resolveSeasonalChestPvpFinisherRewards(
+          profile,
+          pendingOpen,
+          revisionResult.content
+        );
+
+      if (!resolvedPvpFinisher.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas o Finalizador de PvP Sazonal ainda não pôde ser resolvido.`
         );
       }
     }

@@ -20,6 +20,7 @@ import { seasonRoute } from "./routes/season.js";
 import { bankRoute } from "./routes/bank.js";
 import { confirmRoute } from "./routes/bank-confirm.js";
 import { chestRoute } from "./routes/chest.js";
+import { pvpFinisherRoute } from "./routes/pvp-finisher.js";
 import { characterApiV1Route } from "./routes/api-character-v1.js";
 import { adminCharactersApiRoute } from "./routes/api-admin-characters.js";
 import { adminCharacterActionsApiRoute } from "./routes/api-admin-character-actions.js";
@@ -186,6 +187,13 @@ export async function handleRequest(request, env, ctx) {
     path === "/baú"
   ) {
     return chestRoute(
+      request,
+      env
+    );
+  }
+
+  if (path === "/finalizador") {
+    return pvpFinisherRoute(
       request,
       env
     );

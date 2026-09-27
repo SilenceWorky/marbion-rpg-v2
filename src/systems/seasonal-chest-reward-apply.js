@@ -23,6 +23,10 @@ import {
   addConsumableToInventory
 } from "./consumable-inventory.js";
 
+import {
+  grantPvpFinisher
+} from "./pvp-finisher-collection.js";
+
 
 function validateResolvedReward(
   reward
@@ -116,6 +120,37 @@ function validateResolvedReward(
         ok: false,
         error:
           "INVALID_SEASONAL_CONSUMABLE_REWARD"
+      };
+    }
+
+    return {
+      ok: true,
+      applicable: true
+    };
+  }
+
+  if (
+    reward.type ===
+      "seasonal_pvp_finisher"
+  ) {
+    if (
+      !reward.finisher ||
+      typeof reward.finisher !==
+        "object" ||
+      Array.isArray(
+        reward.finisher
+      ) ||
+      !String(
+        reward.finisher.id ?? ""
+      ).trim() ||
+      !String(
+        reward.finisher.name ?? ""
+      ).trim()
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_PVP_FINISHER_REWARD"
       };
     }
 
@@ -283,6 +318,7 @@ export function applyResolvedSeasonalChestRewards(
   const moneyRewards = [];
   const consumableRewards = [];
   const abilityRewards = [];
+  const pvpFinisherRewards = [];
 
   for (
     let index = 0;
@@ -379,6 +415,66 @@ export function applyResolvedSeasonalChestRewards(
             )
         });
       }
+    }
+    else if (
+      reward.type ===
+        "seasonal_pvp_finisher"
+    ) {
+      if (
+        reward.seasonId !==
+          pendingOpen.seasonId ||
+        reward.seasonalChestId !==
+          pendingOpen.seasonalChestId ||
+        Number(reward.chestOrder) !==
+          Number(pendingOpen.chestOrder) ||
+        Number(reward.poolRevision) !==
+          Number(pendingOpen.poolRevision)
+      ) {
+        return {
+          ok: false,
+          error:
+            "SEASONAL_PVP_FINISHER_REWARD_IDENTITY_MISMATCH"
+        };
+      }
+
+      const delivered =
+        grantPvpFinisher(
+          profile,
+          {
+            seasonId:
+              pendingOpen.seasonId,
+            finisherId:
+              reward.finisher.id,
+            name:
+              reward.finisher.name,
+            description:
+              reward.finisher.description,
+            source:
+              "seasonal_chest",
+            seasonalChestId:
+              pendingOpen.seasonalChestId,
+            chestOrder:
+              pendingOpen.chestOrder,
+            poolRevision:
+              pendingOpen.poolRevision,
+            acquiredAt:
+              pendingOpen.createdAt
+          }
+        );
+
+      if (!delivered.ok) {
+        return delivered;
+      }
+
+      pvpFinisherRewards.push({
+        index,
+        duplicate:
+          delivered.duplicate === true,
+        finisher:
+          structuredClone(
+            delivered.finisher
+          )
+      });
     }
     else if (
       reward.type ===
@@ -480,6 +576,7 @@ export function applyResolvedSeasonalChestRewards(
     xpResults,
     moneyRewards,
     consumableRewards,
-    abilityRewards
+    abilityRewards,
+    pvpFinisherRewards
   };
 }

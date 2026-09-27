@@ -116,6 +116,12 @@ export function createBaseProfile(user) {
 
     pendingFinalRebuff: false,
 
+    // FINALIZADORES PVP
+    pvpFinishers: {
+      owned: [],
+      equipped: null
+    },
+
     // PVP
     pvp: {
       wins: 0,
@@ -273,6 +279,26 @@ export function ensureProfileDefaults(profile, user = null) {
     rebuffBonus: {
       ...defaults.rebuffBonus,
       ...(profile.rebuffBonus || {})
+    },
+
+    pvpFinishers: {
+      ...defaults.pvpFinishers,
+      ...(
+        profile.pvpFinishers ||
+        {}
+      ),
+      owned:
+        Array.isArray(
+          profile?.pvpFinishers?.owned
+        )
+          ? profile.pvpFinishers.owned
+          : defaults.pvpFinishers.owned,
+      equipped:
+        profile?.pvpFinishers?.equipped &&
+        typeof profile.pvpFinishers.equipped === "object" &&
+        !Array.isArray(profile.pvpFinishers.equipped)
+          ? profile.pvpFinishers.equipped
+          : null
     },
 
     pvp: {
