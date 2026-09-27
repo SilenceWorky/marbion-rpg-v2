@@ -83,13 +83,25 @@ const legacy =
 
 assert.equal(
   legacy.version,
-  3
+  4
+);
+
+assert.equal(
+  legacy.defaultSeasonalChestId,
+  null,
+  "dados antigos não podem ganhar baú padrão automaticamente"
 );
 
 assert.deepEqual(
   legacy.seasonalChestRewardBindings,
   [],
   "dados antigos não podem ganhar binding automaticamente"
+);
+
+assert.deepEqual(
+  legacy.seasonalChestPostPassPool,
+  [],
+  "dados antigos não podem ganhar pool de pós-passe automaticamente"
 );
 
 

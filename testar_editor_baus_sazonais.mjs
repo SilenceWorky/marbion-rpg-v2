@@ -54,7 +54,7 @@ const legacy =
 
 assert.equal(
   legacy.version,
-  3
+  4
 );
 
 assert.equal(
@@ -67,10 +67,22 @@ assert.deepEqual(
   []
 );
 
+assert.equal(
+  legacy.defaultSeasonalChestId,
+  null,
+  "conteúdo antigo não pode receber baú padrão automaticamente"
+);
+
 assert.deepEqual(
   legacy.seasonalChestRewardBindings,
   [],
   "conteúdo antigo não pode receber distribuição de baús automaticamente"
+);
+
+assert.deepEqual(
+  legacy.seasonalChestPostPassPool,
+  [],
+  "conteúdo antigo não pode receber sorteio de pós-passe automaticamente"
 );
 
 assert.equal(

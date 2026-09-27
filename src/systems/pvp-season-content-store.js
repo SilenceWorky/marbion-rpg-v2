@@ -18,7 +18,7 @@ import {
 } from "../config/seasonal-chest-reward-bindings.js";
 
 
-export const PVP_SEASON_CONTENT_VERSION = 3;
+export const PVP_SEASON_CONTENT_VERSION = 4;
 
 export const PVP_SEASON_CONTENT_STORAGE_PREFIX =
   "pvp_season_content:";
@@ -582,6 +582,149 @@ function validateSeasonalChestRelations(
 }
 
 
+function normalizeSeasonalChestDefaultId(
+  value,
+  seasonalChests
+) {
+  if (
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+  ) {
+    return {
+      ok: true,
+      value: null
+    };
+  }
+
+  const id =
+    normalizeText(
+      value,
+      180
+    );
+
+  const exists =
+    seasonalChests.some(
+      chest =>
+        chest.id === id
+    );
+
+  if (
+    !id ||
+    !exists
+  ) {
+    return {
+      ok: false,
+      error:
+        "INVALID_DEFAULT_SEASONAL_CHEST"
+    };
+  }
+
+  return {
+    ok: true,
+    value: id
+  };
+}
+
+
+function normalizeSeasonalChestPostPassPool(
+  value,
+  seasonalChests
+) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const chestById =
+    new Map(
+      seasonalChests.map(
+        chest => [
+          chest.id,
+          chest
+        ]
+      )
+    );
+
+  const seen =
+    new Set();
+
+  const pool = [];
+
+  for (
+    const raw of
+      value.slice(0, 50)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      return null;
+    }
+
+    const seasonalChestId =
+      normalizeText(
+        raw.seasonalChestId,
+        180
+      );
+
+    const chance =
+      Number(
+        raw.chancePercent
+      );
+
+    if (
+      !seasonalChestId ||
+      !chestById.has(
+        seasonalChestId
+      ) ||
+      seen.has(
+        seasonalChestId
+      ) ||
+      !Number.isFinite(chance) ||
+      chance <= 0 ||
+      chance > 100
+    ) {
+      return null;
+    }
+
+    seen.add(
+      seasonalChestId
+    );
+
+    pool.push({
+      seasonalChestId,
+      chancePercent:
+        Math.round(
+          chance * 100
+        ) / 100
+    });
+  }
+
+  if (
+    pool.length > 0
+  ) {
+    const total =
+      pool.reduce(
+        (sum, entry) =>
+          sum +
+          entry.chancePercent,
+        0
+      );
+
+    if (
+      Math.abs(
+        total - 100
+      ) > 0.01
+    ) {
+      return null;
+    }
+  }
+
+  return pool;
+}
+
+
 function normalizeSeasonalChestRewardBindings(
   value,
   seasonalChests
@@ -740,6 +883,33 @@ export function normalizePvpSeasonContent(
     return null;
   }
 
+  const defaultSeasonalChest =
+    normalizeSeasonalChestDefaultId(
+      value.defaultSeasonalChestId,
+      seasonalChests
+    );
+
+  if (!defaultSeasonalChest.ok) {
+    return null;
+  }
+
+  const rawPostPassPool =
+    Array.isArray(
+      value.seasonalChestPostPassPool
+    )
+      ? value.seasonalChestPostPassPool
+      : [];
+
+  const seasonalChestPostPassPool =
+    normalizeSeasonalChestPostPassPool(
+      rawPostPassPool,
+      seasonalChests
+    );
+
+  if (!seasonalChestPostPassPool) {
+    return null;
+  }
+
   const rawRewardBindings =
     Array.isArray(
       value.seasonalChestRewardBindings
@@ -863,7 +1033,10 @@ export function normalizePvpSeasonContent(
       ),
     featuredElements,
     seasonalChests,
+    defaultSeasonalChestId:
+      defaultSeasonalChest.value,
     seasonalChestRewardBindings,
+    seasonalChestPostPassPool,
     seasonalSkills,
     seasonalConsumables,
     seasonalPvpFinishers,
@@ -883,7 +1056,9 @@ export function createEmptyPvpSeasonContent(
     summary: null,
     featuredElements: [],
     seasonalChests: [],
+    defaultSeasonalChestId: null,
     seasonalChestRewardBindings: [],
+    seasonalChestPostPassPool: [],
     seasonalSkills: [],
     seasonalConsumables: [],
     seasonalPvpFinishers: [],
@@ -1396,11 +1571,21 @@ export async function savePvpSeasonMonthContent(
         nextRevision,
       seasonalChests:
         reconciled.chests,
+      defaultSeasonalChestId:
+        input?.defaultSeasonalChestId ===
+          undefined
+          ? existing.defaultSeasonalChestId
+          : input.defaultSeasonalChestId,
       seasonalChestRewardBindings:
         input?.seasonalChestRewardBindings ===
           undefined
           ? existing.seasonalChestRewardBindings
           : input.seasonalChestRewardBindings,
+      seasonalChestPostPassPool:
+        input?.seasonalChestPostPassPool ===
+          undefined
+          ? existing.seasonalChestPostPassPool
+          : input.seasonalChestPostPassPool,
       seasonalSkills:
         input?.seasonalSkills ===
           undefined

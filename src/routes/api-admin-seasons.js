@@ -1018,6 +1018,20 @@ export async function adminSeasonsApiRoute(
       );
     }
 
+    const defaultSeasonalChestId =
+      input.defaultSeasonalChestId ===
+        undefined
+        ? undefined
+        : input.defaultSeasonalChestId ===
+            null ||
+          String(
+            input.defaultSeasonalChestId
+          ).trim() === ""
+          ? null
+          : String(
+              input.defaultSeasonalChestId
+            ).trim();
+
     const rewardBindings =
       input.seasonalChestRewardBindings ===
         undefined
@@ -1053,6 +1067,45 @@ export async function adminSeasonsApiRoute(
     if (!rewardBindings.ok) {
       return Response.json(
         rewardBindings,
+        { status: 400 }
+      );
+    }
+
+    const postPassPool =
+      input.seasonalChestPostPassPool ===
+        undefined
+        ? {
+            ok: true,
+            value: undefined
+          }
+        : Array.isArray(
+            input.seasonalChestPostPassPool
+          )
+          ? {
+              ok: true,
+              value:
+                input.seasonalChestPostPassPool
+                  .map(entry => ({
+                    seasonalChestId:
+                      String(
+                        entry?.seasonalChestId ??
+                        ""
+                      ).trim(),
+                    chancePercent:
+                      Number(
+                        entry?.chancePercent
+                      )
+                  }))
+            }
+          : {
+              ok: false,
+              error:
+                "INVALID_SEASONAL_CHEST_POST_PASS_POOL"
+            };
+
+    if (!postPassPool.ok) {
+      return Response.json(
+        postPassPool,
         { status: 400 }
       );
     }
@@ -1174,12 +1227,25 @@ export async function adminSeasonsApiRoute(
                   seasonalChests:
                     chests.value
                 }),
+            ...(defaultSeasonalChestId ===
+              undefined
+              ? {}
+              : {
+                  defaultSeasonalChestId
+                }),
             ...(rewardBindings.value ===
               undefined
               ? {}
               : {
                   seasonalChestRewardBindings:
                     rewardBindings.value
+                }),
+            ...(postPassPool.value ===
+              undefined
+              ? {}
+              : {
+                  seasonalChestPostPassPool:
+                    postPassPool.value
                 }),
             seasonalSkills:
               skills.value,
