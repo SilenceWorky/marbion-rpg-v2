@@ -9,6 +9,10 @@ import {
   normalizeSeasonalSkillEffect
 } from "../config/seasonal-skill-effects.js";
 
+import {
+  normalizeSkillRarity
+} from "../config/skill-rarities.js";
+
 export const PVP_SEASON_CONTENT_VERSION = 1;
 export const PVP_SEASON_CONTENT_STORAGE_PREFIX =
   "pvp_season_content:";
@@ -82,6 +86,11 @@ function normalizeSkill(value, index) {
       value.effect
     );
 
+  const rarity =
+    normalizeSkillRarity(
+      value.rarity
+    );
+
   if (!element || !name) {
     return null;
   }
@@ -106,6 +115,7 @@ function normalizeSkill(value, index) {
     id,
     element,
     name,
+    rarity,
     baseDamage,
     effect:
       effect === undefined

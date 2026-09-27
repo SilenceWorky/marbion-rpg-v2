@@ -12,6 +12,11 @@ import {
 } from "../config/seasonal-skill-effects.js";
 
 import {
+  SKILL_RARITIES,
+  normalizeSkillRarity
+} from "../config/skill-rarities.js";
+
+import {
   SEASON_PASS_MAX_TIER,
   SEASON_PASS_TOTAL_XP,
   SEASON_PASS_POST_REWARD_XP,
@@ -185,7 +190,7 @@ function normalizeLookup(value) {
     .toLowerCase();
 }
 
-function normalizeSeasonalSkills(
+export function normalizeSeasonalSkills(
   value,
   allowedElements
 ) {
@@ -251,6 +256,11 @@ function normalizeSeasonalSkills(
         raw.effect
       );
 
+    const rarity =
+      normalizeSkillRarity(
+        raw.rarity
+      );
+
     if (
       effect === undefined
     ) {
@@ -266,6 +276,7 @@ function normalizeSeasonalSkills(
     if (
       !element ||
       !name ||
+      !rarity ||
       (
         baseDamage !== null &&
         (
@@ -293,6 +304,7 @@ function normalizeSeasonalSkills(
       element,
       name:
         name.slice(0, 120),
+      rarity,
       baseDamage,
       effect,
       description:
@@ -567,6 +579,10 @@ export async function adminSeasonsApiRoute(
         getSeasonBaseTheme(month),
       skillEffects:
         SEASONAL_SKILL_EFFECTS,
+      skillRarities:
+        Object.values(
+          SKILL_RARITIES
+        ),
       definition,
       content:
         saved.content
@@ -646,6 +662,10 @@ export async function adminSeasonsApiRoute(
       content.months ?? {},
     skillEffects:
       SEASONAL_SKILL_EFFECTS,
+    skillRarities:
+      Object.values(
+        SKILL_RARITIES
+      ),
     pass:
       buildPassCatalog()
   });
