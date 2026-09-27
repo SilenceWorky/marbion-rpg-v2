@@ -2,6 +2,10 @@ import {
   bronzeToCanonicalMoney
 } from "../systems/money.js";
 
+import {
+  SKILL_RARITIES
+} from "./skill-rarities.js";
+
 
 export const SEASONAL_CHEST_BASE_REWARD_WEIGHTS =
   Object.freeze({
@@ -22,6 +26,31 @@ export const SEASONAL_CHEST_MONEY_RANGE =
     min: 20,
     max: 80
   });
+
+
+export const SEASONAL_CHEST_SKILL_RARITY_POOL =
+  Object.freeze([
+    Object.freeze({
+      rarity: SKILL_RARITIES.COMMON,
+      weight: 0.40
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.RARE,
+      weight: 0.30
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.SUPER_RARE,
+      weight: 0.20
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.MYTHIC,
+      weight: 0.08
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.LEGENDARY,
+      weight: 0.02
+    })
+  ]);
 
 
 export const SEASONAL_CHEST_SPECIAL_POOL =
