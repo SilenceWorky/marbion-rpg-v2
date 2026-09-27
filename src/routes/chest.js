@@ -56,6 +56,10 @@ import {
 } from "../systems/seasonal-chest-pvp-finisher-resolver.js";
 
 import {
+  resolveSeasonalChestVictoryMessageRewards
+} from "../systems/seasonal-chest-victory-message-resolver.js";
+
+import {
   applyResolvedSeasonalChestRewards
 } from "../systems/seasonal-chest-reward-apply.js";
 
@@ -390,7 +394,8 @@ async function handleOpenCommand(
             [
               "seasonal_skill",
               "seasonal_consumable",
-              "seasonal_pvp_finisher"
+              "seasonal_pvp_finisher",
+              "seasonal_victory_message"
             ].includes(
               reward?.type
             ) &&
@@ -470,6 +475,25 @@ async function handleOpenCommand(
 
         return new Response(
           `@${user}, a abertura foi registrada, mas o Finalizador de PvP Sazonal ainda não pôde ser resolvido.`
+        );
+      }
+
+      const resolvedVictoryMessage =
+        resolveSeasonalChestVictoryMessageRewards(
+          profile,
+          pendingOpen,
+          revisionResult.content
+        );
+
+      if (!resolvedVictoryMessage.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas a Mensagem de Vitória Sazonal ainda não pôde ser resolvida.`
         );
       }
     }
