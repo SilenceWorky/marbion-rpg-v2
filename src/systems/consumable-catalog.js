@@ -38,6 +38,38 @@ export const ATOMIC_CONSUMABLE_TIER_POOLS =
         weight:
           SPECIAL_CONSUMABLE_BASE_CHANCE
       })
+    ]),
+
+    4: Object.freeze([
+      Object.freeze({
+        tier: "comum",
+        weight: 0.70
+      }),
+      Object.freeze({
+        tier: "melhorada",
+        weight: 0.299
+      }),
+      Object.freeze({
+        tier: "especial",
+        weight:
+          SPECIAL_CONSUMABLE_BASE_CHANCE
+      })
+    ]),
+
+    5: Object.freeze([
+      Object.freeze({
+        tier: "comum",
+        weight: 0.499
+      }),
+      Object.freeze({
+        tier: "melhorada",
+        weight: 0.50
+      }),
+      Object.freeze({
+        tier: "especial",
+        weight:
+          SPECIAL_CONSUMABLE_BASE_CHANCE
+      })
     ])
   });
 

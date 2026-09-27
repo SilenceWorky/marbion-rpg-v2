@@ -123,3 +123,71 @@ chance final = chance-base +/ou modificador de Sorte
 ```
 
 A expressão acima é apenas estrutural. A fórmula exata do modificador continua pendente e deve ser definida antes da implementação.
+
+## 9. Bônus dos Baús Atômicos IV e V
+
+### Baú ⚛⚛⚛⚛
+
+Chance de ativar bônus extra: **30%**.
+
+Pool interno:
+- 40% Consumível;
+- 30% XP extra;
+- 20% dinheiro extra;
+- 10% segundo Pergaminho.
+
+Consumível bônus:
+- 70% Comum;
+- 29,9% Melhorada;
+- 0,1% Especial;
+- depois, Vida/Mentalidade em 50/50.
+
+Segundo Pergaminho:
+- R2 60%;
+- R3 30%;
+- R4 9%;
+- R5 1%.
+
+XP extra:
+- +50% do XP-base sorteado no próprio Baú IV.
+
+Dinheiro extra:
+- +50% do dinheiro-base sorteado no próprio Baú IV.
+
+A implementação atual mantém XP/moedas como inteiros; frações resultantes do bônus de 50% são arredondadas para baixo.
+
+### Baú ⚛⚛⚛⚛⚛
+
+Chance de ativar bônus extra: **20%**.
+
+Pool interno:
+- 39% Consumível;
+- 30% XP extra;
+- 20% dinheiro extra;
+- 10% segundo Pergaminho;
+- 1% título especial.
+
+Consumível bônus:
+- 49,9% Comum;
+- 50% Melhorada;
+- 0,1% Especial;
+- depois, Vida/Mentalidade em 50/50.
+
+Segundo Pergaminho:
+- R3 60%;
+- R4 30%;
+- R5 10%.
+
+XP extra:
+- +100% do XP-base sorteado no próprio Baú V.
+
+Dinheiro extra:
+- +100% do dinheiro-base sorteado no próprio Baú V.
+
+Título especial:
+- **Mago dos Baús**
+- descrição atual: **“Nem todo baú deveria ser aberto.”**
+
+Como o título ocupa 1% de um bônus que ativa em 20% das aberturas do Baú V, a chance efetiva por abertura do Baú V é **0,2%**.
+
+O título é armazenado atualmente em `profile.unlockedTags`, sem duplicação.

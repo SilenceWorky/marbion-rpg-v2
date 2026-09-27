@@ -159,6 +159,34 @@ function validateResolvedReward(
     };
   }
 
+  if (
+    reward.type ===
+      "title"
+  ) {
+    if (
+      !reward.title ||
+      typeof reward.title !==
+        "object" ||
+      Array.isArray(
+        reward.title
+      ) ||
+      !String(
+        reward.title.name ?? ""
+      ).trim()
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_ATOMIC_TITLE_REWARD"
+      };
+    }
+
+    return {
+      ok: true,
+      applicable: true
+    };
+  }
+
   return {
     ok: false,
     error:
@@ -242,6 +270,7 @@ export function applyResolvedAtomicChestRewards(
   const moneyRewards = [];
   const scrollRewards = [];
   const consumableRewards = [];
+  const titleRewards = [];
 
   for (
     let index = 0;
@@ -374,6 +403,45 @@ export function applyResolvedAtomicChestRewards(
         });
       }
     }
+    else if (
+      reward.type ===
+        "title"
+    ) {
+      if (
+        !Array.isArray(
+          profile.unlockedTags
+        )
+      ) {
+        profile.unlockedTags = [];
+      }
+
+      const titleName =
+        String(
+          reward.title.name
+        ).trim();
+
+      const alreadyUnlocked =
+        profile.unlockedTags
+          .includes(
+            titleName
+          );
+
+      if (!alreadyUnlocked) {
+        profile.unlockedTags.push(
+          titleName
+        );
+      }
+
+      titleRewards.push({
+        index,
+        duplicate:
+          alreadyUnlocked,
+        title:
+          structuredClone(
+            reward.title
+          )
+      });
+    }
 
     applied.add(index);
     appliedNow.push(index);
@@ -424,6 +492,7 @@ export function applyResolvedAtomicChestRewards(
     xpResults,
     moneyRewards,
     scrollRewards,
-    consumableRewards
+    consumableRewards,
+    titleRewards
   };
 }

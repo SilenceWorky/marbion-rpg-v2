@@ -19,6 +19,10 @@ import {
 } from "./atomic-chest-reward-plan.js";
 
 import {
+  resolveAtomicChestBonusRewards
+} from "./atomic-chest-bonus-resolver.js";
+
+import {
   resolveAtomicChestConsumableRewards
 } from "./atomic-chest-consumable-resolver.js";
 
@@ -169,6 +173,16 @@ export function attemptChestOpen(
           rewardPlan.hasUnresolvedRewards
       }
     };
+
+    const bonuses =
+      resolveAtomicChestBonusRewards(
+        latestAtomic.state.pendingOpen,
+        random
+      );
+
+    if (!bonuses.ok) {
+      return bonuses;
+    }
 
     const consumables =
       resolveAtomicChestConsumableRewards(

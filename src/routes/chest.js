@@ -24,6 +24,14 @@ import {
 } from "../systems/atomic-chest-reward-apply.js";
 
 import {
+  resolveAtomicChestBonusRewards
+} from "../systems/atomic-chest-bonus-resolver.js";
+
+import {
+  resolveAtomicChestConsumableRewards
+} from "../systems/atomic-chest-consumable-resolver.js";
+
+import {
   resolveAtomicChestScrollRewards
 } from "../systems/atomic-chest-scroll-resolver.js";
 
@@ -206,6 +214,40 @@ async function handleOpenCommand(
   ) {
     const pendingOpen =
       result.pendingOpen;
+
+    const resolvedBonuses =
+      resolveAtomicChestBonusRewards(
+        pendingOpen
+      );
+
+    if (!resolvedBonuses.ok) {
+      await saveProfile(
+        env,
+        user,
+        profile
+      );
+
+      return new Response(
+        `@${user}, a abertura foi registrada, mas ainda não foi possível resolver um bônus pendente.`
+      );
+    }
+
+    const resolvedConsumables =
+      resolveAtomicChestConsumableRewards(
+        pendingOpen
+      );
+
+    if (!resolvedConsumables.ok) {
+      await saveProfile(
+        env,
+        user,
+        profile
+      );
+
+      return new Response(
+        `@${user}, a abertura foi registrada, mas ainda não foi possível resolver um consumível pendente.`
+      );
+    }
 
     const hasUnresolvedScroll =
       pendingOpen.rewardPlan.rewards
