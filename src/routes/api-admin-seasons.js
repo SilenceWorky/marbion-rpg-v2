@@ -28,6 +28,7 @@ import {
   getSeasonBaseTheme,
   getSeasonCalendarPartsAt,
   getSeasonMonthName,
+  getMonthlySeasonId,
   getSeasonalFeaturedElements,
   normalizeSeasonMonth,
   normalizeSeasonYear,
@@ -190,9 +191,172 @@ function normalizeLookup(value) {
     .toLowerCase();
 }
 
+function normalizeSeasonalChestId(
+  value,
+  expectedSeasonId = null
+) {
+  const id =
+    String(value ?? "")
+      .trim();
+
+  const modern =
+    id.match(
+      /^seasonal:(\d{4}-(?:0[1-9]|1[0-2])):chest:[a-zA-Z0-9_-]{6,96}$/
+    );
+
+  const legacy =
+    id.match(
+      /^(\d{4}-(?:0[1-9]|1[0-2])):[a-zA-Z0-9_-]{3,120}$/
+    );
+
+  const embeddedSeasonId =
+    modern?.[1] ??
+    legacy?.[1] ??
+    null;
+
+  if (
+    !embeddedSeasonId ||
+    (
+      expectedSeasonId &&
+      embeddedSeasonId !==
+        expectedSeasonId
+    )
+  ) {
+    return null;
+  }
+
+  return id;
+}
+
+
+export function normalizeSeasonalChests(
+  value,
+  seasonId
+) {
+  if (!Array.isArray(value)) {
+    return {
+      ok: false,
+      error:
+        "INVALID_SEASONAL_CHESTS"
+    };
+  }
+
+  const chests = [];
+  const ids = new Set();
+  const orders = new Set();
+
+  for (
+    const raw of value.slice(0, 50)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_CHEST"
+      };
+    }
+
+    const id =
+      normalizeSeasonalChestId(
+        raw.id,
+        seasonId
+      );
+
+    const order =
+      Number(raw.order);
+
+    const name =
+      String(
+        raw.name ?? ""
+      )
+        .trim()
+        .slice(0, 160);
+
+    const description =
+      String(
+        raw.description ?? ""
+      )
+        .trim()
+        .slice(0, 1200) ||
+      null;
+
+    const inputSeasonId =
+      String(
+        raw.seasonId ??
+        seasonId
+      ).trim();
+
+    if (
+      !id ||
+      inputSeasonId !==
+        seasonId ||
+      !Number.isSafeInteger(order) ||
+      order < 1 ||
+      !name ||
+      ids.has(id) ||
+      orders.has(order)
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_CHEST"
+      };
+    }
+
+    ids.add(id);
+    orders.add(order);
+
+    chests.push({
+      id,
+      seasonId,
+      order,
+      name,
+      description,
+      poolRevision:
+        Number.isSafeInteger(
+          Number(raw.poolRevision)
+        ) &&
+        Number(raw.poolRevision) > 0
+          ? Number(raw.poolRevision)
+          : null,
+      createdAt:
+        Number.isSafeInteger(
+          Number(raw.createdAt)
+        ) &&
+        Number(raw.createdAt) >= 0
+          ? Number(raw.createdAt)
+          : 0,
+      updatedAt:
+        Number.isSafeInteger(
+          Number(raw.updatedAt)
+        ) &&
+        Number(raw.updatedAt) >= 0
+          ? Number(raw.updatedAt)
+          : 0
+    });
+  }
+
+  chests.sort(
+    (left, right) =>
+      left.order -
+      right.order
+  );
+
+  return {
+    ok: true,
+    value: chests
+  };
+}
+
+
 export function normalizeSeasonalSkills(
   value,
-  allowedElements
+  allowedElements,
+  seasonalChests = null
 ) {
   const byLookup =
     new Map(
@@ -261,6 +425,35 @@ export function normalizeSeasonalSkills(
         raw.rarity
       );
 
+    const introducedInSeasonalChestId =
+      raw.introducedInSeasonalChestId ===
+        null ||
+      raw.introducedInSeasonalChestId ===
+        undefined ||
+      String(
+        raw.introducedInSeasonalChestId
+      ).trim() === ""
+        ? null
+        : normalizeSeasonalChestId(
+            raw.introducedInSeasonalChestId
+          );
+
+    const rawIntroducedOrder =
+      raw.introducedInSeasonalChestOrder ??
+      raw.introducedInChestOrder;
+
+    const introducedInSeasonalChestOrder =
+      rawIntroducedOrder ===
+        null ||
+      rawIntroducedOrder ===
+        undefined ||
+      rawIntroducedOrder ===
+        ""
+        ? null
+        : Number(
+            rawIntroducedOrder
+          );
+
     if (
       effect === undefined
     ) {
@@ -277,6 +470,21 @@ export function normalizeSeasonalSkills(
       !element ||
       !name ||
       !rarity ||
+      (
+        introducedInSeasonalChestId &&
+        introducedInSeasonalChestOrder ===
+          null
+      ) ||
+      (
+        introducedInSeasonalChestOrder !==
+          null &&
+        (
+          !Number.isSafeInteger(
+            introducedInSeasonalChestOrder
+          ) ||
+          introducedInSeasonalChestOrder < 1
+        )
+      ) ||
       (
         baseDamage !== null &&
         (
@@ -296,6 +504,33 @@ export function normalizeSeasonalSkills(
       };
     }
 
+    if (
+      introducedInSeasonalChestId &&
+      Array.isArray(
+        seasonalChests
+      )
+    ) {
+      const chest =
+        seasonalChests.find(
+          entry =>
+            entry.id ===
+            introducedInSeasonalChestId
+        );
+
+      if (
+        !chest ||
+        chest.order !==
+          introducedInSeasonalChestOrder
+      ) {
+        return {
+          ok: false,
+          error:
+            "INVALID_SEASON_SKILL_CHEST",
+          value: raw
+        };
+      }
+    }
+
     skills.push({
       id:
         String(
@@ -313,7 +548,9 @@ export function normalizeSeasonalSkills(
         )
           .trim()
           .slice(0, 1200) ||
-        null
+        null,
+      introducedInSeasonalChestId,
+      introducedInSeasonalChestOrder
     });
   }
 
@@ -462,10 +699,47 @@ export async function adminSeasonsApiRoute(
       );
     }
 
+    const seasonId =
+      getMonthlySeasonId(
+        requestedYear,
+        month
+      );
+
+    if (!seasonId) {
+      return Response.json(
+        {
+          ok: false,
+          error:
+            "INVALID_SEASON_ID"
+        },
+        { status: 400 }
+      );
+    }
+
+    const chests =
+      input.seasonalChests ===
+        undefined
+        ? {
+            ok: true,
+            value: undefined
+          }
+        : normalizeSeasonalChests(
+            input.seasonalChests,
+            seasonId
+          );
+
+    if (!chests.ok) {
+      return Response.json(
+        chests,
+        { status: 400 }
+      );
+    }
+
     const skills =
       normalizeSeasonalSkills(
         input.seasonalSkills,
-        featuredElements
+        featuredElements,
+        chests.value ?? null
       );
 
     if (!skills.ok) {
@@ -545,6 +819,13 @@ export async function adminSeasonsApiRoute(
                 input.summary ?? ""
               ).trim() || null,
             featuredElements,
+            ...(chests.value ===
+              undefined
+              ? {}
+              : {
+                  seasonalChests:
+                    chests.value
+                }),
             seasonalSkills:
               skills.value
           }

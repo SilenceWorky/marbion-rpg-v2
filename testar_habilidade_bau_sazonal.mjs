@@ -45,8 +45,23 @@ assert.deepEqual(
 );
 
 
+const chest = {
+  id:
+    "seasonal:2026-09:chest:teste01",
+  seasonId:
+    "2026-09",
+  order: 1,
+  poolRevision: 1,
+  name:
+    "Baú Sazonal de Setembro"
+};
+
 const seasonContent = {
   id: "2026-09",
+  revision: 1,
+  seasonalChests: [
+    chest
+  ],
   seasonalSkills: [
     {
       id: "setembro:comum",
@@ -100,6 +115,16 @@ const seasonContent = {
   ]
 };
 
+for (
+  const skill of
+    seasonContent.seasonalSkills
+) {
+  skill.introducedInSeasonalChestId =
+    chest.id;
+  skill.introducedInSeasonalChestOrder =
+    1;
+}
+
 
 const profile =
   createBaseProfile(
@@ -117,7 +142,14 @@ profile.skills = [
 const eligible =
   getEligibleSeasonalChestSkills(
     profile,
-    seasonContent
+    seasonContent,
+    {
+      seasonId: "2026-09",
+      seasonalChestId:
+        chest.id,
+      chestOrder: 1,
+      poolRevision: 1
+    }
   );
 
 assert.equal(
@@ -138,6 +170,10 @@ assert.deepEqual(
 
 const pending = {
   seasonId: "2026-09",
+  seasonalChestId:
+    chest.id,
+  chestOrder: 1,
+  poolRevision: 1,
   rewardPlan: {
     rewards: [
       {
@@ -208,6 +244,10 @@ exhausted.skills = [
 
 const fallbackPending = {
   seasonId: "2026-09",
+  seasonalChestId:
+    chest.id,
+  chestOrder: 1,
+  poolRevision: 1,
   rewardPlan: {
     rewards: [
       {
@@ -253,6 +293,10 @@ assert.deepEqual(
 
 const mismatchPending = {
   seasonId: "2026-08",
+  seasonalChestId:
+    chest.id,
+  chestOrder: 1,
+  poolRevision: 1,
   rewardPlan: {
     rewards: [
       {

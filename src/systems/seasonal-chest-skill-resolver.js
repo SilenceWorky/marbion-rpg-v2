@@ -132,11 +132,55 @@ function normalizeSeasonalSkill(
       value.rarity
     );
 
+  const introducedInSeasonalChestId =
+    value.introducedInSeasonalChestId ===
+      null ||
+    value.introducedInSeasonalChestId ===
+      undefined ||
+    String(
+      value.introducedInSeasonalChestId
+    ).trim() === ""
+      ? null
+      : String(
+          value.introducedInSeasonalChestId
+        ).trim();
+
+  const rawIntroducedOrder =
+    value.introducedInSeasonalChestOrder ??
+    value.introducedInChestOrder;
+
+  const introducedInSeasonalChestOrder =
+    rawIntroducedOrder ===
+      null ||
+    rawIntroducedOrder ===
+      undefined ||
+    rawIntroducedOrder ===
+      ""
+      ? null
+      : Number(
+          rawIntroducedOrder
+        );
+
   if (
     !id ||
     !element ||
     !name ||
-    !rarity
+    !rarity ||
+    (
+      introducedInSeasonalChestOrder !==
+        null &&
+      (
+        !Number.isSafeInteger(
+          introducedInSeasonalChestOrder
+        ) ||
+        introducedInSeasonalChestOrder < 1
+      )
+    ) ||
+    (
+      introducedInSeasonalChestId &&
+      introducedInSeasonalChestOrder ===
+        null
+    )
   ) {
     return null;
   }
@@ -146,6 +190,10 @@ function normalizeSeasonalSkill(
     element,
     name,
     rarity,
+    introducedInSeasonalChestId,
+    introducedInSeasonalChestOrder,
+    introducedInChestOrder:
+      introducedInSeasonalChestOrder,
     baseDamage:
       value.baseDamage === null ||
       value.baseDamage === undefined
@@ -161,8 +209,102 @@ function normalizeSeasonalSkill(
 
 export function getEligibleSeasonalChestSkills(
   profile,
-  seasonContent
+  seasonContent,
+  chestContext
 ) {
+  const seasonId =
+    String(
+      chestContext?.seasonId ?? ""
+    ).trim();
+
+  const seasonalChestId =
+    String(
+      chestContext?.seasonalChestId ?? ""
+    ).trim();
+
+  const chestOrder =
+    Number(
+      chestContext?.chestOrder
+    );
+
+  const poolRevision =
+    Number(
+      chestContext?.poolRevision
+    );
+
+  const contentId =
+    String(
+      seasonContent?.id ?? ""
+    ).trim();
+
+  const contentRevision =
+    Number(
+      seasonContent?.revision
+    );
+
+  if (
+    !seasonId ||
+    !seasonalChestId ||
+    !Number.isSafeInteger(
+      chestOrder
+    ) ||
+    chestOrder < 1 ||
+    !Number.isSafeInteger(
+      poolRevision
+    ) ||
+    poolRevision < 1
+  ) {
+    return {
+      ok: false,
+      error:
+        "SEASONAL_CHEST_IDENTITY_REQUIRED"
+    };
+  }
+
+  if (
+    contentId !== seasonId ||
+    contentRevision !==
+      poolRevision
+  ) {
+    return {
+      ok: false,
+      error:
+        "SEASONAL_CHEST_CONTENT_MISMATCH"
+    };
+  }
+
+  const chestDefinitions =
+    Array.isArray(
+      seasonContent?.seasonalChests
+    )
+      ? seasonContent.seasonalChests
+      : [];
+
+  const chestDefinition =
+    chestDefinitions.find(
+      chest =>
+        chest?.id ===
+          seasonalChestId
+    );
+
+  if (
+    !chestDefinition ||
+    chestDefinition.seasonId !==
+      seasonId ||
+    Number(
+      chestDefinition.order
+    ) !== chestOrder ||
+    Number(
+      chestDefinition.poolRevision
+    ) !== poolRevision
+  ) {
+    return {
+      ok: false,
+      error:
+        "SEASONAL_CHEST_DEFINITION_MISMATCH"
+    };
+  }
+
   const seasonalSkills =
     Array.isArray(
       seasonContent?.seasonalSkills
@@ -185,14 +327,26 @@ export function getEligibleSeasonalChestSkills(
         .map(entry => entry.rarity)
     );
 
+  const chestById =
+    new Map(
+      chestDefinitions.map(
+        chest => [
+          chest.id,
+          chest
+        ]
+      )
+    );
+
+  const unboundSkillIds = [];
+
   const candidates =
     seasonalSkills
       .map(
         normalizeSeasonalSkill
       )
       .filter(Boolean)
-      .filter(
-        skill =>
+      .filter(skill => {
+        if (
           !owned.has(skill.id) &&
           allowedRarities.has(
             skill.rarity
@@ -201,10 +355,58 @@ export function getEligibleSeasonalChestSkills(
             profile,
             skill.element
           )
-      );
+        ) {
+          if (
+            !skill
+              .introducedInSeasonalChestOrder
+          ) {
+            unboundSkillIds.push(
+              skill.id
+            );
+            return false;
+          }
+
+          if (
+            skill
+              .introducedInSeasonalChestId
+          ) {
+            const introducedChest =
+              chestById.get(
+                skill
+                  .introducedInSeasonalChestId
+              );
+
+            if (
+              !introducedChest ||
+              introducedChest.seasonId !==
+                seasonId ||
+              Number(
+                introducedChest.order
+              ) !==
+                skill
+                  .introducedInSeasonalChestOrder
+            ) {
+              return false;
+            }
+          }
+
+          return (
+            skill
+              .introducedInSeasonalChestOrder <=
+            chestOrder
+          );
+        }
+
+        return false;
+      });
 
   return {
     ok: true,
+    seasonId,
+    seasonalChestId,
+    chestOrder,
+    poolRevision,
+    unboundSkillIds,
     candidates
   };
 }
@@ -312,19 +514,61 @@ export function resolveSeasonalChestSkillRewards(
       pendingOpen.seasonId ?? ""
     ).trim();
 
+  const seasonalChestId =
+    String(
+      pendingOpen
+        .seasonalChestId ?? ""
+    ).trim();
+
+  const chestOrder =
+    Number(
+      pendingOpen.chestOrder
+    );
+
+  const poolRevision =
+    Number(
+      pendingOpen.poolRevision
+    );
+
+  if (
+    !seasonalChestId ||
+    !Number.isSafeInteger(
+      chestOrder
+    ) ||
+    chestOrder <= 0 ||
+    !Number.isSafeInteger(
+      poolRevision
+    ) ||
+    poolRevision <= 0
+  ) {
+    return {
+      ok: false,
+      error:
+        "INVALID_SEASONAL_PENDING_OPEN_IDENTITY"
+    };
+  }
+
   const contentId =
     String(
       seasonContent?.id ?? ""
     ).trim();
 
+  const contentRevision =
+    Number(
+      seasonContent?.revision
+    );
+
   if (
     !seasonId ||
     !contentId ||
-    seasonId !== contentId
+    seasonId !== contentId ||
+    contentRevision !==
+      poolRevision
   ) {
     return {
       ok: false,
-      error: "SEASONAL_CHEST_CONTENT_MISMATCH"
+      error:
+        "SEASONAL_CHEST_CONTENT_MISMATCH"
     };
   }
 
@@ -352,7 +596,13 @@ export function resolveSeasonalChestSkillRewards(
     const eligible =
       getEligibleSeasonalChestSkills(
         profile,
-        seasonContent
+        seasonContent,
+        {
+          seasonId,
+          seasonalChestId,
+          chestOrder,
+          poolRevision
+        }
       );
 
     if (!eligible.ok) {
@@ -394,6 +644,9 @@ export function resolveSeasonalChestSkillRewards(
           "seasonal_skill",
         resolved: true,
         seasonId,
+        seasonalChestId,
+        chestOrder,
+        poolRevision,
         rarity:
           selected.rarity,
         skill:

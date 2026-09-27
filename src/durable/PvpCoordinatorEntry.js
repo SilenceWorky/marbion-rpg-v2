@@ -31,6 +31,7 @@ import {
 
 import {
   readPvpSeasonMonthContent,
+  readPvpSeasonContentRevision,
   readPvpSeasonYearContent,
   savePvpSeasonMonthContent
 } from "../systems/pvp-season-content-store.js";
@@ -469,6 +470,30 @@ export class PvpCoordinator extends BasePvpCoordinator {
           this.state.storage,
           url.searchParams.get("year"),
           url.searchParams.get("month")
+        );
+
+      return Response.json(
+        result,
+        {
+          status:
+            getSeasonErrorStatus(
+              result
+            )
+        }
+      );
+    }
+
+
+    if (
+      url.pathname ===
+      "/season/content/revision"
+    ) {
+      const result =
+        await readPvpSeasonContentRevision(
+          this.state.storage,
+          url.searchParams.get("year"),
+          url.searchParams.get("month"),
+          url.searchParams.get("revision")
         );
 
       return Response.json(
