@@ -18,7 +18,7 @@ import {
 import {
   CHEST_TYPE_LABELS,
   CHEST_TYPE_ORDER,
-  createChestInstance,
+  addChests,
   removeChestById
 } from "../systems/chest-inventory.js";
 import {
@@ -88,6 +88,29 @@ function normalizeCategory(value) {
     "scroll"
   ].includes(category)
     ? category
+    : null;
+}
+
+function normalizeQuantity(
+  value,
+  fallback = 1
+) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return fallback;
+  }
+
+  const quantity =
+    Number(value);
+
+  return (
+    Number.isSafeInteger(quantity) &&
+    quantity >= 1
+  )
+    ? quantity
     : null;
 }
 
@@ -203,13 +226,27 @@ async function addInventoryItem(
     };
   }
 
+  const quantity =
+    normalizeQuantity(
+      body?.quantity
+    );
+
+  if (!quantity) {
+    return {
+      ok: false,
+      error:
+        "INVALID_INVENTORY_QUANTITY"
+    };
+  }
+
   if (category === "chest") {
     const result =
-      createChestInstance(
+      addChests(
         profile,
         {
           type:
             body?.chestType,
+          quantity,
           metadata: {
             source: "admin"
           }
@@ -220,8 +257,13 @@ async function addInventoryItem(
       ? {
           ok: true,
           category,
+          quantity:
+            result.quantity,
+          items:
+            result.created,
           item:
-            result.chest
+            result.created[0] ??
+            null
         }
       : result;
   }
@@ -239,28 +281,45 @@ async function addInventoryItem(
       return definition;
     }
 
-    const result =
-      addConsumableToInventory(
-        profile,
-        {
-          key:
-            definition
-              .consumable.key,
-          name:
-            definition
-              .consumable.name,
-          source: "admin"
-        }
-      );
+    const items = [];
 
-    return result.ok
-      ? {
-          ok: true,
-          category,
-          item:
-            result.consumable
-        }
-      : result;
+    for (
+      let index = 0;
+      index < quantity;
+      index += 1
+    ) {
+      const result =
+        addConsumableToInventory(
+          profile,
+          {
+            key:
+              definition
+                .consumable.key,
+            name:
+              definition
+                .consumable.name,
+            source: "admin"
+          }
+        );
+
+      if (!result.ok) {
+        return result;
+      }
+
+      items.push(
+        result.consumable
+      );
+    }
+
+    return {
+      ok: true,
+      category,
+      quantity:
+        items.length,
+      items,
+      item:
+        items[0] ?? null
+    };
   }
 
   const tier =
@@ -290,6 +349,7 @@ async function addInventoryItem(
     await fetchJson(
       SKILLS_URL
     );
+
   const eligible =
     getEligibleScrollRewardSkills(
       profile,
@@ -327,24 +387,41 @@ async function addInventoryItem(
     };
   }
 
-  const result =
-    addScrollToInventory(
-      profile,
-      {
-        tier,
-        skill,
-        source: "admin"
-      }
-    );
+  const items = [];
 
-  return result.ok
-    ? {
-        ok: true,
-        category,
-        item:
-          result.scroll
-      }
-    : result;
+  for (
+    let index = 0;
+    index < quantity;
+    index += 1
+  ) {
+    const result =
+      addScrollToInventory(
+        profile,
+        {
+          tier,
+          skill,
+          source: "admin"
+        }
+      );
+
+    if (!result.ok) {
+      return result;
+    }
+
+    items.push(
+      result.scroll
+    );
+  }
+
+  return {
+    ok: true,
+    category,
+    quantity:
+      items.length,
+    items,
+    item:
+      items[0] ?? null
+  };
 }
 
 function removeInventoryItem(
@@ -355,10 +432,6 @@ function removeInventoryItem(
     normalizeCategory(
       body?.category
     );
-  const itemId =
-    String(
-      body?.itemId ?? ""
-    ).trim();
 
   if (!category) {
     return {
@@ -368,7 +441,32 @@ function removeInventoryItem(
     };
   }
 
-  if (!itemId) {
+  const requestedIds =
+    Array.isArray(
+      body?.itemIds
+    )
+      ? body.itemIds
+          .map(value =>
+            String(value ?? "")
+              .trim()
+          )
+          .filter(Boolean)
+      : [
+          String(
+            body?.itemId ?? ""
+          ).trim()
+        ].filter(Boolean);
+
+  const uniqueIds =
+    Array.from(
+      new Set(
+        requestedIds
+      )
+    );
+
+  if (
+    uniqueIds.length === 0
+  ) {
     return {
       ok: false,
       error:
@@ -376,57 +474,90 @@ function removeInventoryItem(
     };
   }
 
-  if (category === "chest") {
-    const result =
-      removeChestById(
-        profile,
-        itemId
-      );
-
-    return result.ok
-      ? {
-          ok: true,
-          category,
-          item:
-            result.chest
-        }
-      : result;
-  }
-
-  if (
-    category ===
-    "consumable"
-  ) {
-    const result =
-      removeConsumableById(
-        profile,
-        itemId
-      );
-
-    return result.ok
-      ? {
-          ok: true,
-          category,
-          item:
-            result.consumable
-        }
-      : result;
-  }
-
-  const result =
-    removeScrollById(
-      profile,
-      itemId
+  const requestedQuantity =
+    normalizeQuantity(
+      body?.quantity,
+      uniqueIds.length
     );
 
-  return result.ok
-    ? {
-        ok: true,
-        category,
-        item:
-          result.scroll
+  if (
+    !requestedQuantity ||
+    requestedQuantity !==
+      uniqueIds.length
+  ) {
+    return {
+      ok: false,
+      error:
+        "INVALID_INVENTORY_QUANTITY"
+    };
+  }
+
+  const items = [];
+
+  for (const itemId of uniqueIds) {
+    let result;
+
+    if (category === "chest") {
+      result =
+        removeChestById(
+          profile,
+          itemId
+        );
+
+      if (!result.ok) {
+        return result;
       }
-    : result;
+
+      items.push(
+        result.chest
+      );
+      continue;
+    }
+
+    if (
+      category ===
+      "consumable"
+    ) {
+      result =
+        removeConsumableById(
+          profile,
+          itemId
+        );
+
+      if (!result.ok) {
+        return result;
+      }
+
+      items.push(
+        result.consumable
+      );
+      continue;
+    }
+
+    result =
+      removeScrollById(
+        profile,
+        itemId
+      );
+
+    if (!result.ok) {
+      return result;
+    }
+
+    items.push(
+      result.scroll
+    );
+  }
+
+  return {
+    ok: true,
+    category,
+    quantity:
+      items.length,
+    items,
+    item:
+      items[0] ?? null
+  };
 }
 
 export async function adminInventoryApiRoute(
@@ -637,8 +768,12 @@ export async function adminInventoryApiRoute(
     operation,
     category:
       result.category,
+    quantity:
+      result.quantity,
     item:
       result.item,
+    items:
+      result.items,
     inventory:
       inventorySnapshot(
         user,

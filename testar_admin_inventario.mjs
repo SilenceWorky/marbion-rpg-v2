@@ -332,8 +332,122 @@ try {
     0
   );
 
+  const stackedChests =
+    await mutate({
+      operation: "add",
+      category: "chest",
+      chestType: "atomic",
+      quantity: 3
+    });
+
+  assert.equal(
+    stackedChests.response.status,
+    200
+  );
+  assert.equal(
+    stackedChests.payload.quantity,
+    3
+  );
+  assert.equal(
+    stackedChests.payload.items.length,
+    3
+  );
+  assert.equal(
+    stackedChests.payload.inventory.chests.length,
+    3
+  );
+
+  const stackedConsumables =
+    await mutate({
+      operation: "add",
+      category: "consumable",
+      consumableKey:
+        "vida_especial",
+      quantity: 4
+    });
+
+  assert.equal(
+    stackedConsumables.response.status,
+    200
+  );
+  assert.equal(
+    stackedConsumables.payload.quantity,
+    4
+  );
+  assert.equal(
+    stackedConsumables.payload.inventory.consumables.length,
+    4
+  );
+
+  const stackedScrolls =
+    await mutate({
+      operation: "add",
+      category: "scroll",
+      scrollTier: "R1",
+      skillQuery:
+        "Fogo:Chama_Teste",
+      quantity: 2
+    });
+
+  assert.equal(
+    stackedScrolls.response.status,
+    200
+  );
+  assert.equal(
+    stackedScrolls.payload.quantity,
+    2
+  );
+  assert.equal(
+    stackedScrolls.payload.inventory.scrolls.length,
+    2
+  );
+
+  inventory =
+    await readInventory();
+
+  const removeTwoChests =
+    await mutate({
+      operation: "remove",
+      category: "chest",
+      quantity: 2,
+      itemIds:
+        inventory.chests
+          .slice(0, 2)
+          .map(item => item.id)
+    });
+
+  assert.equal(
+    removeTwoChests.response.status,
+    200
+  );
+  assert.equal(
+    removeTwoChests.payload.quantity,
+    2
+  );
+  assert.equal(
+    removeTwoChests.payload.inventory.chests.length,
+    1
+  );
+
+  const invalidQuantity =
+    await mutate({
+      operation: "add",
+      category: "chest",
+      chestType: "atomic",
+      quantity: 0
+    });
+
+  assert.equal(
+    invalidQuantity.response.status,
+    400
+  );
+  assert.equal(
+    invalidQuantity.payload.error,
+    "INVALID_INVENTORY_QUANTITY"
+  );
+
   console.log(
-    "✅ Inventário administrativo validado."
+    "✅ Inventário administrativo validado com quantidades."
   );
 }
 finally {
