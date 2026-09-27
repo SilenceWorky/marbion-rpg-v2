@@ -47,6 +47,14 @@ import {
   resolveSeasonalChestSkillRewards
 } from "../systems/seasonal-chest-skill-resolver.js";
 
+import {
+  resolveSeasonalChestConsumableRewards
+} from "../systems/seasonal-chest-consumable-resolver.js";
+
+import {
+  applyResolvedSeasonalChestRewards
+} from "../systems/seasonal-chest-reward-apply.js";
+
 
 const CHESTS_PER_PAGE =
   5;
@@ -371,17 +379,21 @@ async function handleOpenCommand(
     const pendingOpen =
       result.pendingOpen;
 
-    const needsSeasonalSkill =
+    const needsSeasonContent =
       pendingOpen.rewardPlan.rewards
         .some(
           reward =>
-            reward?.type ===
-              "seasonal_skill" &&
+            [
+              "seasonal_skill",
+              "seasonal_consumable"
+            ].includes(
+              reward?.type
+            ) &&
             reward?.resolved !==
               true
         );
 
-    if (needsSeasonalSkill) {
+    if (needsSeasonContent) {
       const revisionResult =
         await readSeasonContentRevision(
           env,
@@ -418,6 +430,42 @@ async function handleOpenCommand(
           `@${user}, a abertura foi registrada, mas a habilidade temática do Baú Sazonal ainda não pôde ser resolvida.`
         );
       }
+
+      const resolvedConsumable =
+        resolveSeasonalChestConsumableRewards(
+          pendingOpen,
+          revisionResult.content
+        );
+
+      if (!resolvedConsumable.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas o Consumível Sazonal ainda não pôde ser resolvido.`
+        );
+      }
+    }
+
+    const applied =
+      applyResolvedSeasonalChestRewards(
+        profile,
+        result.chestId
+      );
+
+    if (!applied.ok) {
+      await saveProfile(
+        env,
+        user,
+        profile
+      );
+
+      return new Response(
+        `@${user}, a abertura foi registrada, mas as recompensas já resolvidas do Baú Sazonal ainda não puderam ser aplicadas.`
+      );
     }
 
     await saveProfile(
@@ -434,7 +482,7 @@ async function handleOpenCommand(
       "Baú Sazonal";
 
     return new Response(
-      `📦 @${user}, ${chestName} teve a abertura registrada. O plano de recompensas foi congelado e as recompensas sazonais disponíveis foram resolvidas com o catálogo histórico correto.`
+      `📦 @${user}, ${chestName} teve a abertura registrada. O plano foi congelado e as recompensas sazonais já resolvidas foram aplicadas com segurança.`
     );
   }
 

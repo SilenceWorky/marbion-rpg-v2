@@ -13,6 +13,21 @@ import {
 } from "./src/routes/chest.js";
 
 
+function sequenceRandom(values) {
+  let index = 0;
+
+  return () => {
+    if (index >= values.length) {
+      throw new Error(
+        "RNG_SEQUENCE_EXHAUSTED"
+      );
+    }
+
+    return values[index++];
+  };
+}
+
+
 function createEnv(
   profile,
   seasonContent
@@ -30,32 +45,21 @@ function createEnv(
       const url =
         new URL(request.url);
 
-      assert.equal(
-        url.pathname,
+      if (
+        url.pathname ===
         "/season/content/revision"
-      );
-
-      assert.equal(
-        url.searchParams.get("year"),
-        "2026"
-      );
-
-      assert.equal(
-        url.searchParams.get("month"),
-        "12"
-      );
-
-      assert.equal(
-        url.searchParams.get("revision"),
-        "5"
-      );
+      ) {
+        return Response.json({
+          ok: true,
+          content:
+            structuredClone(
+              seasonContent
+            )
+        });
+      }
 
       return Response.json({
-        ok: true,
-        content:
-          structuredClone(
-            seasonContent
-          )
+        profileStore: false
       });
     }
   };
@@ -109,27 +113,30 @@ function createEnv(
   };
 }
 
+
 const profile =
   createBaseProfile(
-    "rota-sazonal"
+    "rota-consumivel"
   );
 
 profile.race =
   "Metamorfo";
 
+const chestDefinition = {
+  id:
+    "seasonal:2026-12:chest:consroute",
+  seasonId:
+    "2026-12",
+  order: 1,
+  poolRevision: 8,
+  name:
+    "Baú de Pinheiro"
+};
+
 const created =
   createSeasonalChestFromDefinition(
     profile,
-    {
-      id:
-        "seasonal:2026-12:chest:route001",
-      seasonId:
-        "2026-12",
-      order: 2,
-      poolRevision: 5,
-      name:
-        "Baú Rena"
-    },
+    chestDefinition,
     {
       createdAt: 100
     }
@@ -142,40 +149,28 @@ assert.equal(
 
 const seasonContent = {
   id: "2026-12",
-  revision: 5,
+  revision: 8,
   seasonalChests: [
-    {
-      id:
-        "seasonal:2026-12:chest:route001",
-      seasonId:
-        "2026-12",
-      order: 2,
-      poolRevision: 5,
-      name:
-        "Baú Rena"
-    }
+    chestDefinition
   ],
-  seasonalSkills: [
+  seasonalSkills: [],
+  seasonalConsumables: [
     {
       id:
-        "natal:chama-da-rena",
-      element:
-        "Fogo",
+        "natal:biscoito",
+      key:
+        "natal:biscoito",
       name:
-        "Chama da Rena",
+        "Biscoito de Pinheiro",
       rarity:
         "Comum",
       introducedInSeasonalChestId:
-        "seasonal:2026-12:chest:route001",
+        chestDefinition.id,
       introducedInSeasonalChestOrder:
-        2
+        1
     }
   ]
 };
-
-profile.elements = [
-  "Fogo"
-];
 
 const env =
   createEnv(
@@ -187,12 +182,18 @@ const originalRandom =
   Math.random;
 
 Math.random =
-  () => 0;
+  sequenceRandom([
+    0,
+    0,
+    0.20,
+    0,
+    0
+  ]);
 
 const response =
   await chestRoute(
     new Request(
-      "https://worker.test/bau?user=rota-sazonal&args=abrir%201"
+      "https://worker.test/bau?user=rota-consumivel&args=abrir%201"
     ),
     env
   );
@@ -201,21 +202,33 @@ Math.random =
   originalRandom;
 
 assert.equal(
-  await response.text(),
-  "📦 @rota-sazonal, Baú Rena teve a abertura registrada. O plano foi congelado e as recompensas sazonais já resolvidas foram aplicadas com segurança."
+  response.status,
+  200
 );
 
 const stored =
   JSON.parse(
     env.store.get(
-      "rota-sazonal"
+      "rota-consumivel"
     )
   );
 
 assert.equal(
-  stored.chests.length,
-  1,
-  "o Baú Sazonal não deve ser consumido antes da finalização sazonal"
+  stored.inventory
+    .consumables.length,
+  1
+);
+
+assert.equal(
+  stored.inventory
+    .consumables[0].key,
+  "natal:biscoito"
+);
+
+assert.equal(
+  stored.inventory
+    .consumables[0].source,
+  "seasonal_chest"
 );
 
 const pending =
@@ -224,29 +237,9 @@ const pending =
     .pendingOpen;
 
 assert.equal(
-  pending.seasonId,
-  "2026-12"
-);
-
-assert.equal(
-  pending.seasonalChestId,
-  "seasonal:2026-12:chest:route001"
-);
-
-assert.equal(
-  pending.chestOrder,
-  2
-);
-
-assert.equal(
-  pending.poolRevision,
-  5
-);
-
-assert.equal(
   pending.rewardPlan
     .rewards[1].type,
-  "seasonal_skill"
+  "seasonal_consumable"
 );
 
 assert.equal(
@@ -255,43 +248,49 @@ assert.equal(
   true
 );
 
-assert.equal(
-  pending.rewardPlan
-    .rewards[1].skill.id,
-  "natal:chama-da-rena"
-);
-
-assert.equal(
-  pending.rewardPlan
-    .rewards[1].poolRevision,
-  5
-);
-
 assert.deepEqual(
   pending.rewardPlan
     .appliedRewardIndexes,
   [0, 1]
 );
 
+const firstGrantId =
+  stored.inventory
+    .consumables[0].grantId;
+
+const retry =
+  await chestRoute(
+    new Request(
+      "https://worker.test/bau?user=rota-consumivel&args=abrir%201"
+    ),
+    env
+  );
+
 assert.equal(
-  stored.xp,
-  50
+  retry.status,
+  200
+);
+
+const retried =
+  JSON.parse(
+    env.store.get(
+      "rota-consumivel"
+    )
+  );
+
+assert.equal(
+  retried.inventory
+    .consumables.length,
+  1,
+  "retry não pode duplicar o Consumível Sazonal"
 );
 
 assert.equal(
-  stored.skills.includes(
-    "natal:chama-da-rena"
-  ),
-  true
-);
-
-assert.equal(
-  stored.skillMeta[
-    "natal:chama-da-rena"
-  ].source,
-  "seasonal_chest"
+  retried.inventory
+    .consumables[0].grantId,
+  firstGrantId
 );
 
 console.log(
-  "✅ Rota do Baú Sazonal separada do fluxo Atômico e pendingOpen persistido."
+  "✅ Consumível Sazonal resolvido, entregue e idempotente na rota real."
 );

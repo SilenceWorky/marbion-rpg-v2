@@ -28,6 +28,35 @@ export const SEASONAL_CHEST_MONEY_RANGE =
   });
 
 
+export const SEASONAL_CHEST_CONSUMABLE_RARITY_POOL =
+  Object.freeze([
+    Object.freeze({
+      rarity: SKILL_RARITIES.COMMON,
+      weight: 0.399
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.RARE,
+      weight: 0.30
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.SUPER_RARE,
+      weight: 0.20
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.MYTHIC,
+      weight: 0.08
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.LEGENDARY,
+      weight: 0.02
+    }),
+    Object.freeze({
+      rarity: SKILL_RARITIES.UNIQUE,
+      weight: 0.001
+    })
+  ]);
+
+
 export const SEASONAL_CHEST_SKILL_RARITY_POOL =
   Object.freeze([
     Object.freeze({

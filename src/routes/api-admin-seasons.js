@@ -353,6 +353,136 @@ export function normalizeSeasonalChests(
 }
 
 
+export function normalizeSeasonalConsumables(
+  value,
+  seasonalChests = null
+) {
+  if (value === undefined) {
+    return {
+      ok: true,
+      value: undefined
+    };
+  }
+
+  if (!Array.isArray(value)) {
+    return {
+      ok: false,
+      error:
+        "INVALID_SEASONAL_CONSUMABLES"
+    };
+  }
+
+  const consumables = [];
+
+  for (
+    const raw of value.slice(0, 100)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_CONSUMABLE"
+      };
+    }
+
+    const name =
+      String(
+        raw.name ?? ""
+      ).trim();
+
+    const rarity =
+      normalizeSkillRarity(
+        raw.rarity
+      );
+
+    const introducedInSeasonalChestId =
+      normalizeSeasonalChestId(
+        raw.introducedInSeasonalChestId
+      );
+
+    const introducedInSeasonalChestOrder =
+      Number(
+        raw.introducedInSeasonalChestOrder
+      );
+
+    if (
+      !name ||
+      !rarity ||
+      !introducedInSeasonalChestId ||
+      !Number.isSafeInteger(
+        introducedInSeasonalChestOrder
+      ) ||
+      introducedInSeasonalChestOrder < 1
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_CONSUMABLE",
+        value: raw
+      };
+    }
+
+    if (
+      Array.isArray(
+        seasonalChests
+      )
+    ) {
+      const chest =
+        seasonalChests.find(
+          entry =>
+            entry.id ===
+            introducedInSeasonalChestId
+        );
+
+      if (
+        !chest ||
+        chest.order !==
+          introducedInSeasonalChestOrder
+      ) {
+        return {
+          ok: false,
+          error:
+            "INVALID_SEASONAL_CONSUMABLE_CHEST",
+          value: raw
+        };
+      }
+    }
+
+    consumables.push({
+      id:
+        String(
+          raw.id ?? ""
+        ).trim() || undefined,
+      key:
+        String(
+          raw.key ?? raw.id ?? ""
+        ).trim() || undefined,
+      name:
+        name.slice(0, 120),
+      rarity,
+      description:
+        String(
+          raw.description ?? ""
+        )
+          .trim()
+          .slice(0, 1200) ||
+        null,
+      introducedInSeasonalChestId,
+      introducedInSeasonalChestOrder
+    });
+  }
+
+  return {
+    ok: true,
+    value: consumables
+  };
+}
+
+
 export function normalizeSeasonalSkills(
   value,
   allowedElements,
@@ -749,6 +879,19 @@ export async function adminSeasonsApiRoute(
       );
     }
 
+    const consumables =
+      normalizeSeasonalConsumables(
+        input.seasonalConsumables,
+        chests.value ?? null
+      );
+
+    if (!consumables.ok) {
+      return Response.json(
+        consumables,
+        { status: 400 }
+      );
+    }
+
     let definition = null;
 
     const requestedName =
@@ -827,7 +970,14 @@ export async function adminSeasonsApiRoute(
                     chests.value
                 }),
             seasonalSkills:
-              skills.value
+              skills.value,
+            ...(consumables.value ===
+              undefined
+              ? {}
+              : {
+                  seasonalConsumables:
+                    consumables.value
+                })
           }
         }
       );

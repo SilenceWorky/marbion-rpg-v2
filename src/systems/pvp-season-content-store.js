@@ -332,6 +332,93 @@ function normalizeSkill(
 }
 
 
+function normalizeSeasonalConsumable(
+  value,
+  index
+) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  const name =
+    normalizeText(
+      value.name,
+      120
+    );
+
+  const rarity =
+    normalizeSkillRarity(
+      value.rarity
+    );
+
+  const rawId =
+    normalizeText(
+      value.id,
+      160
+    );
+
+  const id =
+    rawId ??
+    [
+      "seasonal-consumable",
+      name ?? "item",
+      index + 1
+    ]
+      .join(":")
+      .normalize("NFD")
+      .replace(
+        /[\u0300-\u036f]/g,
+        ""
+      )
+      .replace(
+        /[^a-zA-Z0-9:_-]+/g,
+        "_"
+      )
+      .toLowerCase();
+
+  const introducedInSeasonalChestId =
+    normalizeSeasonalChestId(
+      value.introducedInSeasonalChestId
+    );
+
+  const introducedInSeasonalChestOrder =
+    normalizePositiveInteger(
+      value.introducedInSeasonalChestOrder
+    );
+
+  if (
+    !name ||
+    !rarity ||
+    !introducedInSeasonalChestId ||
+    !introducedInSeasonalChestOrder
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    key:
+      normalizeText(
+        value.key,
+        160
+      ) ?? id,
+    name,
+    rarity,
+    description:
+      normalizeText(
+        value.description,
+        1200
+      ),
+    introducedInSeasonalChestId,
+    introducedInSeasonalChestOrder
+  };
+}
+
+
 function validateSeasonalChestRelations(
   chests,
   skills
@@ -515,10 +602,36 @@ export function normalizePvpSeasonContent(
     return null;
   }
 
+  const rawConsumables =
+    Array.isArray(
+      value.seasonalConsumables
+    )
+      ? value.seasonalConsumables
+      : [];
+
+  const seasonalConsumables =
+    rawConsumables
+      .slice(0, 100)
+      .map(
+        normalizeSeasonalConsumable
+      )
+      .filter(Boolean);
+
+  if (
+    seasonalConsumables.length !==
+    rawConsumables.slice(0, 100).length
+  ) {
+    return null;
+  }
+
   if (
     !validateSeasonalChestRelations(
       seasonalChests,
       seasonalSkills
+    ) ||
+    !validateSeasonalChestRelations(
+      seasonalChests,
+      seasonalConsumables
     )
   ) {
     return null;
@@ -548,6 +661,7 @@ export function normalizePvpSeasonContent(
     featuredElements,
     seasonalChests,
     seasonalSkills,
+    seasonalConsumables,
     updatedAt
   };
 }
@@ -565,6 +679,7 @@ export function createEmptyPvpSeasonContent(
     featuredElements: [],
     seasonalChests: [],
     seasonalSkills: [],
+    seasonalConsumables: [],
     updatedAt: 0
   });
 }
@@ -1079,6 +1194,11 @@ export async function savePvpSeasonMonthContent(
           undefined
           ? existing.seasonalSkills
           : input.seasonalSkills,
+      seasonalConsumables:
+        input?.seasonalConsumables ===
+          undefined
+          ? existing.seasonalConsumables
+          : input.seasonalConsumables,
       updatedAt:
         now
     });
