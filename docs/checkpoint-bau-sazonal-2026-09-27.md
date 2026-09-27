@@ -507,3 +507,58 @@ Validado:
 - integração coexistindo com Consumíveis Sazonais e Finalizadores PvP Sazonais passou sem regressão.
 
 Nenhum deploy de produção foi executado.
+
+# 14. Distribuição simplificada: padrão mensal, exceções e pós-passe ponderado — 27/09/2026
+
+Implementação concluída no commit `9cc6157` (`feat: simplifica distribuicao dos baus sazonais`).
+
+O schema mensal foi evoluído para `PVP_SEASON_CONTENT_VERSION = 4` sem remover compatibilidade com os bindings detalhados anteriores.
+
+Novos campos canônicos:
+
+```txt
+defaultSeasonalChestId
+seasonalChestRewardBindings[]
+seasonalChestPostPassPool[]
+```
+
+Semântica:
+
+- `defaultSeasonalChestId`: identidade do Baú Sazonal padrão daquele `seasonId`; todo patamar do Passe que concede `seasonal_chest` herda este baú quando não houver exceção.
+- `seasonalChestRewardBindings`: passa a representar principalmente exceções por patamar. Um binding específico substitui o baú padrão somente naquele slot.
+- `seasonalChestPostPassPool`: pool personalizado do pós-passe, com entradas `seasonalChestId + chancePercent`.
+
+Regras preservadas:
+
+- o baú padrão deve pertencer ao mesmo `seasonId`;
+- exceções só podem apontar para baús existentes do mesmo mês/ano;
+- dados antigos continuam legíveis;
+- nenhum dado histórico recebe baú padrão ou pool aleatório inventado;
+- bindings antigos continuam sendo resolvidos normalmente;
+- se não houver pool personalizado do pós-passe, o pós-passe herda o comportamento normal: binding antigo específico, quando existir, ou o baú padrão;
+- um pool personalizado não pode repetir o mesmo baú;
+- todas as chances do pool personalizado precisam ser > 0 e <= 100;
+- quando o pool existe, a soma das chances precisa ser 100% (tolerância técnica de 0,01);
+- o sorteio ponderado é feito por chamada, portanto cada recompensa do pós-passe sorteia uma identidade segundo as porcentagens configuradas;
+- quantidade dos patamares continua vindo exclusivamente do catálogo do Passe.
+
+Resolver atualizado:
+`src/systems/seasonal-chest-reward-binding-resolver.js`.
+
+Ele agora informa a origem da resolução (`default`, `override` ou `post_pass_pool`) e possui:
+- `getSeasonPassPostSeasonalChestRewardPool`;
+- `rollSeasonPassPostSeasonalChestReward`.
+
+Teste novo:
+`testar_distribuicao_padrao_baus_sazonais.mjs`.
+
+Validado:
+- patamar sem exceção herda o baú padrão;
+- exceção substitui o padrão sem alterar a quantidade do catálogo;
+- pós-passe 50%/30%/20% seleciona corretamente os três intervalos;
+- ausência de pool personalizado faz o pós-passe herdar o padrão;
+- soma diferente de 100% é recusada;
+- baú padrão cross-season é recusado;
+- testes anteriores de bindings anuais, editor, progressão cumulativa, finalizadores e catálogo do Passe permaneceram verdes.
+
+Nenhuma entrega física do Passe foi ativada e nenhum deploy de produção foi executado.
