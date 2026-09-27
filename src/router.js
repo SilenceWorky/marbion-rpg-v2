@@ -22,6 +22,7 @@ import { confirmRoute } from "./routes/bank-confirm.js";
 import { chestRoute } from "./routes/chest.js";
 import { characterApiV1Route } from "./routes/api-character-v1.js";
 import { adminCharactersApiRoute } from "./routes/api-admin-characters.js";
+import { adminCharacterActionsApiRoute } from "./routes/api-admin-character-actions.js";
 import { adminSeasonsApiRoute } from "./routes/api-admin-seasons.js";
 import { adminEconomyApiRoute } from "./routes/api-admin-economy.js";
 import { adminInventoryApiRoute } from "./routes/api-admin-inventory.js";
@@ -222,6 +223,15 @@ export async function handleRequest(request, env, ctx) {
     path === "/api/v1/admin/economy"
   ) {
     return adminEconomyApiRoute(
+      request,
+      env
+    );
+  }
+
+  if (
+    path === "/api/v1/admin/character-actions"
+  ) {
+    return adminCharacterActionsApiRoute(
       request,
       env
     );
