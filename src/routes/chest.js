@@ -4,6 +4,14 @@ import {
 } from "../core/database.js";
 
 import {
+  fetchJson
+} from "../core/content.js";
+
+import {
+  SKILLS_URL
+} from "../config/urls.js";
+
+import {
   getChestGroups
 } from "../systems/chest-inventory.js";
 
@@ -14,6 +22,14 @@ import {
 import {
   applyResolvedAtomicChestRewards
 } from "../systems/atomic-chest-reward-apply.js";
+
+import {
+  resolveAtomicChestScrollRewards
+} from "../systems/atomic-chest-scroll-resolver.js";
+
+import {
+  finalizeAtomicChestOpen
+} from "../systems/atomic-chest-finalizer.js";
 
 
 const CHESTS_PER_PAGE =
@@ -188,31 +204,123 @@ async function handleOpenCommand(
     result.action === "open" &&
     result.pending
   ) {
+    const pendingOpen =
+      result.pendingOpen;
+
+    const hasUnresolvedScroll =
+      pendingOpen.rewardPlan.rewards
+        .some(
+          reward =>
+            reward?.type ===
+              "scroll" &&
+            reward?.resolved !==
+              true
+        );
+
+    if (hasUnresolvedScroll) {
+      let skillsData;
+
+      try {
+        skillsData =
+          await fetchJson(
+            SKILLS_URL
+          );
+      }
+      catch {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas o catálogo de habilidades não pôde ser carregado agora. Tente novamente para concluir as recompensas pendentes.`
+        );
+      }
+
+      const resolvedScrolls =
+        resolveAtomicChestScrollRewards(
+          profile,
+          pendingOpen,
+          skillsData
+        );
+
+      if (!resolvedScrolls.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas ainda não foi possível resolver um Pergaminho pendente.`
+        );
+      }
+    }
+
     const applied =
       applyResolvedAtomicChestRewards(
         profile,
         result.chestId
       );
 
-    /*
-     * Mesmo se a aplicação falhar, o pendingOpen já contém o
-     * plano congelado e precisa ser persistido para impedir
-     * qualquer reroll posterior.
-     */
+    if (!applied.ok) {
+      await saveProfile(
+        env,
+        user,
+        profile
+      );
+
+      return new Response(
+        `@${user}, a abertura foi registrada, mas não foi possível aplicar as recompensas resolvidas agora.`
+      );
+    }
+
+    let finalized =
+      false;
+
+    if (
+      applied.fullyResolved &&
+      applied.appliedRewardIndexes
+        .length ===
+        pendingOpen.rewardPlan
+          .rewards.length
+    ) {
+      const finalization =
+        finalizeAtomicChestOpen(
+          profile,
+          result.chestId
+        );
+
+      if (!finalization.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, as recompensas foram aplicadas, mas o Baú Atômico ainda não pôde ser finalizado com segurança.`
+        );
+      }
+
+      finalized = true;
+    }
+
     await saveProfile(
       env,
       user,
       profile
     );
 
-    if (!applied.ok) {
+    if (finalized) {
       return new Response(
-        `@${user}, a abertura foi registrada, mas não foi possível aplicar as recompensas resolvidas agora.`
+        `📦 @${user}, o Baú Atômico ${formatAtomicAtoms(result.currentAtoms)} abriu! Todas as recompensas foram aplicadas e o baú foi consumido.`
       );
     }
 
     return new Response(
-      `📦 @${user}, o Baú Atômico ${formatAtomicAtoms(result.currentAtoms)} abriu! As recompensas disponíveis foram aplicadas e a abertura ficou registrada com segurança.`
+      `📦 @${user}, o Baú Atômico ${formatAtomicAtoms(result.currentAtoms)} abriu! As recompensas disponíveis foram aplicadas; ainda existem recompensas pendentes de resolução.`
     );
   }
 

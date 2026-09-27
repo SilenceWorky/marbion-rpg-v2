@@ -194,6 +194,12 @@ const openEnv =
       openProfile
   });
 
+const originalRandom =
+  Math.random;
+
+Math.random =
+  () => 0.99;
+
 const openResponse =
   await chestRoute(
     new Request(
@@ -202,9 +208,12 @@ const openResponse =
     openEnv
   );
 
+Math.random =
+  originalRandom;
+
 assert.equal(
   await openResponse.text(),
-  "📦 @abre, o Baú Atômico ⚛⚛ abriu! As recompensas disponíveis foram aplicadas e a abertura ficou registrada com segurança."
+  "📦 @abre, o Baú Atômico ⚛⚛ abriu! Todas as recompensas foram aplicadas e o baú foi consumido."
 );
 
 const openStored =
@@ -216,30 +225,8 @@ const openStored =
 
 assert.equal(
   openStored.chests.length,
-  1,
-  "o baú ainda não deve ser consumido neste bloco"
-);
-
-assert.equal(
-  openStored.chests[0]
-    .metadata.atomic
-    .pendingOpen
-    .atoms,
-  2,
-  "pendingOpen precisa ser persistido pela rota"
-);
-
-assert.deepEqual(
-  openStored.chests[0]
-    .metadata.atomic
-    .pendingOpen
-    .rewardPlan
-    .appliedRewardIndexes,
-  [
-    0,
-    1
-  ],
-  "XP e dinheiro base precisam ser marcados como aplicados"
+  0,
+  "o baú deve ser consumido quando todas as recompensas forem resolvidas e aplicadas"
 );
 
 assert.equal(
@@ -272,19 +259,6 @@ const rewardSnapshot =
       openStored.money
   });
 
-const pendingSnapshot =
-  structuredClone(
-    openStored.chests[0]
-      .metadata.atomic
-      .pendingOpen
-  );
-
-const scriptIndexSnapshot =
-  openStored.chests[0]
-    .metadata.atomic
-    .scriptIndex;
-
-
 const retryOpenResponse =
   await chestRoute(
     new Request(
@@ -295,7 +269,7 @@ const retryOpenResponse =
 
 assert.equal(
   await retryOpenResponse.text(),
-  "📦 @abre, o Baú Atômico ⚛⚛ abriu! As recompensas disponíveis foram aplicadas e a abertura ficou registrada com segurança."
+  "@abre, esse número de baú não existe na sua lista."
 );
 
 const retryOpenStored =
@@ -304,28 +278,6 @@ const retryOpenStored =
       "abre"
     )
   );
-
-assert.equal(
-  retryOpenStored.chests.length,
-  1,
-  "retry de pendingOpen não pode consumir o baú"
-);
-
-assert.deepEqual(
-  retryOpenStored.chests[0]
-    .metadata.atomic
-    .pendingOpen,
-  pendingSnapshot,
-  "retry pela rota deve reutilizar exatamente o mesmo pendingOpen"
-);
-
-assert.equal(
-  retryOpenStored.chests[0]
-    .metadata.atomic
-    .scriptIndex,
-  scriptIndexSnapshot,
-  "retry de pendingOpen não pode executar nem consumir outro passo do roteiro"
-);
 
 assert.deepEqual(
   {
@@ -339,7 +291,7 @@ assert.deepEqual(
       retryOpenStored.money
   },
   rewardSnapshot,
-  "retry pela rota não pode duplicar XP nem dinheiro"
+  "tentar novamente após consumir o baú não pode duplicar XP nem dinheiro"
 );
 
 
