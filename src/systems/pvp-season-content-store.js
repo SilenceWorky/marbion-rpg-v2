@@ -13,8 +13,12 @@ import {
   normalizeSkillRarity
 } from "../config/skill-rarities.js";
 
+import {
+  getSeasonalChestRewardBindingSlot
+} from "../config/seasonal-chest-reward-bindings.js";
 
-export const PVP_SEASON_CONTENT_VERSION = 2;
+
+export const PVP_SEASON_CONTENT_VERSION = 3;
 
 export const PVP_SEASON_CONTENT_STORAGE_PREFIX =
   "pvp_season_content:";
@@ -578,6 +582,87 @@ function validateSeasonalChestRelations(
 }
 
 
+function normalizeSeasonalChestRewardBindings(
+  value,
+  seasonalChests
+) {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const chestById =
+    new Map(
+      seasonalChests.map(
+        chest => [
+          chest.id,
+          chest
+        ]
+      )
+    );
+
+  const seen =
+    new Set();
+
+  const bindings = [];
+
+  for (
+    const raw of
+      value.slice(0, 100)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      return null;
+    }
+
+    const key =
+      normalizeText(
+        raw.key,
+        120
+      );
+
+    const seasonalChestId =
+      normalizeText(
+        raw.seasonalChestId,
+        180
+      );
+
+    const slot =
+      getSeasonalChestRewardBindingSlot(
+        key
+      );
+
+    const chest =
+      seasonalChestId
+        ? chestById.get(
+            seasonalChestId
+          )
+        : null;
+
+    if (
+      !key ||
+      !slot ||
+      !seasonalChestId ||
+      !chest ||
+      seen.has(key)
+    ) {
+      return null;
+    }
+
+    seen.add(key);
+
+    bindings.push({
+      key,
+      seasonalChestId
+    });
+  }
+
+  return bindings;
+}
+
+
 export function normalizePvpSeasonContent(
   value,
   fallback = {}
@@ -652,6 +737,23 @@ export function normalizePvpSeasonContent(
     seasonalChests.length !==
     rawChests.slice(0, 50).length
   ) {
+    return null;
+  }
+
+  const rawRewardBindings =
+    Array.isArray(
+      value.seasonalChestRewardBindings
+    )
+      ? value.seasonalChestRewardBindings
+      : [];
+
+  const seasonalChestRewardBindings =
+    normalizeSeasonalChestRewardBindings(
+      rawRewardBindings,
+      seasonalChests
+    );
+
+  if (!seasonalChestRewardBindings) {
     return null;
   }
 
@@ -761,6 +863,7 @@ export function normalizePvpSeasonContent(
       ),
     featuredElements,
     seasonalChests,
+    seasonalChestRewardBindings,
     seasonalSkills,
     seasonalConsumables,
     seasonalPvpFinishers,
@@ -780,6 +883,7 @@ export function createEmptyPvpSeasonContent(
     summary: null,
     featuredElements: [],
     seasonalChests: [],
+    seasonalChestRewardBindings: [],
     seasonalSkills: [],
     seasonalConsumables: [],
     seasonalPvpFinishers: [],
@@ -1292,6 +1396,11 @@ export async function savePvpSeasonMonthContent(
         nextRevision,
       seasonalChests:
         reconciled.chests,
+      seasonalChestRewardBindings:
+        input?.seasonalChestRewardBindings ===
+          undefined
+          ? existing.seasonalChestRewardBindings
+          : input.seasonalChestRewardBindings,
       seasonalSkills:
         input?.seasonalSkills ===
           undefined

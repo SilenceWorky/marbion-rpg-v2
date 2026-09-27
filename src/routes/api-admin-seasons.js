@@ -7,6 +7,10 @@ import {
 } from "../config/season-pass-rewards.js";
 
 import {
+  getSeasonPassSeasonalChestRewardSlots
+} from "../config/seasonal-chest-reward-bindings.js";
+
+import {
   SEASONAL_SKILL_EFFECTS,
   normalizeSeasonalSkillEffect
 } from "../config/seasonal-skill-effects.js";
@@ -163,6 +167,8 @@ function buildPassCatalog() {
     postRewardXp:
       SEASON_PASS_POST_REWARD_XP,
     deliveryIntegrated: false,
+    seasonalChestRewardSlots:
+      getSeasonPassSeasonalChestRewardSlots(),
     tiers:
       SEASON_PASS_REWARDS.map(
         entry => ({
@@ -1012,6 +1018,45 @@ export async function adminSeasonsApiRoute(
       );
     }
 
+    const rewardBindings =
+      input.seasonalChestRewardBindings ===
+        undefined
+        ? {
+            ok: true,
+            value: undefined
+          }
+        : Array.isArray(
+            input.seasonalChestRewardBindings
+          )
+          ? {
+              ok: true,
+              value:
+                input.seasonalChestRewardBindings
+                  .map(binding => ({
+                    key:
+                      String(
+                        binding?.key ?? ""
+                      ).trim(),
+                    seasonalChestId:
+                      String(
+                        binding?.seasonalChestId ??
+                        ""
+                      ).trim()
+                  }))
+            }
+          : {
+              ok: false,
+              error:
+                "INVALID_SEASONAL_CHEST_REWARD_BINDINGS"
+            };
+
+    if (!rewardBindings.ok) {
+      return Response.json(
+        rewardBindings,
+        { status: 400 }
+      );
+    }
+
     const skills =
       normalizeSeasonalSkills(
         input.seasonalSkills,
@@ -1128,6 +1173,13 @@ export async function adminSeasonsApiRoute(
               : {
                   seasonalChests:
                     chests.value
+                }),
+            ...(rewardBindings.value ===
+              undefined
+              ? {}
+              : {
+                  seasonalChestRewardBindings:
+                    rewardBindings.value
                 }),
             seasonalSkills:
               skills.value,

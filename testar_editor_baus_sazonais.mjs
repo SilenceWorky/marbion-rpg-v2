@@ -54,7 +54,7 @@ const legacy =
 
 assert.equal(
   legacy.version,
-  2
+  3
 );
 
 assert.equal(
@@ -65,6 +65,12 @@ assert.equal(
 assert.deepEqual(
   legacy.seasonalChests,
   []
+);
+
+assert.deepEqual(
+  legacy.seasonalChestRewardBindings,
+  [],
+  "conteúdo antigo não pode receber distribuição de baús automaticamente"
 );
 
 assert.equal(
