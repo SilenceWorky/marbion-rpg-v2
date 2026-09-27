@@ -27,6 +27,10 @@ import {
   grantPvpFinisher
 } from "./pvp-finisher-collection.js";
 
+import {
+  grantVictoryMessage
+} from "./victory-message-collection.js";
+
 
 function validateResolvedReward(
   reward
@@ -151,6 +155,37 @@ function validateResolvedReward(
         ok: false,
         error:
           "INVALID_SEASONAL_PVP_FINISHER_REWARD"
+      };
+    }
+
+    return {
+      ok: true,
+      applicable: true
+    };
+  }
+
+  if (
+    reward.type ===
+      "seasonal_victory_message"
+  ) {
+    if (
+      !reward.message ||
+      typeof reward.message !==
+        "object" ||
+      Array.isArray(
+        reward.message
+      ) ||
+      !String(
+        reward.message.id ?? ""
+      ).trim() ||
+      !String(
+        reward.message.text ?? ""
+      ).trim()
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_VICTORY_MESSAGE_REWARD"
       };
     }
 
@@ -319,6 +354,7 @@ export function applyResolvedSeasonalChestRewards(
   const consumableRewards = [];
   const abilityRewards = [];
   const pvpFinisherRewards = [];
+  const victoryMessageRewards = [];
 
   for (
     let index = 0;
@@ -478,6 +514,64 @@ export function applyResolvedSeasonalChestRewards(
     }
     else if (
       reward.type ===
+        "seasonal_victory_message"
+    ) {
+      if (
+        reward.seasonId !==
+          pendingOpen.seasonId ||
+        reward.seasonalChestId !==
+          pendingOpen.seasonalChestId ||
+        Number(reward.chestOrder) !==
+          Number(pendingOpen.chestOrder) ||
+        Number(reward.poolRevision) !==
+          Number(pendingOpen.poolRevision)
+      ) {
+        return {
+          ok: false,
+          error:
+            "SEASONAL_VICTORY_MESSAGE_REWARD_IDENTITY_MISMATCH"
+        };
+      }
+
+      const delivered =
+        grantVictoryMessage(
+          profile,
+          {
+            seasonId:
+              pendingOpen.seasonId,
+            messageId:
+              reward.message.id,
+            text:
+              reward.message.text,
+            source:
+              "seasonal_chest",
+            seasonalChestId:
+              pendingOpen.seasonalChestId,
+            chestOrder:
+              pendingOpen.chestOrder,
+            poolRevision:
+              pendingOpen.poolRevision,
+            acquiredAt:
+              pendingOpen.createdAt
+          }
+        );
+
+      if (!delivered.ok) {
+        return delivered;
+      }
+
+      victoryMessageRewards.push({
+        index,
+        duplicate:
+          delivered.duplicate === true,
+        message:
+          structuredClone(
+            delivered.message
+          )
+      });
+    }
+    else if (
+      reward.type ===
         "seasonal_skill"
     ) {
       const learnedSkill = {
@@ -577,6 +671,7 @@ export function applyResolvedSeasonalChestRewards(
     moneyRewards,
     consumableRewards,
     abilityRewards,
-    pvpFinisherRewards
+    pvpFinisherRewards,
+    victoryMessageRewards
   };
 }
