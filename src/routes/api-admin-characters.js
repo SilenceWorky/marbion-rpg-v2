@@ -4,6 +4,14 @@ import {
 } from "../core/database.js";
 
 import {
+  fetchJson
+} from "../core/content.js";
+
+import {
+  SKILLS_URL
+} from "../config/urls.js";
+
+import {
   adminSetLevel,
   adminSetRace,
   adminSetElements,
@@ -13,6 +21,13 @@ import {
 import {
   isAdminUser
 } from "../config/admins.js";
+
+import {
+  ensureSkillLoadout,
+  getOwnedSkills,
+  equipSkill,
+  clearSkillSlot
+} from "../systems/skills.js";
 
 
 const INDEX_PREFIX =
@@ -334,6 +349,143 @@ function toPositiveInteger(
     ? number
     : null;
 }
+
+async function applyEquippedSkillsPatch(
+  env,
+  profile,
+  rawSlots
+) {
+  if (
+    !Array.isArray(rawSlots) ||
+    rawSlots.length !== 4
+  ) {
+    return {
+      ok: false,
+      error:
+        "INVALID_EQUIPPED_SKILLS"
+    };
+  }
+
+  const desiredSlots =
+    rawSlots.map(value => {
+      if (
+        value === null ||
+        value === undefined ||
+        String(value).trim() === ""
+      ) {
+        return null;
+      }
+
+      return String(value).trim();
+    });
+
+  const equippedIds =
+    desiredSlots.filter(Boolean);
+
+  if (
+    new Set(equippedIds).size !==
+    equippedIds.length
+  ) {
+    return {
+      ok: false,
+      error:
+        "DUPLICATE_EQUIPPED_SKILL"
+    };
+  }
+
+  const skillsData =
+    await fetchJson(
+      SKILLS_URL
+    );
+
+  ensureSkillLoadout(
+    profile
+  );
+
+  const ownedSkills =
+    getOwnedSkills(
+      profile,
+      skillsData
+    );
+
+  const ownedIndexById =
+    new Map(
+      ownedSkills.map(
+        (skill, index) => [
+          skill.id,
+          index + 1
+        ]
+      )
+    );
+
+  for (const skillId of equippedIds) {
+    if (
+      !ownedIndexById.has(
+        skillId
+      )
+    ) {
+      return {
+        ok: false,
+        error:
+          "SKILL_NOT_OWNED"
+      };
+    }
+  }
+
+  for (
+    let slot = 1;
+    slot <= 4;
+    slot += 1
+  ) {
+    clearSkillSlot(
+      profile,
+      slot
+    );
+  }
+
+  for (
+    let index = 0;
+    index <
+    desiredSlots.length;
+    index += 1
+  ) {
+    const skillId =
+      desiredSlots[index];
+
+    if (!skillId) {
+      continue;
+    }
+
+    const ownedNumber =
+      ownedIndexById.get(
+        skillId
+      );
+
+    const result =
+      equipSkill(
+        profile,
+        skillsData,
+        index + 1,
+        ownedNumber
+      );
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        error:
+          result.error ||
+          "INVALID_EQUIPPED_SKILLS"
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    equippedSkills:
+      [...profile.equippedSkills]
+  };
+}
+
 async function applyPatch(
   env,
   user,
@@ -725,6 +877,49 @@ async function applyPatch(
         };
       }
     }
+  }
+
+  if (
+    patch.equippedSkills !==
+      undefined
+  ) {
+    profile =
+      await getProfile(
+        env,
+        user
+      );
+
+    if (!profile) {
+      return {
+        ok: false,
+        status: 404,
+        error:
+          "CHARACTER_NOT_FOUND"
+      };
+    }
+
+    const result =
+      await applyEquippedSkillsPatch(
+        env,
+        profile,
+        patch.equippedSkills
+      );
+
+    if (!result.ok) {
+      return {
+        ok: false,
+        status: 400,
+        error:
+          result.error ||
+          "INVALID_EQUIPPED_SKILLS"
+      };
+    }
+
+    await saveProfile(
+      env,
+      user,
+      profile
+    );
   }
 
   profile =
