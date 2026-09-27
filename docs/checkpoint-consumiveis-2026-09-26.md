@@ -231,3 +231,38 @@ O catálogo externo `skills.json` ainda usa a escala antiga. A conversão aprova
 Como `Raro` existe nas duas escalas com significado diferente, o Worker distingue catálogo legado de catálogo canônico pela presença de nomes exclusivos da escala antiga, como `Incomum`, `Muito Raro` e `Especial`.
 
 Essa adaptação também foi aplicada ao seletor de Pergaminhos, para que o catálogo externo atual continue compatível com a escala canônica R1–R5.
+
+## 11. Validação integrada dos Baús Atômicos I–V
+
+Foi adicionado o teste:
+
+`testar_integracao_bau_atomico_1_a_5.mjs`
+
+Ele valida, pela rota real de abertura:
+- abertura e finalização dos cinco níveis;
+- remoção do baú após aplicar todas as recompensas;
+- Baú I com recompensa primária;
+- XP + dinheiro dos níveis II–V;
+- consumível garantido do III;
+- Pergaminho garantido do IV;
+- habilidade elemental garantida do V;
+- exclusão de habilidade Único/Especial no V;
+- retry após consumo sem duplicar XP, dinheiro, habilidades ou inventário;
+- evolução persistida de ⚛ até ⚛⚛⚛⚛⚛;
+- reset de `attemptsAtLevel` após cada evolução;
+- abertura e consumo final após a cadeia completa de evolução.
+
+Resultado atual:
+
+`✅ Integração completa dos Baús Atômicos I–V validada.`
+
+Regressões específicas também continuaram passando após essa validação integrada:
+- mecânica de tentativas/evolução;
+- plano de recompensas;
+- valores de XP/dinheiro;
+- resolução congelada de Consumíveis;
+- resolução congelada de Pergaminhos;
+- habilidade garantida do Baú V;
+- aplicação idempotente;
+- finalização segura;
+- pools de bônus IV/V.
