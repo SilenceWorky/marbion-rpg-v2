@@ -7,19 +7,10 @@ import {
 } from "./element-compatibility.js";
 
 import {
-  getSkillRarityForScrollTier
+  getSkillRarityForScrollTier,
+  detectLegacySkillRarityScale,
+  normalizeCatalogSkillRarity
 } from "../config/skill-rarities.js";
-
-
-function normalizeText(
-  value
-) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim()
-    .toLowerCase();
-}
 
 
 function readRandom(
@@ -101,20 +92,32 @@ export function getEligibleScrollRewardSkills(
         : []
     );
 
-  const candidates =
+  const catalog =
     flattenSkills(
       skillsData
-    ).filter(
+    );
+
+  const legacyScale =
+    detectLegacySkillRarityScale(
+      catalog.map(
+        skill =>
+          skill.raridade
+      )
+    );
+
+  const candidates =
+    catalog.filter(
       skill =>
         !owned.has(
           skill.id
         ) &&
-        normalizeText(
-          skill.raridade
+        normalizeCatalogSkillRarity(
+          skill.raridade,
+          {
+            legacyScale
+          }
         ) ===
-          normalizeText(
-            skillRarity
-          ) &&
+          skillRarity &&
         canLearnSkillFromScroll(
           profile,
           skill.elemento

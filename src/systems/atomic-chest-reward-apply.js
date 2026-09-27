@@ -22,6 +22,11 @@ import {
   addConsumableToInventory
 } from "./consumable-inventory.js";
 
+import {
+  learnResolvedSkillReward,
+  playerHasSkill
+} from "./skill-learning.js";
+
 
 function validateResolvedReward(
   reward
@@ -161,6 +166,37 @@ function validateResolvedReward(
 
   if (
     reward.type ===
+      "new_elemental_ability"
+  ) {
+    if (
+      !reward.skill ||
+      typeof reward.skill !==
+        "object" ||
+      Array.isArray(
+        reward.skill
+      ) ||
+      !String(
+        reward.skill.id ?? ""
+      ).trim() ||
+      !String(
+        reward.skill.elemento ?? ""
+      ).trim()
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_ATOMIC_ABILITY_REWARD"
+      };
+    }
+
+    return {
+      ok: true,
+      applicable: true
+    };
+  }
+
+  if (
+    reward.type ===
       "title"
   ) {
     if (
@@ -270,6 +306,7 @@ export function applyResolvedAtomicChestRewards(
   const moneyRewards = [];
   const scrollRewards = [];
   const consumableRewards = [];
+  const abilityRewards = [];
   const titleRewards = [];
 
   for (
@@ -405,6 +442,42 @@ export function applyResolvedAtomicChestRewards(
     }
     else if (
       reward.type ===
+        "new_elemental_ability"
+    ) {
+      const alreadyLearned =
+        playerHasSkill(
+          profile,
+          reward.skill.id
+        );
+
+      if (!alreadyLearned) {
+        const learned =
+          learnResolvedSkillReward(
+            profile,
+            reward.skill,
+            {
+              source:
+                "atomic_chest"
+            }
+          );
+
+        if (!learned.ok) {
+          return learned;
+        }
+      }
+
+      abilityRewards.push({
+        index,
+        duplicate:
+          alreadyLearned,
+        skill:
+          structuredClone(
+            reward.skill
+          )
+      });
+    }
+    else if (
+      reward.type ===
         "title"
     ) {
       if (
@@ -493,6 +566,7 @@ export function applyResolvedAtomicChestRewards(
     moneyRewards,
     scrollRewards,
     consumableRewards,
+    abilityRewards,
     titleRewards
   };
 }

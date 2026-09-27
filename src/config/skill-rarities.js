@@ -9,6 +9,23 @@ export const SKILL_RARITIES =
   });
 
 
+export const LEGACY_SKILL_RARITY_TO_CANONICAL =
+  Object.freeze({
+    Comum:
+      SKILL_RARITIES.COMMON,
+    Incomum:
+      SKILL_RARITIES.RARE,
+    Raro:
+      SKILL_RARITIES.SUPER_RARE,
+    "Muito Raro":
+      SKILL_RARITIES.MYTHIC,
+    Lendário:
+      SKILL_RARITIES.LEGENDARY,
+    Especial:
+      SKILL_RARITIES.UNIQUE
+  });
+
+
 export const SCROLL_RARITY_TO_SKILL_RARITY =
   Object.freeze({
     R1:
@@ -43,27 +60,135 @@ export function getSkillRarityForScrollTier(
 }
 
 
-export function isScrollEligibleSkillRarity(
+function normalizeRarityKey(
+  rarity
+) {
+  return String(
+    rarity ?? ""
+  )
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+
+export function normalizeLegacySkillRarity(
   rarity
 ) {
   const normalized =
-    String(
-      rarity ?? ""
+    normalizeRarityKey(
+      rarity
+    );
+
+  if (!normalized) {
+    return null;
+  }
+
+  for (
+    const [
+      legacy,
+      canonical
+    ] of Object.entries(
+      LEGACY_SKILL_RARITY_TO_CANONICAL
     )
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .trim()
-      .toLowerCase();
+  ) {
+    if (
+      normalizeRarityKey(
+        legacy
+      ) === normalized
+    ) {
+      return canonical;
+    }
+  }
+
+  return null;
+}
+
+
+export function normalizeSkillRarity(
+  rarity
+) {
+  const normalized =
+    normalizeRarityKey(
+      rarity
+    );
+
+  if (!normalized) {
+    return null;
+  }
+
+  for (
+    const canonical of
+      Object.values(
+        SKILL_RARITIES
+      )
+  ) {
+    if (
+      normalizeRarityKey(
+        canonical
+      ) === normalized
+    ) {
+      return canonical;
+    }
+  }
+
+  return null;
+}
+
+
+export function detectLegacySkillRarityScale(
+  rarities
+) {
+  if (!Array.isArray(rarities)) {
+    return false;
+  }
+
+  const distinctiveLegacy =
+    new Set([
+      "incomum",
+      "muito raro",
+      "especial"
+    ]);
+
+  return rarities.some(
+    rarity =>
+      distinctiveLegacy.has(
+        normalizeRarityKey(
+          rarity
+        )
+      )
+  );
+}
+
+
+export function normalizeCatalogSkillRarity(
+  rarity,
+  {
+    legacyScale = false
+  } = {}
+) {
+  return legacyScale
+    ? normalizeLegacySkillRarity(
+        rarity
+      )
+    : normalizeSkillRarity(
+        rarity
+      );
+}
+
+
+export function isScrollEligibleSkillRarity(
+  rarity
+) {
+  const canonical =
+    normalizeSkillRarity(
+      rarity
+    );
 
   return Object.values(
     SCROLL_RARITY_TO_SKILL_RARITY
-  ).some(
-    value =>
-      value
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .trim()
-        .toLowerCase() ===
-      normalized
+  ).includes(
+    canonical
   );
 }

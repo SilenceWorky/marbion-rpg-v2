@@ -296,6 +296,122 @@ export function learnSkillFromScroll(
  * recompensas
  * PvP
  */
+export function learnResolvedSkillReward(
+  profile,
+  skill,
+  {
+    source = "reward"
+  } = {}
+) {
+  if (
+    !skill ||
+    typeof skill !== "object" ||
+    Array.isArray(skill) ||
+    !String(skill.id ?? "").trim()
+  ) {
+    return {
+      ok: false,
+      error: "INVALID_SKILL_REWARD"
+    };
+  }
+
+  if (
+    hasSkill(
+      profile,
+      skill.id
+    )
+  ) {
+    return {
+      ok: false,
+      error: "ALREADY_LEARNED",
+      skill
+    };
+  }
+
+  if (
+    !canLearnSkillFromScroll(
+      profile,
+      skill.elemento
+    )
+  ) {
+    return {
+      ok: false,
+      error:
+        "INCOMPATIBLE_ELEMENT",
+      skill
+    };
+  }
+
+  return addSkill(
+    profile,
+    skill,
+    {
+      source,
+      temporary: false
+    }
+  );
+}
+
+
+export function learnSkillFromReward(
+  profile,
+  skillsData,
+  skillQuery,
+  {
+    source = "reward"
+  } = {}
+) {
+  const skill =
+    findSkill(
+      skillsData,
+      skillQuery
+    );
+
+  if (!skill) {
+    return {
+      ok: false,
+      error: "SKILL_NOT_FOUND"
+    };
+  }
+
+  if (
+    hasSkill(
+      profile,
+      skill.id
+    )
+  ) {
+    return {
+      ok: false,
+      error: "ALREADY_LEARNED",
+      skill
+    };
+  }
+
+  if (
+    !canLearnSkillFromScroll(
+      profile,
+      skill.elemento
+    )
+  ) {
+    return {
+      ok: false,
+      error:
+        "INCOMPATIBLE_ELEMENT",
+      skill
+    };
+  }
+
+  return addSkill(
+    profile,
+    skill,
+    {
+      source,
+      temporary: false
+    }
+  );
+}
+
+
 export function playerHasSkill(
   profile,
   skillId

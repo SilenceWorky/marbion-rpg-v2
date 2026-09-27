@@ -191,3 +191,43 @@ Título especial:
 Como o título ocupa 1% de um bônus que ativa em 20% das aberturas do Baú V, a chance efetiva por abertura do Baú V é **0,2%**.
 
 O título é armazenado atualmente em `profile.unlockedTags`, sem duplicação.
+
+## 10. Habilidade elemental garantida do Baú ⚛⚛⚛⚛⚛
+
+O Baú Atômico V garante uma **nova habilidade elemental compatível**.
+
+Regras canônicas:
+- a habilidade precisa ser compatível com o personagem;
+- não pode ser uma habilidade que o personagem já possua;
+- habilidade `Universal` não entra nesse prêmio;
+- raridade `Único` não entra nesse prêmio;
+- a habilidade é aprendida diretamente e de forma permanente;
+- se não houver mais nenhuma habilidade válida no pool, entra o fallback em Platina.
+
+Distribuição de raridade:
+- Comum: **35%**;
+- Raro: **30%**;
+- Super Raro: **20%**;
+- Mítico: **10%**;
+- Lendário: **5%**.
+
+Se uma raridade não possuir nenhuma habilidade elegível naquele momento, ela é removida do sorteio e os pesos restantes são normalizados entre as raridades ainda disponíveis. O fallback só ocorre quando o **pool inteiro** de habilidades válidas estiver esgotado.
+
+Fallback por pool esgotado:
+- **75%** → 1 Platina;
+- **25%** → 2 Platinas.
+
+### Compatibilidade com o catálogo legado de raridades
+
+O catálogo externo `skills.json` ainda usa a escala antiga. A conversão aprovada é:
+
+- Comum → Comum;
+- Incomum → Raro;
+- Raro → Super Raro;
+- Muito Raro → Mítico;
+- Lendário → Lendário;
+- Especial → Único.
+
+Como `Raro` existe nas duas escalas com significado diferente, o Worker distingue catálogo legado de catálogo canônico pela presença de nomes exclusivos da escala antiga, como `Incomum`, `Muito Raro` e `Especial`.
+
+Essa adaptação também foi aplicada ao seletor de Pergaminhos, para que o catálogo externo atual continue compatível com a escala canônica R1–R5.

@@ -24,6 +24,10 @@ import {
 } from "../systems/atomic-chest-reward-apply.js";
 
 import {
+  resolveAtomicChestAbilityRewards
+} from "../systems/atomic-chest-ability-resolver.js";
+
+import {
   resolveAtomicChestBonusRewards
 } from "../systems/atomic-chest-bonus-resolver.js";
 
@@ -249,17 +253,21 @@ async function handleOpenCommand(
       );
     }
 
-    const hasUnresolvedScroll =
+    const needsSkillCatalog =
       pendingOpen.rewardPlan.rewards
         .some(
           reward =>
-            reward?.type ===
-              "scroll" &&
+            (
+              reward?.type ===
+                "scroll" ||
+              reward?.type ===
+                "new_elemental_ability"
+            ) &&
             reward?.resolved !==
               true
         );
 
-    if (hasUnresolvedScroll) {
+    if (needsSkillCatalog) {
       let skillsData;
 
       try {
@@ -277,6 +285,25 @@ async function handleOpenCommand(
 
         return new Response(
           `@${user}, a abertura foi registrada, mas o catálogo de habilidades não pôde ser carregado agora. Tente novamente para concluir as recompensas pendentes.`
+        );
+      }
+
+      const resolvedAbilities =
+        resolveAtomicChestAbilityRewards(
+          profile,
+          pendingOpen,
+          skillsData
+        );
+
+      if (!resolvedAbilities.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas ainda não foi possível resolver a habilidade garantida.`
         );
       }
 

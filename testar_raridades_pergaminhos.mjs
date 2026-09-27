@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 
 import {
   SKILL_RARITIES,
+  LEGACY_SKILL_RARITY_TO_CANONICAL,
   SCROLL_RARITY_TO_SKILL_RARITY,
   getSkillRarityForScrollTier,
+  normalizeLegacySkillRarity,
+  normalizeSkillRarity,
+  detectLegacySkillRarityScale,
+  normalizeCatalogSkillRarity,
   isScrollEligibleSkillRarity
 } from "./src/config/skill-rarities.js";
 
@@ -20,6 +25,19 @@ assert.deepEqual(
     "Lendário",
     "Único"
   ]
+);
+
+
+assert.deepEqual(
+  LEGACY_SKILL_RARITY_TO_CANONICAL,
+  {
+    Comum: "Comum",
+    Incomum: "Raro",
+    Raro: "Super Raro",
+    "Muito Raro": "Mítico",
+    Lendário: "Lendário",
+    Especial: "Único"
+  }
 );
 
 
@@ -54,6 +72,86 @@ assert.equal(
     "R6"
   ),
   null
+);
+
+
+for (
+  const [
+    source,
+    expected
+  ] of [
+    ["Comum", "Comum"],
+    ["Incomum", "Raro"],
+    ["Raro", "Super Raro"],
+    ["Muito Raro", "Mítico"],
+    ["Lendário", "Lendário"],
+    ["Especial", "Único"]
+  ]
+) {
+  assert.equal(
+    normalizeLegacySkillRarity(
+      source
+    ),
+    expected
+  );
+}
+
+
+for (
+  const rarity of [
+    "Comum",
+    "Raro",
+    "Super Raro",
+    "Mítico",
+    "Lendário",
+    "Único"
+  ]
+) {
+  assert.equal(
+    normalizeSkillRarity(
+      rarity
+    ),
+    rarity
+  );
+}
+
+
+assert.equal(
+  detectLegacySkillRarityScale([
+    "Comum",
+    "Incomum",
+    "Raro"
+  ]),
+  true
+);
+
+assert.equal(
+  detectLegacySkillRarityScale([
+    "Comum",
+    "Raro",
+    "Super Raro"
+  ]),
+  false
+);
+
+assert.equal(
+  normalizeCatalogSkillRarity(
+    "Raro",
+    {
+      legacyScale: true
+    }
+  ),
+  "Super Raro"
+);
+
+assert.equal(
+  normalizeCatalogSkillRarity(
+    "Raro",
+    {
+      legacyScale: false
+    }
+  ),
+  "Raro"
 );
 
 
