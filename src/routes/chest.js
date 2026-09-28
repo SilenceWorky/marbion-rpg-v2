@@ -64,6 +64,10 @@ import {
 } from "../systems/seasonal-chest-cosmetic-resolver.js";
 
 import {
+  resolveSeasonalChestRelicRewards
+} from "../systems/seasonal-chest-relic-resolver.js";
+
+import {
   applyResolvedSeasonalChestRewards
 } from "../systems/seasonal-chest-reward-apply.js";
 
@@ -400,7 +404,8 @@ async function handleOpenCommand(
               "seasonal_consumable",
               "seasonal_pvp_finisher",
               "seasonal_victory_message",
-              "seasonal_cosmetic"
+              "seasonal_cosmetic",
+              "seasonal_relic"
             ].includes(
               reward?.type
             ) &&
@@ -518,6 +523,25 @@ async function handleOpenCommand(
 
         return new Response(
           `@${user}, a abertura foi registrada, mas o Cosmético Sazonal ainda não pôde ser resolvido.`
+        );
+      }
+
+      const resolvedRelic =
+        resolveSeasonalChestRelicRewards(
+          profile,
+          pendingOpen,
+          revisionResult.content
+        );
+
+      if (!resolvedRelic.ok) {
+        await saveProfile(
+          env,
+          user,
+          profile
+        );
+
+        return new Response(
+          `@${user}, a abertura foi registrada, mas a Relíquia Sazonal ainda não pôde ser resolvida.`
         );
       }
     }
