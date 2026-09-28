@@ -562,3 +562,110 @@ Validado:
 - testes anteriores de bindings anuais, editor, progressão cumulativa, finalizadores e catálogo do Passe permaneceram verdes.
 
 Nenhuma entrega física do Passe foi ativada e nenhum deploy de produção foi executado.
+
+# 15. REGRA CANÔNICA NOVA — Baú Sazonal recorrente por mês, não por ano — 27/09/2026
+
+Esta seção **substitui a interpretação anterior** de que a identidade do Baú Sazonal pertencia exclusivamente a um único `seasonId = YYYY-MM`.
+
+Implementação concluída no commit `6e04e02` (`feat: herda baus sazonais entre anos`).
+
+## Regra atual
+
+A identidade permanente do Baú Sazonal pertence ao **mês temático recorrente**.
+
+Exemplo:
+
+```txt
+Dezembro/2026
+#1 Baú De Madeira Congelada — ID A
+#2 Baú De Rena              — ID B
+
+Dezembro/2027
+#1 Baú De Madeira Congelada — mesmo ID A
+#2 Baú De Rena              — mesmo ID B
+
+Dezembro/2028
+#1 Baú De Madeira Congelada — mesmo ID A
+#2 Baú De Rena              — mesmo ID B
+```
+
+O ID nasce uma única vez no primeiro ano em que o baú é criado e nunca é regenerado nos anos seguintes.
+
+Um baú novo criado somente em Dezembro/2027 recebe seu ID uma vez e passa a existir em Dezembro/2027, 2028, 2029 etc. Ele **não retroage** para Dezembro/2026.
+
+Baús nunca atravessam meses diferentes. Um baú de Dezembro não aparece em Fevereiro, Novembro etc.
+
+## Separação identidade mensal x publicação anual
+
+O Worker agora mantém duas responsabilidades distintas:
+
+1. **Catálogo mensal de identidade**
+   - chave própria por mês;
+   - contém ID permanente, `originSeasonId`, ordem, nome, descrição e última temporada que atualizou a definição;
+   - é a fonte de recorrência do baú nos anos futuros.
+
+2. **Conteúdo anual da temporada**
+   - continua em `YYYY-MM`;
+   - contém a publicação daquele ano, `poolRevision`, bindings do Passe e conteúdo sazonal;
+   - preserva snapshots históricos/revisões.
+
+O schema do conteúdo anual passou para `PVP_SEASON_CONTENT_VERSION = 5`.
+
+O catálogo mensal usa `PVP_SEASONAL_CHEST_MONTH_CATALOG_VERSION = 1`.
+
+## Herança
+
+Ao ler um ano futuro do mesmo mês:
+
+- o Worker injeta os baús já existentes no catálogo mensal;
+- mantém exatamente os mesmos IDs e ordens;
+- altera apenas o `seasonId` anual da definição para o ano visualizado;
+- antes do primeiro save daquele ano, esses baús aparecem com `poolRevision: null` e `inherited: true`;
+- no primeiro save anual, os mesmos IDs recebem a nova `poolRevision` daquele ano.
+
+Exemplo:
+
+```txt
+ID A nasceu em 2026-12.
+
+Instância entregue em 2026:
+seasonId = 2026-12
+seasonalChestId = ID A
+poolRevision = revisão histórica de 2026
+
+Instância entregue em 2027:
+seasonId = 2027-12
+seasonalChestId = mesmo ID A
+poolRevision = revisão histórica de 2027
+```
+
+Assim, guardar o baú de 2026 continua seguro: ele abre usando a temporada/revisão de 2026 mesmo que a mesma identidade seja usada novamente em 2027.
+
+## Compatibilidade/migração
+
+- IDs antigos como `seasonal:2026-12:chest:<token>` continuam válidos e passam a representar o ano de **origem da identidade**, não um limite de uso.
+- Um ID originado em 2026-12 pode ser usado em 2027-12, 2028-12 etc.
+- Ele não pode ser usado em mês diferente.
+- Ele não pode ser usado retroativamente em ano anterior ao seu ano de origem.
+- se o catálogo mensal ainda não existir, o Worker o deriva de forma segura do conteúdo anual anterior já persistido;
+- nenhuma migração inventa IDs novos para baús existentes.
+
+O catálogo também guarda `latestSeasonId`: uma edição feita em ano mais novo pode seguir para anos futuros, mas salvar um ano antigo depois não faz o catálogo voltar no tempo.
+
+## Teste
+
+Novo teste:
+`testar_heranca_anual_baus_sazonais.mjs`.
+
+Validado:
+- mesmos IDs de Dezembro/2026 aparecem em Dezembro/2027;
+- primeiro save de 2027 publica esses mesmos IDs com revisão anual própria;
+- novo baú criado em 2027 aparece em 2028;
+- novo baú de 2027 não aparece em 2026;
+- edição de nome em 2027 segue para 2028;
+- salvar 2026 depois não reverte a definição mais nova do catálogo;
+- Dezembro não vaza para Novembro;
+- uma instância de 2027 aceita ID originado em 2026 do mesmo mês;
+- testes de distribuição padrão, bindings, editor, progressão, habilidade, finalizador, mensagem de vitória e `!baú abrir` continuaram passando.
+
+Nenhum deploy de produção foi executado.
