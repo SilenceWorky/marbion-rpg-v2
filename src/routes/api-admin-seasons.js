@@ -817,6 +817,146 @@ export function normalizeSeasonalVictoryMessages(
 }
 
 
+export function normalizeSeasonalCosmetics(
+  value,
+  seasonalChests = null
+) {
+  if (value === undefined) {
+    return {
+      ok: true,
+      value: undefined
+    };
+  }
+
+  if (!Array.isArray(value)) {
+    return {
+      ok: false,
+      error: "INVALID_SEASONAL_COSMETICS"
+    };
+  }
+
+  const cosmetics = [];
+  const ids = new Set();
+
+  for (
+    const raw of value.slice(0, 100)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      return {
+        ok: false,
+        error: "INVALID_SEASONAL_COSMETIC"
+      };
+    }
+
+    const name =
+      String(
+        raw.name ?? ""
+      ).trim();
+
+    const introducedInSeasonalChestId =
+      normalizeSeasonalChestId(
+        raw.introducedInSeasonalChestId
+      );
+
+    const introducedInSeasonalChestOrder =
+      Number(
+        raw.introducedInSeasonalChestOrder
+      );
+
+    if (
+      !name ||
+      !introducedInSeasonalChestId ||
+      !Number.isSafeInteger(
+        introducedInSeasonalChestOrder
+      ) ||
+      introducedInSeasonalChestOrder < 1
+    ) {
+      return {
+        ok: false,
+        error: "INVALID_SEASONAL_COSMETIC",
+        value: raw
+      };
+    }
+
+    if (
+      Array.isArray(seasonalChests)
+    ) {
+      const chest =
+        seasonalChests.find(
+          entry =>
+            entry.id ===
+            introducedInSeasonalChestId
+        );
+
+      if (
+        !chest ||
+        chest.order !==
+          introducedInSeasonalChestOrder
+      ) {
+        return {
+          ok: false,
+          error: "INVALID_SEASONAL_COSMETIC_CHEST",
+          value: raw
+        };
+      }
+    }
+
+    const rawId =
+      String(
+        raw.id ?? ""
+      ).trim();
+
+    const id =
+      rawId ||
+      [
+        "seasonal-cosmetic",
+        name,
+        cosmetics.length + 1
+      ]
+        .join(":")
+        .normalize("NFD")
+        .replace(
+          /[\u0300-\u036f]/g,
+          ""
+        )
+        .replace(
+          /[^a-zA-Z0-9:_-]+/g,
+          "_"
+        )
+        .toLowerCase();
+
+    const normalizedId =
+      id.slice(0, 160);
+
+    if (ids.has(normalizedId)) {
+      return {
+        ok: false,
+        error: "DUPLICATE_SEASONAL_COSMETIC_ID",
+        value: normalizedId
+      };
+    }
+
+    ids.add(normalizedId);
+
+    cosmetics.push({
+      id: normalizedId,
+      name: name.slice(0, 120),
+      introducedInSeasonalChestId,
+      introducedInSeasonalChestOrder
+    });
+  }
+
+  return {
+    ok: true,
+    value: cosmetics
+  };
+}
+
+
 export function normalizeSeasonalSkills(
   value,
   allowedElements,
@@ -1344,6 +1484,19 @@ export async function adminSeasonsApiRoute(
       );
     }
 
+    const cosmetics =
+      normalizeSeasonalCosmetics(
+        input.seasonalCosmetics,
+        chests.value ?? null
+      );
+
+    if (!cosmetics.ok) {
+      return Response.json(
+        cosmetics,
+        { status: 400 }
+      );
+    }
+
     let definition = null;
 
     const requestedName =
@@ -1463,6 +1616,13 @@ export async function adminSeasonsApiRoute(
               : {
                   seasonalVictoryMessages:
                     victoryMessages.value
+                }),
+            ...(cosmetics.value ===
+              undefined
+              ? {}
+              : {
+                  seasonalCosmetics:
+                    cosmetics.value
                 })
           }
         }

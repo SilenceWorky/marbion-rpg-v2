@@ -638,6 +638,76 @@ function normalizeSeasonalVictoryMessage(
 }
 
 
+function normalizeSeasonalCosmetic(
+  value,
+  index
+) {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  const name =
+    normalizeText(
+      value.name,
+      120
+    );
+
+  const rawId =
+    normalizeText(
+      value.id,
+      160
+    );
+
+  const id =
+    rawId ??
+    [
+      "seasonal-cosmetic",
+      name ?? "cosmetic",
+      index + 1
+    ]
+      .join(":")
+      .normalize("NFD")
+      .replace(
+        /[\u0300-\u036f]/g,
+        ""
+      )
+      .replace(
+        /[^a-zA-Z0-9:_-]+/g,
+        "_"
+      )
+      .toLowerCase();
+
+  const introducedInSeasonalChestId =
+    normalizeSeasonalChestId(
+      value.introducedInSeasonalChestId
+    );
+
+  const introducedInSeasonalChestOrder =
+    normalizePositiveInteger(
+      value.introducedInSeasonalChestOrder
+    );
+
+  if (
+    !name ||
+    !introducedInSeasonalChestId ||
+    !introducedInSeasonalChestOrder
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    name,
+    introducedInSeasonalChestId,
+    introducedInSeasonalChestOrder
+  };
+}
+
+
 function validateSeasonalChestRelations(
   chests,
   skills
@@ -1155,6 +1225,28 @@ export function normalizePvpSeasonContent(
     return null;
   }
 
+  const rawCosmetics =
+    Array.isArray(
+      value.seasonalCosmetics
+    )
+      ? value.seasonalCosmetics
+      : [];
+
+  const seasonalCosmetics =
+    rawCosmetics
+      .slice(0, 100)
+      .map(
+        normalizeSeasonalCosmetic
+      )
+      .filter(Boolean);
+
+  if (
+    seasonalCosmetics.length !==
+    rawCosmetics.slice(0, 100).length
+  ) {
+    return null;
+  }
+
   if (
     !validateSeasonalChestRelations(
       seasonalChests,
@@ -1171,6 +1263,10 @@ export function normalizePvpSeasonContent(
     !validateSeasonalChestRelations(
       seasonalChests,
       seasonalVictoryMessages
+    ) ||
+    !validateSeasonalChestRelations(
+      seasonalChests,
+      seasonalCosmetics
     )
   ) {
     return null;
@@ -1207,6 +1303,7 @@ export function normalizePvpSeasonContent(
     seasonalConsumables,
     seasonalPvpFinishers,
     seasonalVictoryMessages,
+    seasonalCosmetics,
     updatedAt
   };
 }
@@ -1230,6 +1327,7 @@ export function createEmptyPvpSeasonContent(
     seasonalConsumables: [],
     seasonalPvpFinishers: [],
     seasonalVictoryMessages: [],
+    seasonalCosmetics: [],
     updatedAt: 0
   });
 }
@@ -2494,6 +2592,11 @@ export async function savePvpSeasonMonthContent(
           undefined
           ? existing.seasonalVictoryMessages
           : input.seasonalVictoryMessages,
+      seasonalCosmetics:
+        input?.seasonalCosmetics ===
+          undefined
+          ? existing.seasonalCosmetics
+          : input.seasonalCosmetics,
       updatedAt:
         now
     });
