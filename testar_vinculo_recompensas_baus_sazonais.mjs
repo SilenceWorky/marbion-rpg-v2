@@ -83,7 +83,7 @@ const legacy =
 
 assert.equal(
   legacy.version,
-  4
+  5
 );
 
 assert.equal(
@@ -323,12 +323,35 @@ assert.equal(
 );
 
 
+const inherited2027 =
+  await readPvpSeasonMonthContent(
+    storage,
+    2027,
+    12
+  );
+
+assert.equal(
+  inherited2027.ok,
+  true
+);
+
+assert.deepEqual(
+  inherited2027.content
+    .seasonalChests
+    .map(chest => chest.id),
+  [
+    chest1.id,
+    chest2.id
+  ],
+  "2027 deve herdar as identidades criadas em 2026"
+);
+
 const chest2027 = {
   id:
     "seasonal:2027-12:chest:natal701",
   seasonId:
     "2027-12",
-  order: 1,
+  order: 3,
   name:
     "Baú Natal 2027",
   description: null
@@ -341,6 +364,8 @@ const save2027 =
       year: 2027,
       month: 12,
       seasonalChests: [
+        ...inherited2027.content
+          .seasonalChests,
         chest2027
       ],
       seasonalChestRewardBindings: [

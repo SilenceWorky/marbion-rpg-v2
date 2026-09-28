@@ -24,9 +24,8 @@ function normalizeSeasonId(
 }
 
 
-function normalizeSeasonalChestId(
-  value,
-  seasonId
+function getSeasonalChestOriginSeasonId(
+  value
 ) {
   const id =
     String(value ?? "")
@@ -42,20 +41,56 @@ function normalizeSeasonalChestId(
       /^(\d{4}-(?:0[1-9]|1[0-2])):[a-zA-Z0-9_-]{3,120}$/
     );
 
-  const embeddedSeasonId =
+  return (
     modern?.[1] ??
     legacy?.[1] ??
-    null;
+    null
+  );
+}
 
-  if (
-    !embeddedSeasonId ||
-    (
-      seasonId &&
-      embeddedSeasonId !==
-        seasonId
-    )
-  ) {
+
+function normalizeSeasonalChestId(
+  value,
+  seasonId
+) {
+  const id =
+    String(value ?? "")
+      .trim();
+
+  const originSeasonId =
+    getSeasonalChestOriginSeasonId(
+      id
+    );
+
+  if (!originSeasonId) {
     return null;
+  }
+
+  if (seasonId) {
+    const [
+      originYear,
+      originMonth
+    ] =
+      originSeasonId
+        .split("-")
+        .map(Number);
+
+    const [
+      targetYear,
+      targetMonth
+    ] =
+      String(seasonId)
+        .split("-")
+        .map(Number);
+
+    if (
+      originMonth !==
+        targetMonth ||
+      originYear >
+        targetYear
+    ) {
+      return null;
+    }
   }
 
   return id;

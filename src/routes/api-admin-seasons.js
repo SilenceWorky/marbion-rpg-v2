@@ -197,9 +197,8 @@ function normalizeLookup(value) {
     .toLowerCase();
 }
 
-function normalizeSeasonalChestId(
-  value,
-  expectedSeasonId = null
+function getSeasonalChestOriginSeasonId(
+  value
 ) {
   const id =
     String(value ?? "")
@@ -215,20 +214,58 @@ function normalizeSeasonalChestId(
       /^(\d{4}-(?:0[1-9]|1[0-2])):[a-zA-Z0-9_-]{3,120}$/
     );
 
-  const embeddedSeasonId =
+  return (
     modern?.[1] ??
     legacy?.[1] ??
-    null;
+    null
+  );
+}
 
-  if (
-    !embeddedSeasonId ||
-    (
-      expectedSeasonId &&
-      embeddedSeasonId !==
-        expectedSeasonId
-    )
-  ) {
+
+function normalizeSeasonalChestId(
+  value,
+  expectedSeasonId = null
+) {
+  const id =
+    String(value ?? "")
+      .trim();
+
+  const originSeasonId =
+    getSeasonalChestOriginSeasonId(
+      id
+    );
+
+  if (!originSeasonId) {
     return null;
+  }
+
+  if (expectedSeasonId) {
+    const [
+      originYear,
+      originMonth
+    ] =
+      originSeasonId
+        .split("-")
+        .map(Number);
+
+    const [
+      targetYear,
+      targetMonth
+    ] =
+      String(
+        expectedSeasonId
+      )
+        .split("-")
+        .map(Number);
+
+    if (
+      originMonth !==
+        targetMonth ||
+      originYear >
+        targetYear
+    ) {
+      return null;
+    }
   }
 
   return id;
@@ -318,6 +355,10 @@ export function normalizeSeasonalChests(
 
     chests.push({
       id,
+      originSeasonId:
+        getSeasonalChestOriginSeasonId(
+          id
+        ),
       seasonId,
       order,
       name,

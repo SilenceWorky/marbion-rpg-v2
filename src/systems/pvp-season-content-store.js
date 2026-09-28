@@ -18,13 +18,21 @@ import {
 } from "../config/seasonal-chest-reward-bindings.js";
 
 
-export const PVP_SEASON_CONTENT_VERSION = 4;
+export const PVP_SEASON_CONTENT_VERSION = 5;
 
 export const PVP_SEASON_CONTENT_STORAGE_PREFIX =
   "pvp_season_content:";
 
 export const PVP_SEASON_CONTENT_REVISION_STORAGE_PREFIX =
   "pvp_season_content_revision:";
+
+export const PVP_SEASONAL_CHEST_MONTH_CATALOG_VERSION = 1;
+
+export const PVP_SEASONAL_CHEST_MONTH_CATALOG_STORAGE_PREFIX =
+  "pvp_seasonal_chest_month_catalog:";
+
+const PVP_SEASONAL_CHEST_INHERITANCE_START_YEAR =
+  2026;
 
 
 function normalizeText(
@@ -115,9 +123,8 @@ function normalizePositiveInteger(
 }
 
 
-function normalizeSeasonalChestId(
-  value,
-  expectedSeasonId = null
+function getSeasonalChestOriginSeasonId(
+  value
 ) {
   const id =
     normalizeText(
@@ -139,17 +146,76 @@ function normalizeSeasonalChestId(
       /^(\d{4}-(?:0[1-9]|1[0-2])):[a-zA-Z0-9_-]{3,120}$/
     );
 
-  const embeddedSeasonId =
+  return (
     modern?.[1] ??
     legacy?.[1] ??
-    null;
+    null
+  );
+}
+
+
+function isSeasonalChestIdAllowedForSeason(
+  id,
+  expectedSeasonId
+) {
+  if (!expectedSeasonId) {
+    return true;
+  }
+
+  const originSeasonId =
+    getSeasonalChestOriginSeasonId(
+      id
+    );
+
+  if (!originSeasonId) {
+    return false;
+  }
+
+  const [
+    originYear,
+    originMonth
+  ] =
+    originSeasonId
+      .split("-")
+      .map(Number);
+
+  const [
+    targetYear,
+    targetMonth
+  ] =
+    String(
+      expectedSeasonId
+    )
+      .split("-")
+      .map(Number);
+
+  return (
+    originMonth ===
+      targetMonth &&
+    originYear <=
+      targetYear
+  );
+}
+
+
+function normalizeSeasonalChestId(
+  value,
+  expectedSeasonId = null
+) {
+  const id =
+    normalizeText(
+      value,
+      180
+    );
 
   if (
-    !embeddedSeasonId ||
-    (
-      expectedSeasonId &&
-      embeddedSeasonId !==
-        expectedSeasonId
+    !id ||
+    !getSeasonalChestOriginSeasonId(
+      id
+    ) ||
+    !isSeasonalChestIdAllowedForSeason(
+      id,
+      expectedSeasonId
     )
   ) {
     return null;
@@ -212,6 +278,10 @@ function normalizeSeasonalChest(
 
   return {
     id,
+    originSeasonId:
+      getSeasonalChestOriginSeasonId(
+        id
+      ),
     seasonId,
     order,
     name,
@@ -1228,7 +1298,196 @@ export function getPvpSeasonContentRevisionStorageKey(
 }
 
 
-export async function readPvpSeasonMonthContent(
+export function getPvpSeasonalChestMonthCatalogStorageKey(
+  month
+) {
+  const normalizedMonth =
+    normalizeSeasonMonth(
+      month
+    );
+
+  if (!normalizedMonth) {
+    return null;
+  }
+
+  return (
+    PVP_SEASONAL_CHEST_MONTH_CATALOG_STORAGE_PREFIX +
+    String(
+      normalizedMonth
+    ).padStart(2, "0")
+  );
+}
+
+
+function normalizeSeasonalChestMonthCatalog(
+  value,
+  month
+) {
+  const normalizedMonth =
+    normalizeSeasonMonth(
+      month
+    );
+
+  if (
+    !normalizedMonth ||
+    !value ||
+    typeof value !== "object" ||
+    Array.isArray(value)
+  ) {
+    return null;
+  }
+
+  const rawChests =
+    Array.isArray(
+      value.chests
+    )
+      ? value.chests
+      : [];
+
+  const ids =
+    new Set();
+
+  const orders =
+    new Set();
+
+  const chests = [];
+
+  for (
+    const raw of
+      rawChests.slice(0, 50)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      return null;
+    }
+
+    const id =
+      normalizeSeasonalChestId(
+        raw.id
+      );
+
+    const originSeasonId =
+      getSeasonalChestOriginSeasonId(
+        id
+      );
+
+    const originMonth =
+      Number(
+        originSeasonId
+          ?.split("-")[1]
+      );
+
+    const order =
+      normalizePositiveInteger(
+        raw.order
+      );
+
+    const name =
+      normalizeText(
+        raw.name,
+        160
+      );
+
+    const description =
+      normalizeText(
+        raw.description,
+        1200
+      );
+
+    if (
+      !id ||
+      !originSeasonId ||
+      originMonth !==
+        normalizedMonth ||
+      !order ||
+      !name ||
+      ids.has(id) ||
+      orders.has(order)
+    ) {
+      return null;
+    }
+
+    ids.add(id);
+    orders.add(order);
+
+    const latestSeasonId =
+      normalizeText(
+        raw.latestSeasonId,
+        32
+      ) ??
+      originSeasonId;
+
+    const latestMonth =
+      Number(
+        latestSeasonId
+          .split("-")[1]
+      );
+
+    const latestYear =
+      Number(
+        latestSeasonId
+          .split("-")[0]
+      );
+
+    const originYear =
+      Number(
+        originSeasonId
+          .split("-")[0]
+      );
+
+    if (
+      latestMonth !==
+        normalizedMonth ||
+      !Number.isSafeInteger(
+        latestYear
+      ) ||
+      latestYear <
+        originYear
+    ) {
+      return null;
+    }
+
+    chests.push({
+      id,
+      originSeasonId,
+      latestSeasonId,
+      order,
+      name,
+      description,
+      createdAt:
+        normalizeNonNegativeInteger(
+          raw.createdAt
+        ),
+      updatedAt:
+        normalizeNonNegativeInteger(
+          raw.updatedAt
+        )
+    });
+  }
+
+  return {
+    version:
+      PVP_SEASONAL_CHEST_MONTH_CATALOG_VERSION,
+    month:
+      normalizedMonth,
+    chests:
+      chests.sort(
+        (left, right) =>
+          left.order -
+          right.order
+      ),
+    updatedAt:
+      normalizeNonNegativeInteger(
+        value.updatedAt
+      )
+  };
+}
+
+
+async function readStoredPvpSeasonMonthContent(
   storage,
   year,
   month
@@ -1274,6 +1533,7 @@ export async function readPvpSeasonMonthContent(
   ) {
     return {
       ok: true,
+      found: false,
       content:
         createEmptyPvpSeasonContent(
           year,
@@ -1301,7 +1561,494 @@ export async function readPvpSeasonMonthContent(
 
   return {
     ok: true,
+    found: true,
     content
+  };
+}
+
+
+async function readSeasonalChestMonthCatalog(
+  storage,
+  month,
+  targetYear
+) {
+  const normalizedMonth =
+    normalizeSeasonMonth(
+      month
+    );
+
+  const normalizedTargetYear =
+    normalizeSeasonYear(
+      targetYear
+    );
+
+  const key =
+    getPvpSeasonalChestMonthCatalogStorageKey(
+      normalizedMonth
+    );
+
+  if (
+    !key ||
+    !normalizedTargetYear ||
+    !storage ||
+    typeof storage.get !==
+      "function"
+  ) {
+    return {
+      ok: false,
+      error:
+        "SEASONAL_CHEST_CATALOG_UNAVAILABLE"
+    };
+  }
+
+  let stored;
+
+  try {
+    stored =
+      await storage.get(
+        key
+      );
+  }
+  catch {
+    return {
+      ok: false,
+      error:
+        "SEASONAL_CHEST_CATALOG_READ_FAILED"
+    };
+  }
+
+  if (
+    stored !== null &&
+    stored !== undefined
+  ) {
+    const catalog =
+      normalizeSeasonalChestMonthCatalog(
+        stored,
+        normalizedMonth
+      );
+
+    if (!catalog) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_CHEST_CATALOG"
+      };
+    }
+
+    return {
+      ok: true,
+      source:
+        "catalog",
+      catalog
+    };
+  }
+
+  /*
+   * Migração segura dos dados já existentes:
+   * antes do catálogo mensal, os baús viviam apenas
+   * dentro do conteúdo anual. Procuramos o ano anterior
+   * mais recente do mesmo mês, sem escrever nada durante
+   * uma leitura.
+   */
+  for (
+    let candidateYear =
+      normalizedTargetYear;
+    candidateYear >=
+      PVP_SEASONAL_CHEST_INHERITANCE_START_YEAR;
+    candidateYear -= 1
+  ) {
+    const annual =
+      await readStoredPvpSeasonMonthContent(
+        storage,
+        candidateYear,
+        normalizedMonth
+      );
+
+    if (!annual.ok) {
+      return annual;
+    }
+
+    if (
+      annual.content
+        .seasonalChests
+        .length === 0
+    ) {
+      continue;
+    }
+
+    const catalog =
+      normalizeSeasonalChestMonthCatalog(
+        {
+          month:
+            normalizedMonth,
+          chests:
+            annual.content
+              .seasonalChests
+              .map(chest => ({
+                id:
+                  chest.id,
+                originSeasonId:
+                  chest.originSeasonId ??
+                  getSeasonalChestOriginSeasonId(
+                    chest.id
+                  ),
+                latestSeasonId:
+                  annual.content.id,
+                order:
+                  chest.order,
+                name:
+                  chest.name,
+                description:
+                  chest.description,
+                createdAt:
+                  chest.createdAt,
+                updatedAt:
+                  chest.updatedAt
+              })),
+          updatedAt:
+            annual.content.updatedAt
+        },
+        normalizedMonth
+      );
+
+    if (!catalog) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_CHEST_CATALOG"
+      };
+    }
+
+    return {
+      ok: true,
+      source:
+        "annual_fallback",
+      catalog
+    };
+  }
+
+  return {
+    ok: true,
+    source:
+      "empty",
+    catalog:
+      normalizeSeasonalChestMonthCatalog(
+        {
+          month:
+            normalizedMonth,
+          chests: [],
+          updatedAt: 0
+        },
+        normalizedMonth
+      )
+  };
+}
+
+
+function mergeInheritedSeasonalChests(
+  content,
+  catalog
+) {
+  if (
+    !content ||
+    !catalog
+  ) {
+    return content;
+  }
+
+  const currentYear =
+    Number(content.year);
+
+  const currentSeasonId =
+    content.id;
+
+  const byId =
+    new Map(
+      content.seasonalChests.map(
+        chest => [
+          chest.id,
+          chest
+        ]
+      )
+    );
+
+  const merged =
+    [
+      ...content.seasonalChests
+    ];
+
+  for (
+    const definition of
+      catalog.chests
+  ) {
+    const originYear =
+      Number(
+        definition
+          .originSeasonId
+          .split("-")[0]
+      );
+
+    if (
+      originYear >
+        currentYear ||
+      byId.has(
+        definition.id
+      )
+    ) {
+      continue;
+    }
+
+    merged.push({
+      id:
+        definition.id,
+      originSeasonId:
+        definition.originSeasonId,
+      seasonId:
+        currentSeasonId,
+      order:
+        definition.order,
+      name:
+        definition.name,
+      description:
+        definition.description,
+      poolRevision: null,
+      createdAt:
+        definition.createdAt,
+      updatedAt:
+        definition.updatedAt,
+      inherited:
+        true
+    });
+  }
+
+  return {
+    ...content,
+    seasonalChests:
+      merged.sort(
+        (left, right) =>
+          left.order -
+          right.order
+      )
+  };
+}
+
+
+function buildSeasonalChestMonthCatalog(
+  existingCatalog,
+  annualChests,
+  seasonId,
+  month,
+  now
+) {
+  const normalizedMonth =
+    normalizeSeasonMonth(
+      month
+    );
+
+  const currentYear =
+    Number(
+      String(seasonId)
+        .split("-")[0]
+    );
+
+  if (
+    !normalizedMonth ||
+    !Number.isSafeInteger(
+      currentYear
+    )
+  ) {
+    return {
+      ok: false,
+      error:
+        "INVALID_SEASONAL_CHEST_CATALOG"
+    };
+  }
+
+  const byId =
+    new Map(
+      (
+        existingCatalog?.chests ??
+        []
+      ).map(
+        chest => [
+          chest.id,
+          {
+            ...chest
+          }
+        ]
+      )
+    );
+
+  for (
+    const chest of
+      annualChests
+  ) {
+    const originSeasonId =
+      chest.originSeasonId ??
+      getSeasonalChestOriginSeasonId(
+        chest.id
+      );
+
+    if (
+      !originSeasonId ||
+      !isSeasonalChestIdAllowedForSeason(
+        chest.id,
+        seasonId
+      )
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_CHEST_CATALOG_IDENTITY"
+      };
+    }
+
+    const existing =
+      byId.get(
+        chest.id
+      );
+
+    if (existing) {
+      if (
+        existing.order !==
+          chest.order ||
+        existing.originSeasonId !==
+          originSeasonId
+      ) {
+        return {
+          ok: false,
+          error:
+            "SEASONAL_CHEST_CATALOG_IDENTITY_IMMUTABLE"
+        };
+      }
+
+      const latestYear =
+        Number(
+          String(
+            existing.latestSeasonId ??
+            existing.originSeasonId
+          )
+            .split("-")[0]
+        );
+
+      if (
+        currentYear >=
+          latestYear
+      ) {
+        byId.set(
+          chest.id,
+          {
+            ...existing,
+            latestSeasonId:
+              seasonId,
+            name:
+              chest.name,
+            description:
+              chest.description,
+            createdAt:
+              existing.createdAt ||
+              chest.createdAt ||
+              now,
+            updatedAt:
+              now
+          }
+        );
+      }
+
+      continue;
+    }
+
+    byId.set(
+      chest.id,
+      {
+        id:
+          chest.id,
+        originSeasonId,
+        latestSeasonId:
+          seasonId,
+        order:
+          chest.order,
+        name:
+          chest.name,
+        description:
+          chest.description,
+        createdAt:
+          chest.createdAt ||
+          now,
+        updatedAt:
+          now
+      }
+    );
+  }
+
+  const catalog =
+    normalizeSeasonalChestMonthCatalog(
+      {
+        version:
+          PVP_SEASONAL_CHEST_MONTH_CATALOG_VERSION,
+        month:
+          normalizedMonth,
+        chests:
+          [
+            ...byId.values()
+          ],
+        updatedAt:
+          now
+      },
+      normalizedMonth
+    );
+
+  if (!catalog) {
+    return {
+      ok: false,
+      error:
+        "SEASONAL_CHEST_CATALOG_CONFLICT"
+    };
+  }
+
+  return {
+    ok: true,
+    catalog
+  };
+}
+
+
+export async function readPvpSeasonMonthContent(
+  storage,
+  year,
+  month
+) {
+  const annual =
+    await readStoredPvpSeasonMonthContent(
+      storage,
+      year,
+      month
+    );
+
+  if (!annual.ok) {
+    return annual;
+  }
+
+  const catalogResult =
+    await readSeasonalChestMonthCatalog(
+      storage,
+      month,
+      year
+    );
+
+  if (!catalogResult.ok) {
+    return catalogResult;
+  }
+
+  return {
+    ok: true,
+    content:
+      mergeInheritedSeasonalChests(
+        annual.content,
+        catalogResult.catalog
+      ),
+    seasonalChestCatalogSource:
+      catalogResult.source
   };
 }
 
@@ -1433,7 +2180,8 @@ function reconcileSeasonalChests(
   ) {
     const id =
       normalizeSeasonalChestId(
-        raw?.id
+        raw?.id,
+        seasonId
       );
 
     const order =
@@ -1498,8 +2246,46 @@ function reconcileSeasonalChests(
         };
       }
 
+      /*
+       * Baú herdado de um ano anterior:
+       * a identidade já existe no catálogo mensal, mas
+       * ainda não possui revisão de pool neste ano.
+       * O primeiro save anual publica o mesmo ID na
+       * revisão atual.
+       */
+      if (
+        !existing.poolRevision
+      ) {
+        reconciled.push({
+          id,
+          originSeasonId:
+            existing.originSeasonId ??
+            getSeasonalChestOriginSeasonId(
+              id
+            ),
+          seasonId,
+          order,
+          name,
+          description,
+          poolRevision:
+            nextRevision,
+          createdAt:
+            existing.createdAt ||
+            now,
+          updatedAt:
+            now
+        });
+
+        continue;
+      }
+
       reconciled.push({
         ...existing,
+        originSeasonId:
+          existing.originSeasonId ??
+          getSeasonalChestOriginSeasonId(
+            id
+          ),
         name,
         description,
         updatedAt:
@@ -1522,6 +2308,10 @@ function reconcileSeasonalChests(
 
     reconciled.push({
       id,
+      originSeasonId:
+        getSeasonalChestOriginSeasonId(
+          id
+        ),
       seasonId,
       order,
       name,
@@ -1716,6 +2506,30 @@ export async function savePvpSeasonMonthContent(
     };
   }
 
+  const catalogResult =
+    await readSeasonalChestMonthCatalog(
+      storage,
+      month,
+      year
+    );
+
+  if (!catalogResult.ok) {
+    return catalogResult;
+  }
+
+  const nextCatalog =
+    buildSeasonalChestMonthCatalog(
+      catalogResult.catalog,
+      content.seasonalChests,
+      seasonId,
+      month,
+      now
+    );
+
+  if (!nextCatalog.ok) {
+    return nextCatalog;
+  }
+
   const key =
     getPvpSeasonContentStorageKey(
       year,
@@ -1729,9 +2543,15 @@ export async function savePvpSeasonMonthContent(
       nextRevision
     );
 
+  const catalogKey =
+    getPvpSeasonalChestMonthCatalogStorageKey(
+      month
+    );
+
   if (
     !key ||
-    !revisionKey
+    !revisionKey ||
+    !catalogKey
   ) {
     return {
       ok: false,
@@ -1754,6 +2574,11 @@ export async function savePvpSeasonMonthContent(
     await storage.put(
       key,
       content
+    );
+
+    await storage.put(
+      catalogKey,
+      nextCatalog.catalog
     );
   }
   catch {

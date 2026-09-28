@@ -117,7 +117,7 @@ assert.equal(
 
 assert.equal(
   saved.content.version,
-  4
+  5
 );
 
 assert.equal(

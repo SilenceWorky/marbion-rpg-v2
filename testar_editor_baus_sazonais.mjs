@@ -54,7 +54,7 @@ const legacy =
 
 assert.equal(
   legacy.version,
-  4
+  5
 );
 
 assert.equal(
