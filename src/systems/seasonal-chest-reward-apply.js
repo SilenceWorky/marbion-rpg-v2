@@ -35,6 +35,10 @@ import {
   grantCosmetic
 } from "./cosmetic-collection.js";
 
+import {
+  grantRelic
+} from "./relic-collection.js";
+
 
 function validateResolvedReward(
   reward
@@ -232,6 +236,68 @@ function validateResolvedReward(
 
   if (
     reward.type ===
+      "seasonal_relic"
+  ) {
+    if (
+      !reward.relic ||
+      typeof reward.relic !==
+        "object" ||
+      Array.isArray(
+        reward.relic
+      ) ||
+      !String(
+        reward.relic.id ?? ""
+      ).trim() ||
+      !String(
+        reward.relic.name ?? ""
+      ).trim()
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_RELIC_REWARD"
+      };
+    }
+
+    return {
+      ok: true,
+      applicable: true
+    };
+  }
+
+  if (
+    reward.type ===
+      "seasonal_relic"
+  ) {
+    if (
+      !reward.relic ||
+      typeof reward.relic !==
+        "object" ||
+      Array.isArray(
+        reward.relic
+      ) ||
+      !String(
+        reward.relic.id ?? ""
+      ).trim() ||
+      !String(
+        reward.relic.name ?? ""
+      ).trim()
+    ) {
+      return {
+        ok: false,
+        error:
+          "INVALID_SEASONAL_RELIC_REWARD"
+      };
+    }
+
+    return {
+      ok: true,
+      applicable: true
+    };
+  }
+
+  if (
+    reward.type ===
       "seasonal_skill"
   ) {
     if (
@@ -391,6 +457,7 @@ export function applyResolvedSeasonalChestRewards(
   const pvpFinisherRewards = [];
   const victoryMessageRewards = [];
   const cosmeticRewards = [];
+  const relicRewards = [];
 
   for (
     let index = 0;
@@ -668,6 +735,130 @@ export function applyResolvedSeasonalChestRewards(
     }
     else if (
       reward.type ===
+        "seasonal_relic"
+    ) {
+      if (
+        reward.seasonId !==
+          pendingOpen.seasonId ||
+        reward.seasonalChestId !==
+          pendingOpen.seasonalChestId ||
+        Number(reward.chestOrder) !==
+          Number(pendingOpen.chestOrder) ||
+        Number(reward.poolRevision) !==
+          Number(pendingOpen.poolRevision)
+      ) {
+        return {
+          ok: false,
+          error:
+            "SEASONAL_RELIC_REWARD_IDENTITY_MISMATCH"
+        };
+      }
+
+      const delivered =
+        grantRelic(
+          profile,
+          {
+            seasonId:
+              pendingOpen.seasonId,
+            relicId:
+              reward.relic.id,
+            name:
+              reward.relic.name,
+            description:
+              reward.relic.description,
+            lore:
+              reward.relic.lore,
+            source:
+              "seasonal_chest",
+            seasonalChestId:
+              pendingOpen.seasonalChestId,
+            chestOrder:
+              pendingOpen.chestOrder,
+            poolRevision:
+              pendingOpen.poolRevision,
+            acquiredAt:
+              pendingOpen.createdAt
+          }
+        );
+
+      if (!delivered.ok) {
+        return delivered;
+      }
+
+      relicRewards.push({
+        index,
+        duplicate:
+          delivered.duplicate === true,
+        relic:
+          structuredClone(
+            delivered.relic
+          )
+      });
+    }
+    else if (
+      reward.type ===
+        "seasonal_relic"
+    ) {
+      if (
+        reward.seasonId !==
+          pendingOpen.seasonId ||
+        reward.seasonalChestId !==
+          pendingOpen.seasonalChestId ||
+        Number(reward.chestOrder) !==
+          Number(pendingOpen.chestOrder) ||
+        Number(reward.poolRevision) !==
+          Number(pendingOpen.poolRevision)
+      ) {
+        return {
+          ok: false,
+          error:
+            "SEASONAL_RELIC_REWARD_IDENTITY_MISMATCH"
+        };
+      }
+
+      const delivered =
+        grantRelic(
+          profile,
+          {
+            seasonId:
+              pendingOpen.seasonId,
+            relicId:
+              reward.relic.id,
+            name:
+              reward.relic.name,
+            description:
+              reward.relic.description,
+            lore:
+              reward.relic.lore,
+            source:
+              "seasonal_chest",
+            seasonalChestId:
+              pendingOpen.seasonalChestId,
+            chestOrder:
+              pendingOpen.chestOrder,
+            poolRevision:
+              pendingOpen.poolRevision,
+            acquiredAt:
+              pendingOpen.createdAt
+          }
+        );
+
+      if (!delivered.ok) {
+        return delivered;
+      }
+
+      relicRewards.push({
+        index,
+        duplicate:
+          delivered.duplicate === true,
+        relic:
+          structuredClone(
+            delivered.relic
+          )
+      });
+    }
+    else if (
+      reward.type ===
         "seasonal_skill"
     ) {
       const learnedSkill = {
@@ -769,6 +960,7 @@ export function applyResolvedSeasonalChestRewards(
     abilityRewards,
     pvpFinisherRewards,
     victoryMessageRewards,
-    cosmeticRewards
+    cosmeticRewards,
+    relicRewards
   };
 }
