@@ -35,7 +35,7 @@ const chest2 = {
 };
 
 const content = {
-  version: 6,
+  version: 7,
   id: "2026-12",
   year: 2026,
   month: 12,

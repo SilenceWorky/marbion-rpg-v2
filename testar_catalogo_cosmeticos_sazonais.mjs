@@ -214,7 +214,7 @@ const stored =
   );
 
 assert.ok(stored);
-assert.equal(stored.version, 6);
+assert.equal(stored.version, 7);
 assert.equal(
   stored.seasonalCosmetics.length,
   2

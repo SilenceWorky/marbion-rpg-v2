@@ -969,6 +969,164 @@ export function normalizeSeasonalCosmetics(
 }
 
 
+export function normalizeSeasonalRelics(
+  value,
+  seasonalChests = null
+) {
+  if (value === undefined) {
+    return {
+      ok: true,
+      value: undefined
+    };
+  }
+
+  if (!Array.isArray(value)) {
+    return {
+      ok: false,
+      error: "INVALID_SEASONAL_RELICS"
+    };
+  }
+
+  const relics = [];
+  const ids = new Set();
+
+  for (
+    const raw of value.slice(0, 100)
+  ) {
+    if (
+      !raw ||
+      typeof raw !== "object" ||
+      Array.isArray(raw)
+    ) {
+      return {
+        ok: false,
+        error: "INVALID_SEASONAL_RELIC"
+      };
+    }
+
+    const name =
+      String(
+        raw.name ?? ""
+      ).trim();
+
+    const description =
+      String(
+        raw.description ?? ""
+      ).trim();
+
+    const lore =
+      String(
+        raw.lore ?? ""
+      ).trim();
+
+    const introducedInSeasonalChestId =
+      normalizeSeasonalChestId(
+        raw.introducedInSeasonalChestId
+      );
+
+    const introducedInSeasonalChestOrder =
+      Number(
+        raw.introducedInSeasonalChestOrder
+      );
+
+    if (
+      !name ||
+      !introducedInSeasonalChestId ||
+      !Number.isSafeInteger(
+        introducedInSeasonalChestOrder
+      ) ||
+      introducedInSeasonalChestOrder < 1
+    ) {
+      return {
+        ok: false,
+        error: "INVALID_SEASONAL_RELIC",
+        value: raw
+      };
+    }
+
+    if (
+      Array.isArray(seasonalChests)
+    ) {
+      const chest =
+        seasonalChests.find(
+          entry =>
+            entry.id ===
+            introducedInSeasonalChestId
+        );
+
+      if (
+        !chest ||
+        chest.order !==
+          introducedInSeasonalChestOrder
+      ) {
+        return {
+          ok: false,
+          error: "INVALID_SEASONAL_RELIC_CHEST",
+          value: raw
+        };
+      }
+    }
+
+    const rawId =
+      String(
+        raw.id ?? ""
+      ).trim();
+
+    const id =
+      rawId ||
+      [
+        "seasonal-relic",
+        name,
+        relics.length + 1
+      ]
+        .join(":")
+        .normalize("NFD")
+        .replace(
+          /[\u0300-\u036f]/g,
+          ""
+        )
+        .replace(
+          /[^a-zA-Z0-9:_-]+/g,
+          "_"
+        )
+        .toLowerCase();
+
+    const normalizedId =
+      id.slice(0, 160);
+
+    if (ids.has(normalizedId)) {
+      return {
+        ok: false,
+        error: "DUPLICATE_SEASONAL_RELIC_ID",
+        value: normalizedId
+      };
+    }
+
+    ids.add(normalizedId);
+
+    relics.push({
+      id: normalizedId,
+      name: name.slice(0, 120),
+      description:
+        description
+          ? description.slice(0, 1200)
+          : null,
+      lore:
+        lore
+          ? lore.slice(0, 4000)
+          : null,
+      introducedInSeasonalChestId,
+      introducedInSeasonalChestOrder
+    });
+  }
+
+  return {
+    ok: true,
+    value: relics
+  };
+}
+
+
 export function normalizeSeasonalSkills(
   value,
   allowedElements,
@@ -1509,6 +1667,19 @@ export async function adminSeasonsApiRoute(
       );
     }
 
+    const relics =
+      normalizeSeasonalRelics(
+        input.seasonalRelics,
+        chests.value ?? null
+      );
+
+    if (!relics.ok) {
+      return Response.json(
+        relics,
+        { status: 400 }
+      );
+    }
+
     let definition = null;
 
     const requestedName =
@@ -1635,6 +1806,13 @@ export async function adminSeasonsApiRoute(
               : {
                   seasonalCosmetics:
                     cosmetics.value
+                }),
+            ...(relics.value ===
+              undefined
+              ? {}
+              : {
+                  seasonalRelics:
+                    relics.value
                 })
           }
         }
