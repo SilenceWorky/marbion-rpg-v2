@@ -199,3 +199,90 @@ Também ler:
 `docs/checkpoint-bau-sazonal-2026-09-27.md`
 
 Esse arquivo contém as regras canônicas detalhadas e o histórico de implementação específico do Baú Sazonal.
+
+## Cosméticos Sazonais — tipo/slot canônico (27/09/2026)
+
+Implementação concluída no commit `0f2475f` (`feat: adiciona tipos aos cosmeticos sazonais`).
+
+O catálogo `seasonalCosmetics` passou a armazenar também:
+
+```txt
+slot
+```
+
+A taxonomia é a mesma já usada pelo Passe de Temporada. Não existe uma segunda classificação paralela.
+
+Slots canônicos:
+
+- `hair` — Cabelo;
+- `accessory` — Acessório (chapéu, óculos, cachecol etc.);
+- `top` — Parte de cima (camisa, casaco etc.);
+- `bottom` — Parte de baixo (calça, short, saia etc.);
+- `shoes` — Calçado (bota, tênis etc.).
+
+Fonte canônica:
+`src/config/cosmetic-slots.js`.
+
+Ela expõe:
+- `SEASON_COSMETIC_SLOT_DEFINITIONS`;
+- `SEASON_COSMETIC_SLOTS`;
+- `normalizeSeasonCosmeticSlot()`;
+- `getSeasonCosmeticSlotDefinition()`.
+
+O endpoint administrativo de Temporadas agora devolve `cosmeticSlots` com ID e rótulo para a Platform consumir diretamente.
+
+### Persistência e compatibilidade
+
+O schema anual do conteúdo de temporada passou para `PVP_SEASON_CONTENT_VERSION = 6`.
+
+Novos cosméticos enviados pelo editor precisam possuir um slot canônico válido.
+
+Dados históricos já persistidos antes desta mudança, sem `slot`, continuam legíveis:
+- o storage normaliza esses registros com `slot: null`;
+- nenhuma categoria é inventada automaticamente;
+- quando forem editados/salvos pela interface nova, o ADM precisará escolher explicitamente o tipo.
+
+### Fluxo de recompensa
+
+O `slot` é preservado em todo o fluxo:
+
+```txt
+seasonalCosmetics
+→ resolver do Baú Sazonal
+→ rewardPlan congelado
+→ aplicação da recompensa
+→ profile.cosmetics.owned[]
+```
+
+A coleção do jogador passa a armazenar `slot` junto de `seasonId`, `cosmeticId`, nome e metadados de aquisição.
+
+A coleção continua inerte na v1.0:
+- nenhum sistema de equipar foi criado;
+- nenhum visual/preview foi criado;
+- o slot serve como classificação canônica e preparação para o sistema futuro de equipamento/aparência.
+
+`grantCosmetic()` aceita registros legados sem slot, mas rejeita um slot não vazio que não pertença à taxonomia canônica.
+
+### Testes
+
+Novo teste:
+`testar_slots_cosmeticos.mjs`.
+
+Também foram atualizados:
+- `testar_catalogo_cosmeticos_sazonais.mjs`;
+- `testar_colecao_cosmeticos.mjs`;
+- `testar_cosmetico_bau_sazonal.mjs`;
+- `testar_aplicacao_cosmetico_bau_sazonal.mjs`;
+- `testar_rota_cosmetico_bau_sazonal.mjs`.
+
+Validado:
+- os cinco slots canônicos coincidem com os slots usados no Passe;
+- `hat` e outros valores fora da taxonomia são recusados;
+- cosmético histórico sem slot continua legível como `null`;
+- rename preserva ID e slot;
+- o resolver preserva slot;
+- a aplicação grava slot na coleção;
+- a rota real de abertura do baú mantém o slot no plano e no perfil;
+- catálogo do Passe e `!baú abrir` continuaram passando.
+
+Nenhum deploy de produção foi executado.
