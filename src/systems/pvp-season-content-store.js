@@ -17,8 +17,12 @@ import {
   getSeasonalChestRewardBindingSlot
 } from "../config/seasonal-chest-reward-bindings.js";
 
+import {
+  normalizeSeasonCosmeticSlot
+} from "../config/cosmetic-slots.js";
 
-export const PVP_SEASON_CONTENT_VERSION = 5;
+
+export const PVP_SEASON_CONTENT_VERSION = 6;
 
 export const PVP_SEASON_CONTENT_STORAGE_PREFIX =
   "pvp_season_content:";
@@ -656,6 +660,11 @@ function normalizeSeasonalCosmetic(
       120
     );
 
+  const slot =
+    normalizeSeasonCosmeticSlot(
+      value.slot
+    );
+
   const rawId =
     normalizeText(
       value.id,
@@ -702,6 +711,7 @@ function normalizeSeasonalCosmetic(
   return {
     id,
     name,
+    slot,
     introducedInSeasonalChestId,
     introducedInSeasonalChestOrder
   };

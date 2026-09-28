@@ -31,6 +31,7 @@ const first =
       seasonId: "2026-12",
       cosmeticId: "natal:cachecol",
       name: "Cachecol Congelado",
+      slot: "accessory",
       source: "seasonal_chest",
       seasonalChestId:
         "seasonal:2026-12:chest:cosmetic01",
@@ -54,6 +55,10 @@ assert.equal(
 assert.equal(
   profile.cosmetics.owned[0].name,
   "Cachecol Congelado"
+);
+assert.equal(
+  profile.cosmetics.owned[0].slot,
+  "accessory"
 );
 assert.equal(
   profile.cosmetics.owned[0]
@@ -202,6 +207,36 @@ assert.equal(
   preserved.cosmetics.owned[0]
     .cosmeticId,
   "natal:cachecol"
+);
+
+const invalidSlotProfile =
+  createBaseProfile(
+    "slot-invalido"
+  );
+
+const invalidSlot =
+  grantCosmetic(
+    invalidSlotProfile,
+    {
+      seasonId: "2026-12",
+      cosmeticId: "natal:invalido",
+      name: "Inválido",
+      slot: "hat"
+    }
+  );
+
+assert.equal(
+  invalidSlot.ok,
+  false
+);
+assert.equal(
+  invalidSlot.error,
+  "INVALID_COSMETIC"
+);
+assert.equal(
+  invalidSlotProfile.cosmetics
+    .owned.length,
+  0
 );
 
 console.log(

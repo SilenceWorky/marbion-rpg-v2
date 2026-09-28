@@ -58,6 +58,7 @@ created.chest.metadata
           cosmetic: {
             id: "natal:bota",
             name: "Bota Invernal",
+            slot: "shoes",
             introducedInSeasonalChestId:
               "seasonal:2026-12:chest:cosmetic01",
             introducedInSeasonalChestOrder:
@@ -125,6 +126,10 @@ assert.equal(
 assert.equal(
   profile.cosmetics.owned[0].name,
   "Bota Invernal"
+);
+assert.equal(
+  profile.cosmetics.owned[0].slot,
+  "shoes"
 );
 assert.equal(
   profile.cosmetics.owned[0]

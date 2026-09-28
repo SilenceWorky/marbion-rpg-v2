@@ -1,3 +1,8 @@
+import {
+  normalizeSeasonCosmeticSlot
+} from "../config/cosmetic-slots.js";
+
+
 function normalizeText(value) {
   return String(value ?? "").trim();
 }
@@ -113,6 +118,7 @@ export function grantCosmetic(
     seasonId = null,
     cosmeticId,
     name,
+    slot = null,
     source = "unknown",
     seasonalChestId = null,
     chestOrder = null,
@@ -132,10 +138,18 @@ export function grantCosmetic(
     normalizeText(cosmeticId);
   const normalizedName =
     normalizeText(name);
+  const normalizedSlot =
+    normalizeSeasonCosmeticSlot(
+      slot
+    );
 
   if (
     !normalizedCosmeticId ||
-    !normalizedName
+    !normalizedName ||
+    (
+      normalizeText(slot) &&
+      !normalizedSlot
+    )
   ) {
     return {
       ok: false,
@@ -164,6 +178,7 @@ export function grantCosmetic(
     seasonId: normalizedSeasonId,
     cosmeticId: normalizedCosmeticId,
     name: normalizedName,
+    slot: normalizedSlot,
     source:
       normalizeText(source) ||
       "unknown",

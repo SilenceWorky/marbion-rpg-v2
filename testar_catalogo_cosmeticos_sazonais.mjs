@@ -58,6 +58,7 @@ const normalized =
       {
         id: "natal:cachecol",
         name: "Cachecol Congelado",
+        slot: "accessory",
         introducedInSeasonalChestId:
           chests[0].id,
         introducedInSeasonalChestOrder: 1
@@ -65,6 +66,7 @@ const normalized =
       {
         id: "natal:bota",
         name: "Bota Invernal",
+        slot: "shoes",
         introducedInSeasonalChestId:
           chests[1].id,
         introducedInSeasonalChestOrder: 2
@@ -84,6 +86,14 @@ assert.equal(
     .introducedInSeasonalChestOrder,
   2
 );
+assert.equal(
+  normalized.value[0].slot,
+  "accessory"
+);
+assert.equal(
+  normalized.value[1].slot,
+  "shoes"
+);
 
 
 const generated =
@@ -91,6 +101,7 @@ const generated =
     [
       {
         name: "Chapéu de Neve",
+        slot: "accessory",
         introducedInSeasonalChestId:
           chests[0].id,
         introducedInSeasonalChestOrder: 1
@@ -104,12 +115,42 @@ assert.equal(
   generated.value[0].id,
   "seasonal-cosmetic:chapeu_de_neve:1"
 );
+assert.equal(
+  generated.value[0].slot,
+  "accessory"
+);
+
+const invalidSlot =
+  normalizeSeasonalCosmetics(
+    [
+      {
+        id: "natal:slot-invalido",
+        name: "Cosmético inválido",
+        slot: "hat",
+        introducedInSeasonalChestId:
+          chests[0].id,
+        introducedInSeasonalChestOrder: 1
+      }
+    ],
+    chests
+  );
+
+assert.equal(
+  invalidSlot.ok,
+  false
+);
+assert.equal(
+  invalidSlot.error,
+  "INVALID_SEASONAL_COSMETIC"
+);
+
 const wrongChest =
   normalizeSeasonalCosmetics(
     [
       {
         id: "natal:erro",
         name: "Erro",
+        slot: "hair",
         introducedInSeasonalChestId:
           chests[0].id,
         introducedInSeasonalChestOrder: 2
@@ -131,6 +172,7 @@ const duplicate =
       {
         id: "natal:igual",
         name: "Primeiro",
+        slot: "top",
         introducedInSeasonalChestId:
           chests[0].id,
         introducedInSeasonalChestOrder: 1
@@ -138,6 +180,7 @@ const duplicate =
       {
         id: "natal:igual",
         name: "Segundo",
+        slot: "bottom",
         introducedInSeasonalChestId:
           chests[1].id,
         introducedInSeasonalChestOrder: 2
@@ -171,7 +214,7 @@ const stored =
   );
 
 assert.ok(stored);
-assert.equal(stored.version, 5);
+assert.equal(stored.version, 6);
 assert.equal(
   stored.seasonalCosmetics.length,
   2
@@ -180,6 +223,38 @@ assert.equal(
   stored.seasonalCosmetics[0]
     .introducedInSeasonalChestOrder,
   1
+);
+
+
+const legacyStored =
+  normalizePvpSeasonContent(
+    {
+      id: "2026-12",
+      year: 2026,
+      month: 12,
+      revision: 1,
+      featuredElements: [],
+      seasonalChests: chests,
+      seasonalCosmetics: [
+        {
+          id: "natal:legado",
+          name: "Cosmético legado",
+          introducedInSeasonalChestId:
+            chests[0].id,
+          introducedInSeasonalChestOrder: 1
+        }
+      ]
+    }
+  );
+
+assert.ok(
+  legacyStored,
+  "conteúdo histórico sem slot deve continuar legível"
+);
+assert.equal(
+  legacyStored.seasonalCosmetics[0]
+    .slot,
+  null
 );
 
 
@@ -244,6 +319,7 @@ const firstSave =
         {
           id: "natal:cachecol",
           name: "Cachecol Congelado",
+          slot: "accessory",
           introducedInSeasonalChestId:
             chests[0].id,
           introducedInSeasonalChestOrder: 1
@@ -266,6 +342,7 @@ const secondSave =
         {
           id: "natal:cachecol",
           name: "Cachecol Congelado Renomeado",
+          slot: "accessory",
           introducedInSeasonalChestId:
             chests[0].id,
           introducedInSeasonalChestOrder: 1
@@ -273,6 +350,7 @@ const secondSave =
         {
           id: "natal:bota",
           name: "Bota Invernal",
+          slot: "shoes",
           introducedInSeasonalChestId:
             chests[1].id,
           introducedInSeasonalChestOrder: 2
@@ -293,6 +371,11 @@ assert.equal(
   secondSave.content
     .seasonalCosmetics[0].name,
   "Cachecol Congelado Renomeado"
+);
+assert.equal(
+  secondSave.content
+    .seasonalCosmetics[0].slot,
+  "accessory"
 );
 const historical =
   await readPvpSeasonContentRevision(
@@ -318,6 +401,12 @@ assert.equal(
     .seasonalCosmetics[0].name,
   "Cachecol Congelado",
   "a revisão histórica não pode ser alterada pelo rename posterior"
+);
+assert.equal(
+  historical.content
+    .seasonalCosmetics[0].slot,
+  "accessory",
+  "a revisão histórica deve preservar também o tipo do cosmético"
 );
 
 

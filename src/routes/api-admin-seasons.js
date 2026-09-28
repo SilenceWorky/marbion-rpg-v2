@@ -21,6 +21,11 @@ import {
 } from "../config/skill-rarities.js";
 
 import {
+  SEASON_COSMETIC_SLOT_DEFINITIONS,
+  normalizeSeasonCosmeticSlot
+} from "../config/cosmetic-slots.js";
+
+import {
   SEASON_PASS_MAX_TIER,
   SEASON_PASS_TOTAL_XP,
   SEASON_PASS_POST_REWARD_XP,
@@ -857,6 +862,11 @@ export function normalizeSeasonalCosmetics(
         raw.name ?? ""
       ).trim();
 
+    const slot =
+      normalizeSeasonCosmeticSlot(
+        raw.slot
+      );
+
     const introducedInSeasonalChestId =
       normalizeSeasonalChestId(
         raw.introducedInSeasonalChestId
@@ -869,6 +879,7 @@ export function normalizeSeasonalCosmetics(
 
     if (
       !name ||
+      !slot ||
       !introducedInSeasonalChestId ||
       !Number.isSafeInteger(
         introducedInSeasonalChestOrder
@@ -945,6 +956,7 @@ export function normalizeSeasonalCosmetics(
     cosmetics.push({
       id: normalizedId,
       name: name.slice(0, 120),
+      slot,
       introducedInSeasonalChestId,
       introducedInSeasonalChestOrder
     });
@@ -1660,6 +1672,8 @@ export async function adminSeasonsApiRoute(
         Object.values(
           SKILL_RARITIES
         ),
+      cosmeticSlots:
+        SEASON_COSMETIC_SLOT_DEFINITIONS,
       definition,
       content:
         saved.content
@@ -1743,6 +1757,8 @@ export async function adminSeasonsApiRoute(
       Object.values(
         SKILL_RARITIES
       ),
+    cosmeticSlots:
+      SEASON_COSMETIC_SLOT_DEFINITIONS,
     pass:
       buildPassCatalog()
   });

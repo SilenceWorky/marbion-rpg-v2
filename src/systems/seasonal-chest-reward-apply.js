@@ -637,6 +637,8 @@ export function applyResolvedSeasonalChestRewards(
               reward.cosmetic.id,
             name:
               reward.cosmetic.name,
+            slot:
+              reward.cosmetic.slot,
             source:
               "seasonal_chest",
             seasonalChestId:

@@ -1,4 +1,8 @@
 import {
+  normalizeSeasonCosmeticSlot
+} from "../config/cosmetic-slots.js";
+
+import {
   getCosmeticCollection
 } from "./cosmetic-collection.js";
 
@@ -21,6 +25,12 @@ function normalizeCosmetic(value) {
     normalizeText(value.id);
   const name =
     normalizeText(value.name);
+  const rawSlot =
+    normalizeText(value.slot);
+  const slot =
+    normalizeSeasonCosmeticSlot(
+      value.slot
+    );
   const introducedInSeasonalChestId =
     normalizeText(
       value.introducedInSeasonalChestId
@@ -33,6 +43,10 @@ function normalizeCosmetic(value) {
   if (
     !id ||
     !name ||
+    (
+      rawSlot &&
+      !slot
+    ) ||
     !introducedInSeasonalChestId ||
     !Number.isSafeInteger(
       introducedInSeasonalChestOrder
@@ -45,6 +59,7 @@ function normalizeCosmetic(value) {
   return {
     id,
     name,
+    slot,
     introducedInSeasonalChestId,
     introducedInSeasonalChestOrder
   };

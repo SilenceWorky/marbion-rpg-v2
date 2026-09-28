@@ -35,7 +35,7 @@ const chest2 = {
 };
 
 const content = {
-  version: 5,
+  version: 6,
   id: "2026-12",
   year: 2026,
   month: 12,
@@ -49,6 +49,7 @@ const content = {
     {
       id: "natal:cachecol",
       name: "Cachecol Congelado",
+      slot: "accessory",
       introducedInSeasonalChestId:
         chest1.id,
       introducedInSeasonalChestOrder: 1
@@ -56,6 +57,7 @@ const content = {
     {
       id: "natal:bota",
       name: "Bota Invernal",
+      slot: "shoes",
       introducedInSeasonalChestId:
         chest2.id,
       introducedInSeasonalChestOrder: 2
@@ -129,6 +131,12 @@ assert.equal(
     .rewardPlan.rewards[0]
     .cosmetic.id,
   "natal:cachecol"
+);
+assert.equal(
+  resolvedChest1.pendingOpen
+    .rewardPlan.rewards[0]
+    .cosmetic.slot,
+  "accessory"
 );
 
 assert.equal(

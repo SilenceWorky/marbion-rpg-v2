@@ -171,6 +171,7 @@ const seasonContent = {
         "natal:cachecol",
       name:
         "Cachecol Congelado",
+      slot: "accessory",
       introducedInSeasonalChestId:
         "seasonal:2026-12:chest:firstcos",
       introducedInSeasonalChestOrder:
@@ -181,6 +182,7 @@ const seasonContent = {
         "natal:bota",
       name:
         "Bota Invernal",
+      slot: "shoes",
       introducedInSeasonalChestId:
         chestDefinition.id,
       introducedInSeasonalChestOrder:
@@ -251,6 +253,11 @@ assert.equal(
     .name,
   "Bota Invernal"
 );
+assert.equal(
+  stored.cosmetics.owned[0]
+    .slot,
+  "shoes"
+);
 
 assert.equal(
   stored.cosmetics.owned[0]
@@ -297,6 +304,11 @@ assert.equal(
   pending.rewardPlan
     .rewards[1].cosmetic.id,
   "natal:bota"
+);
+assert.equal(
+  pending.rewardPlan
+    .rewards[1].cosmetic.slot,
+  "shoes"
 );
 
 assert.deepEqual(
