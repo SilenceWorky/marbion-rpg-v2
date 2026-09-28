@@ -286,3 +286,60 @@ Validado:
 - catálogo do Passe e `!baú abrir` continuaram passando.
 
 Nenhum deploy de produção foi executado.
+
+## Relíquias Sazonais — implementação completa do fluxo do Baú (28/09/2026)
+
+A última categoria pendente do pool especial foi implementada de forma incremental, mantendo o RPG Worker como fonte de verdade.
+
+Regras preservadas:
+- peso do pool: 10% (`seasonal_relic`);
+- relíquia é colecionável permanente de temporada/lore;
+- não é consumível nem peça de roupa;
+- pode armazenar nome, descrição e lore;
+- não concede vantagem de combate por padrão;
+- identidade permanente por `seasonId + relicId`;
+- progressão cumulativa pelo Baú Sazonal de introdução;
+- enquanto existir relíquia elegível ainda não possuída, não há duplicata;
+- coleção completa da categoria/temporada converte a recompensa em 1 Platina;
+- retry reutiliza o plano congelado e não duplica/rerrola a recompensa.
+
+Implementação:
+- `9e02e20 feat: adiciona colecao de reliquias sazonais`
+  - cria `profile.relics.owned[]`;
+  - cria `src/systems/relic-collection.js`;
+  - coleção preserva `seasonId`, `relicId`, nome, descrição, lore, origem, data e metadados do Baú;
+- `2d91c41 feat: adiciona catalogo sazonal de reliquias`
+  - adiciona `seasonalRelics` ao conteúdo versionado de temporada;
+  - conteúdo passa para `PVP_SEASON_CONTENT_VERSION = 7`;
+  - API administrativa aceita/salva `id`, `name`, `description`, `lore`, `introducedInSeasonalChestId` e `introducedInSeasonalChestOrder`;
+  - rename/edição de lore preserva o ID permanente e revisões históricas;
+- `5411e8a feat: resolve reliquias no bau sazonal`
+  - cria `seasonal-chest-relic-resolver.js`;
+  - valida `seasonId`, `seasonalChestId`, `chestOrder` e `poolRevision`;
+  - respeita progressão cumulativa e propriedade existente;
+  - coleção completa -> 1 Platina;
+- `d991907 feat: aplica reliquias do bau sazonal`
+  - entrega a relíquia ao perfil de forma idempotente;
+- `e5f3e8e fix: remove duplicacao na aplicacao de reliquias`
+  - remove bloco duplicado introduzido durante trabalho concorrente, preservando uma única validação/aplicação canônica;
+- `fe2681b feat: integra reliquia ao bau sazonal`
+  - integra resolução da relíquia à rota real `!baú abrir`.
+
+Testes novos:
+- `testar_colecao_reliquias.mjs`;
+- `testar_catalogo_reliquias_sazonais.mjs`;
+- `testar_reliquia_bau_sazonal.mjs`;
+- `testar_aplicacao_reliquia_bau_sazonal.mjs`;
+- `testar_rota_reliquia_bau_sazonal.mjs`.
+
+Regressão executada e aprovada também para Cosméticos, Mensagens de Vitória, Finalizadores PvP, plano estrutural do Baú e comando `!baú abrir`.
+
+Com isso, todas as categorias especiais do pool já possuem fluxo real de resolução/entrega: habilidade, consumível, finalizador, mensagem de vitória, cosmético e relíquia, além de XP/dinheiro base do plano.
+
+### Próximo passo canônico
+
+O próximo passo do Worker deve ser tratado separadamente: **finalização/remoção definitiva da instância do Baú Sazonal somente depois que todas as recompensas do `pendingOpen.rewardPlan` estiverem resolvidas e aplicadas**.
+
+Antes dessa finalização, a Platform ainda precisa ganhar o editor visual de `seasonalRelics` para permitir cadastrar nome, descrição, lore e Baú de introdução sem duplicar regra de gameplay.
+
+Nenhum deploy de produção foi executado e nenhuma temporada real foi ativada/agendada.
