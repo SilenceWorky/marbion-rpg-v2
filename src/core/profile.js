@@ -135,6 +135,12 @@ export function createBaseProfile(user) {
       owned: []
     },
 
+    // RELÍQUIAS SAZONAIS
+    // Itens permanentes de coleção/lore.
+    relics: {
+      owned: []
+    },
+
     // PVP
     pvp: {
       wins: 0,
@@ -346,6 +352,20 @@ export function ensureProfileDefaults(profile, user = null) {
         )
           ? profile.cosmetics.owned
           : defaults.cosmetics.owned
+    },
+
+    relics: {
+      ...defaults.relics,
+      ...(
+        profile.relics ||
+        {}
+      ),
+      owned:
+        Array.isArray(
+          profile?.relics?.owned
+        )
+          ? profile.relics.owned
+          : defaults.relics.owned
     },
 
     pvp: {
