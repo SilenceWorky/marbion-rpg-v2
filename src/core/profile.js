@@ -128,6 +128,13 @@ export function createBaseProfile(user) {
       equipped: null
     },
 
+    // COSMÉTICOS
+    // Na v1.0 são apenas colecionáveis.
+    // Equipamento/visual ficam para atualização futura.
+    cosmetics: {
+      owned: []
+    },
+
     // PVP
     pvp: {
       wins: 0,
@@ -325,6 +332,20 @@ export function ensureProfileDefaults(profile, user = null) {
         !Array.isArray(profile.victoryMessages.equipped)
           ? profile.victoryMessages.equipped
           : null
+    },
+
+    cosmetics: {
+      ...defaults.cosmetics,
+      ...(
+        profile.cosmetics ||
+        {}
+      ),
+      owned:
+        Array.isArray(
+          profile?.cosmetics?.owned
+        )
+          ? profile.cosmetics.owned
+          : defaults.cosmetics.owned
     },
 
     pvp: {
